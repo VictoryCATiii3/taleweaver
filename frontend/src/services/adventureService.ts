@@ -40,7 +40,6 @@ export interface Adventure {
   plot?: string
   rules?: string
   intro_text?: string
-  walkthrough?: string
   completed_condition?: string
   gameover_condition?: string
   completed_guard_expression?: string
@@ -95,7 +94,6 @@ export interface AdventureFormData {
   plot: string
   rules: string
   intro_text: string
-  walkthrough: string
   completed_condition: string
   gameover_condition: string
   completed_guard_expression: string
@@ -193,7 +191,6 @@ export const adventureService = {
     plot?: string
     rules?: string
     intro_text?: string
-    walkthrough?: string
     completed_condition?: string
     gameover_condition?: string
     completed_guard_expression?: string

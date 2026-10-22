@@ -222,11 +222,6 @@ def test_switch_without_initial_state_is_not_flagged():
     assert _codes(findings, "switch_unreachable_state") == []
 
 
-def test_short_walkthrough_emits_warn():
-    findings = validate_adventure(_empty_adventure(adventure_overrides={"walkthrough": "Go."}))
-    assert len(_codes(findings, "walkthrough_too_short")) == 1
-
-
 # ---------------------------------------------------------------------------
 # Key progression (softlocks)
 # ---------------------------------------------------------------------------
@@ -274,4 +269,3 @@ def test_container_whose_key_is_inside_itself_is_a_softlock():
     )
     findings = validate_adventure(payload)
     assert [f.location for f in _codes(findings, "container_key_unobtainable")] == ["entity:BOX"]
-

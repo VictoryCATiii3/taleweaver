@@ -10,11 +10,9 @@ from backend.api.routes.adventures.logic import AdventureLogic
 from backend.core.adventure_format import CURRENT_VERSION
 from backend.engine.adventure_updates import (
     check_template_update,
-    find_matching_file_for_template,
     is_legacy_session,
     is_legacy_template,
     is_version_newer,
-    scan_available_adventure_files,
 )
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
@@ -269,7 +267,6 @@ async def test_migrate_legacy_template(auth_client: AsyncClient, db_session):
         title="Forgotten Crypt",
         owner_id=user.id,
         version="1.0.0",
-        walkthrough="Find the silver chalice and place it on the altar.",
         plot="Explore the ancient crypt.",
         completed_condition="Chalice on altar.",
         original_manifest={

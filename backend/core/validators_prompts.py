@@ -35,7 +35,7 @@ CHECK FOR (only emit `warn`-level findings, never invent errors):
    `character` (e.g. goal "destroy the village" but character
    "kind and peaceful").
 
-6. **Plot holes in walkthrough**: Walkthrough steps that reference entities
+6. **Plot holes in sequence walkthroughs**: Sequence walkthrough steps that reference entities
    not present, or that describe a sequence of actions that would be
    impossible given the world's structure.
 
@@ -56,7 +56,7 @@ CHECK FOR (only emit `warn`-level findings, never invent errors):
 10. **Guard expression & script consistency**: For scenes, exits, items, or
     sequences with custom guard expressions or scripts, verify that their intended
     conditions and narrative hints align with how the player solves them in the
-    walkthrough.
+    sequence walkthroughs.
 
 OUTPUT FORMAT:
 Return a SINGLE JSON object (not a bare array) with the following shape:
@@ -126,7 +126,7 @@ Identify any of the issues listed in your system instructions. Return ONLY the J
 AI_FIX_SUGGESTIONS_SYSTEM_PROMPT = """You are an assistant for TaleWeaver's adventure editor.
 
 You are given:
-1. The full context of an adventure (scenes, exits, NPCs, objects, quests, walkthrough, etc.).
+1. The full context of an adventure (scenes, exits, NPCs, objects, quests, sequences, etc.).
 2. A single validation finding produced by an earlier AI pass.
 
 Your job: propose up to 3 DIFFERENT ways to fix the finding. Each option must be a
@@ -164,7 +164,7 @@ RULES
   state. Do not chain dependencies between proposals.
 - Prefer minimally invasive edits: change the fewest fields / shortest texts that solve
   the finding. Do not rewrite entire scenes or rewrites whole quests.
-- For narrative fields (description, walkthrough, plot, rules, intro_text, goal,
+- For narrative fields (description, plot, rules, intro_text, goal,
   character, teaser, dialog hints): keep their existing language and tone; only adjust
   the offending portions.
 - For structural fixes that touch more than one entity (e.g. move an orphaned code
@@ -181,7 +181,7 @@ RULES
       rule_to_unlock
     - protagonist: name, description, goal, character, hp, mana, stamina, strength, intelligence,
       wisdom, dexterity, charisma, armor_class, exp
-    - adventure: title, teaser, plot, rules, intro_text, walkthrough, tts_director_notes,
+    - adventure: title, teaser, plot, rules, intro_text, tts_director_notes,
       completed_condition, gameover_condition
 - Do NOT add fields outside this allowlist. If the fix requires something else,
   pick the closest narrative field and put a short, in-fiction note inside it.
@@ -226,8 +226,8 @@ Intro Text: {intro_text}
 === QUESTS ({quest_count}) ===
 {quests_json}
 
-=== WALKTHROUGH ===
-{walkthrough}
+=== SEQUENCES (with walkthroughs) ===
+{sequences_json}
 
 Produce up to 3 distinct, immediately applicable fix proposals for the finding above.
 Return ONLY the JSON object with a top-level "proposals" key.

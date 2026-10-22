@@ -51,7 +51,7 @@ def _summarize_for_ai(payload: dict, *, max_field_len: int = 1500) -> dict:
     """Trim large text fields on the editor payload before sending it to an LLM.
 
     Keeps the manifest shape but prevents a single oversized ``description``
-    or ``walkthrough`` from blowing out the context window. Also converts
+    or sequence walkthrough from blowing out the context window. Also converts
     ``datetime`` / ``date`` values to ISO-8601 strings so the result is
     JSON-serialisable (SQLAlchemy TimestampMixin fields otherwise break
     ``json.dumps``).
@@ -86,7 +86,6 @@ def _build_ai_validation_prompt(debug_payload: Any) -> str:
         plot=adventure.get("plot", "") or "",
         rules=adventure.get("rules", "") or "",
         intro_text=adventure.get("intro_text", "") or "",
-        walkthrough=adventure.get("walkthrough", "") or "",
         sequence_count=len(sequences_list),
         sequences_json=_dump(sequences_list),
         scene_count=len(summary.get("scenes") or []),

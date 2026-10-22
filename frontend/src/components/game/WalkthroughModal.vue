@@ -153,8 +153,8 @@ function fixNewlines(text: string | null | undefined): string {
 
               <ol v-if="data?.steps && data.steps.length > 0" class="space-y-2">
                 <li v-for="(step, index) in data.steps" :key="index" class="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                  <p class="text-xxs uppercase tracking-widest text-slate-500 font-black">Step {{ index + 1 }}</p>
-                  <p v-if="step.title && step.title !== `Step ${index + 1}`" class="text-sm text-slate-100 font-bold mt-1">{{ step.title }}</p>
+                  <p class="text-xxs uppercase tracking-widest text-slate-500 font-black">Chapter {{ index + 1 }}</p>
+                  <p v-if="step.title" class="text-sm text-slate-100 font-bold mt-1">{{ step.title }}</p>
                   <p class="text-sm text-slate-300 mt-1 leading-relaxed whitespace-pre-wrap">
                     <template v-for="(part, partIndex) in parseWalkthroughContent(step.content || '')" :key="`${index}-${partIndex}`">
                       <span v-if="part.type === 'text'">{{ fixNewlines(part.text) }}</span>

@@ -715,7 +715,6 @@ class GameTurnManager:
                     plot=snapshot_adventure.get("plot") or self.state.plot,
                     rules=snapshot_adventure.get("rules") or self.state.rules,
                     intro_text=snapshot_adventure.get("intro_text"),
-                    walkthrough=snapshot_adventure.get("walkthrough") or self.state.walkthrough,
                     completed_condition=snapshot_adventure.get("completed_condition")
                     or self.state.completed_condition,
                     gameover_condition=snapshot_adventure.get("gameover_condition")

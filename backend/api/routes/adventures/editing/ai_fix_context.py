@@ -93,7 +93,6 @@ def _summarize_world_for_fix(payload: Any) -> dict[str, Any]:
         "plot",
         "rules",
         "intro_text",
-        "walkthrough",
         "tts_director_notes",
         "completed_condition",
         "gameover_condition",
@@ -201,8 +200,8 @@ def _format_world_context_block(summary: dict[str, Any]) -> str:
         f"{json.dumps(summary.get('objects') or [], ensure_ascii=False)}\n\n"
         f"=== QUESTS ({len(summary.get('quests') or [])}) ===\n"
         f"{json.dumps(summary.get('quests') or [], ensure_ascii=False)}\n\n"
-        f"=== WALKTHROUGH ===\n"
-        f"{adventure.get('walkthrough', '') or ''}\n"
+        f"=== SEQUENCES (with walkthroughs) ===\n"
+        f"{json.dumps(adventure.get('sequences') or [], ensure_ascii=False)}\n"
     )
 
 
@@ -339,7 +338,7 @@ def _format_focused_world_block(
         f"=== STORY METADATA ===\n"
         f"Plot: {_short_state(adventure.get('plot') or '', limit=600)}\n"
         f"Rules: {_short_state(adventure.get('rules') or '', limit=400)}\n"
-        f"Walkthrough: {_short_state(adventure.get('walkthrough') or '', limit=1200)}\n\n"
+        f"Sequences: {_short_state(json.dumps(adventure.get('sequences') or [], ensure_ascii=False), limit=1200)}\n\n"
         f"{target_block}\n"
         f"=== ADJACENT ENTITIES ===\n"
         f"{neighbor_block or '(none)'}\n"

@@ -388,9 +388,7 @@ def _record_to_dict(obj: Any) -> dict[str, Any] | None:
         decor = data.get("decorative_objects")
         if not isinstance(decor, list):
             decor = []
-        data["decorative_objects"] = [
-            str(d) for d in decor if isinstance(d, (str, int, float))
-        ]
+        data["decorative_objects"] = [str(d) for d in decor if isinstance(d, (str, int, float))]
     if isinstance(obj, WorldExit):
         exit_type = str(getattr(obj, "exit_type", "one_way") or "one_way").strip().lower()
         data["exit_type"] = exit_type
@@ -442,7 +440,6 @@ def _build_adventure_section(adv: AdventureTemplate) -> dict[str, Any]:
         "plot": adv.plot,
         "rules": adv.rules,
         "intro_text": adv.intro_text,
-        "walkthrough": adv.walkthrough,
         "completed_condition": adv.completed_condition,
         "gameover_condition": adv.gameover_condition,
         "completed_guard_expression": adv.completed_guard_expression,
@@ -527,13 +524,17 @@ def _localize_manifest_images(
     manifest: dict[str, Any], adventure_dir: str, asset_mapping: dict[str, str]
 ) -> None:
     adventure = manifest["adventure"]
-    adventure["image_url"] = _localize_asset_path(adventure.get("image_url"), adventure_dir, asset_mapping)
+    adventure["image_url"] = _localize_asset_path(
+        adventure.get("image_url"), adventure_dir, asset_mapping
+    )
     if manifest["protagonist"]:
         manifest["protagonist"]["profile_image"] = _localize_asset_path(
             manifest["protagonist"].get("profile_image"), adventure_dir, asset_mapping
         )
     for record in [*manifest["scenes"], *manifest["npcs"], *manifest["objects"]]:
-        record["image_url"] = _localize_asset_path(record.get("image_url"), adventure_dir, asset_mapping)
+        record["image_url"] = _localize_asset_path(
+            record.get("image_url"), adventure_dir, asset_mapping
+        )
 
 
 class AdventureExporter:
@@ -569,9 +570,7 @@ class AdventureExporter:
         )
         avatar = avatar_res.scalars().first()
 
-        inventory, equipment = (
-            _normalize_avatar_loadout(avatar, entities) if avatar else ([], {})
-        )
+        inventory, equipment = _normalize_avatar_loadout(avatar, entities) if avatar else ([], {})
 
         # Build standard manifest structure according to docs/specs/adventure_format.md
         manifest = {

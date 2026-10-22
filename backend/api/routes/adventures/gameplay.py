@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from collections.abc import AsyncGenerator
 from typing import Any, cast
 from uuid import uuid4
@@ -62,6 +61,10 @@ from backend.core.prompts import (
     BABLE_FISH_TRANSLATION_USER_PROMPT_TEMPLATE,
 )
 from backend.engine.adventure_updates import is_legacy_session
+from backend.engine.sequence_walkthrough import (
+    format_walkthrough_steps,
+    sequence_walkthrough_steps,
+)
 from backend.engine.trigger_service import TriggerService
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
@@ -338,56 +341,6 @@ async def translate_text(
     return TranslateTextResponse(translated_text=cleaned or source_text, language=target_language)
 
 
-_WALKTHROUGH_STEP_RE = re.compile(r"^(?:(?:Schritt|Step)\s*\d+[:.]?|\d+[.)])\s*(.*)", re.IGNORECASE)
-
-
-def _walkthrough_heading(stripped: str) -> tuple[str, bool] | None:
-    """Returns (title, keep the line as content) when the line starts a new step."""
-    step_match = _WALKTHROUGH_STEP_RE.match(stripped)
-    if step_match:
-        title = step_match.group(1).strip()
-        return title, not title
-    if stripped.startswith(("# ", "## ", "### ")):
-        return stripped.lstrip("#").strip(), False
-    return None
-
-
-def _append_walkthrough_step(steps: list[dict[str, str]], title: str, content: list[str]) -> None:
-    if content or title:
-        steps.append(
-            {"title": title or f"Step {len(steps) + 1}", "content": "\n".join(content).strip()}
-        )
-
-
-def _parse_walkthrough_steps(text: str) -> list[dict[str, str]]:
-    """Parse walkthrough markdown/text into structured steps if possible."""
-    if not text or not text.strip():
-        return []
-    steps: list[dict[str, str]] = []
-    current_title = ""
-    current_content: list[str] = []
-
-    for line in text.strip().splitlines():
-        stripped = line.strip()
-        heading = _walkthrough_heading(stripped)
-        if heading is None:
-            current_content.append(line)
-            continue
-        _append_walkthrough_step(steps, current_title, current_content)
-        new_title, keep_line = heading
-        current_title = new_title or f"Step {len(steps) + 1}"
-        current_content = [stripped] if keep_line else []
-
-    _append_walkthrough_step(steps, current_title, current_content)
-
-    if len(steps) <= 1:
-        paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
-        if len(paragraphs) > 1:
-            steps = [{"title": f"Step {i + 1}", "content": p} for i, p in enumerate(paragraphs)]
-
-    return steps
-
-
 @router.get("/{game_id}/walkthrough")
 async def get_walkthrough(
     game_id: str,
@@ -407,7 +360,13 @@ async def get_walkthrough(
     row = res.first()
     session, avatar = row if row else (None, None)
 
-    if not state.walkthrough or not state.walkthrough.strip():
+    adventure = None
+    if state.template_id:
+        adventure = await db.get(AdventureTemplate, state.template_id)
+    all_steps = sequence_walkthrough_steps(
+        getattr(adventure, "sequences", None), state.active_sequence_id
+    )
+    if not all_steps:
         return {
             "available": False,
             "revealed": False,
@@ -419,16 +378,14 @@ async def get_walkthrough(
         }
 
     is_revealed = bool(state.is_walkthrough_revealed or settings.TALEWEAVER_DEBUG_ENABLED)
-    steps = _parse_walkthrough_steps(state.walkthrough) if is_revealed else []
-
     if is_revealed:
         return {
             "available": True,
             "revealed": True,
             "current_xp": avatar.exp if avatar else 0,
             "reveal_cost": WALKTHROUGH_REVEAL_COST,
-            "walkthrough": state.walkthrough,
-            "steps": steps,
+            "walkthrough": format_walkthrough_steps(all_steps),
+            "steps": all_steps,
             "message": "Walkthrough unlocked.",
             "preview": "Walkthrough unlocked.",
         }

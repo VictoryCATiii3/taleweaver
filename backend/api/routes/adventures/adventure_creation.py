@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.routes.adventures.logic import AdventureLogic
 from backend.api.routes.adventures.schemas import CreateAdventureTemplatePayload
+from backend.api.routes.adventures.session_assets import copy_data_asset_to_session
 from backend.api.routes.adventures.session_materializer import (
-    copy_data_asset_to_session,
     materialize_initial_session_from_template,
 )
 from backend.core.config import settings
@@ -211,7 +211,6 @@ def _build_session_state(
         ),
         plot=adv.plot,
         rules=adv.rules,
-        walkthrough=adv.walkthrough,
         completed_condition=adv.completed_condition,
         gameover_condition=adv.gameover_condition,
         completed_guard_expression=adv.completed_guard_expression,

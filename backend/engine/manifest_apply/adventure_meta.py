@@ -12,6 +12,7 @@ from backend.engine.image_prompt_context import clean_appearance
 from backend.engine.manifest_apply.assets import is_usable_image_url, resolve_source_asset_image
 from backend.engine.manifest_apply.context import ApplyContext, generator_module
 from backend.engine.manifest_apply.visuals import publish_status, t2i_config
+from backend.engine.sequence_walkthrough import apply_legacy_walkthrough
 from backend.models.adventure_template import AdventureTemplate
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,6 @@ _NARRATIVE_FIELDS = (
     "plot",
     "rules",
     "intro_text",
-    "walkthrough",
     "completed_condition",
     "gameover_condition",
     "completed_guard_expression",
@@ -57,7 +57,6 @@ _RUNTIME_SETTINGS: tuple[tuple[str, Optional[Callable[[Any], Any]], bool], ...] 
 _SESSION_SYNC_FIELDS = (
     "plot",
     "rules",
-    "walkthrough",
     "completed_condition",
     "gameover_condition",
     "completed_guard_expression",
@@ -125,21 +124,8 @@ def _apply_narrative(ctx: ApplyContext, adventure: AdventureTemplate) -> None:
         setattr(adventure, key, adventure_field(ctx.manifest, key) or getattr(adventure, key))
     adventure.cover_appearance = clean_appearance(adventure.cover_appearance)  # type: ignore[assignment]
 
-    walkthrough = adventure_field(ctx.manifest, "walkthrough")
-    if getattr(adventure, "sequences", None) or not walkthrough:
-        return
     # Legacy manifests with a walkthrough but no sequences get a single main sequence.
-    adventure.sequences = [  # type: ignore[assignment]
-        {
-            "id": "SEQ_1_MAIN",
-            "order": 1,
-            "title": "Main Journey",
-            "description": adventure.plot or "Follow the adventure storyline.",
-            "walkthrough": walkthrough,
-            "end_condition": adventure.completed_condition or "Achieve the victory condition.",
-            "exp_reward": 500,
-        }
-    ]
+    apply_legacy_walkthrough(adventure, adventure_field(ctx.manifest, "walkthrough"))
 
 
 def _apply_runtime_settings(ctx: ApplyContext, adventure: AdventureTemplate) -> None:

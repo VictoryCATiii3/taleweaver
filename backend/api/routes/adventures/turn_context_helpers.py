@@ -118,7 +118,6 @@ def resolve_sequence_guidance(adventure: Any, state: Any) -> tuple[str, str]:
         walkthrough = active_seq.get("walkthrough", "")
         end_condition = _sequence_end_condition(active_seq)
 
-    walkthrough = walkthrough or state.walkthrough or adventure.walkthrough
     prefix = _STRICTNESS_PREFIXES.get(getattr(adventure, "generation_strictness", None) or "")
     if walkthrough and prefix:
         walkthrough = f"{prefix}{walkthrough}"

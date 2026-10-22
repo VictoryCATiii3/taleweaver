@@ -208,7 +208,6 @@ def _create_cloned_template_entity(
         plot=original.plot,
         rules=original.rules,
         intro_text=original.intro_text,
-        walkthrough=original.walkthrough,
         completed_condition=original.completed_condition,
         gameover_condition=original.gameover_condition,
         completed_guard_expression=original.completed_guard_expression,

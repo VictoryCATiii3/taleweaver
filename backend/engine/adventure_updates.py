@@ -17,6 +17,7 @@ from backend.api.routes.adventures.logic import AdventureLogic
 from backend.core.adventure_format import CURRENT_VERSION
 from backend.core.config import settings
 from backend.engine.adventure_importer import AdventureTemplateImporter
+from backend.engine.sequence_walkthrough import legacy_main_sequence
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.game_session import GameSession
 from backend.models.session_state import SessionState
@@ -24,9 +25,9 @@ from backend.models.session_state import SessionState
 logger = logging.getLogger(__name__)
 
 # Cache scanned file entries for 5 seconds to prevent repeated disk/zip operations during batch requests
-_SCANNED_FILES_CACHE: list[dict[str, Any]] = []
-_SCANNED_FILES_TIMESTAMP: float = 0.0
+_SCAN_CACHE: dict[str, Any] = {"entries": [], "timestamp": 0.0}
 _CACHE_TTL_SECONDS = 5.0
+_ADVENTURE_FILE_EXTENSIONS = (".adz", ".adv")
 
 
 def _parse_version_tuple(v: Optional[str]) -> tuple[int, ...]:
@@ -37,6 +38,25 @@ def _parse_version_tuple(v: Optional[str]) -> tuple[int, ...]:
     if not parts:
         return (0,)
     return tuple(int(p) for p in parts)
+
+
+def _format_version_newer(file_format: Optional[str], db_format: Optional[str]) -> bool:
+    """True when both manifest format versions parse and the file's is strictly newer."""
+    if not (file_format and db_format):
+        return False
+    try:
+        return parse_semver(str(file_format).strip()) > parse_semver(str(db_format).strip())
+    except InvalidVersion:
+        logger.debug("Unparseable format versions: %r vs %r", file_format, db_format)
+        return False
+
+
+def _version_greater(file_version: str, db_version: str) -> bool:
+    """Semantic comparison, falling back to numeric tuples for non-PEP 440 versions."""
+    try:
+        return parse_semver(file_version) > parse_semver(db_version)
+    except InvalidVersion:
+        return _parse_version_tuple(file_version) > _parse_version_tuple(db_version)
 
 
 def is_version_newer(
@@ -57,57 +77,18 @@ def is_version_newer(
     """
     if file_has_sequences and not db_has_sequences:
         return True
-
-    # If the file manifest format version is higher than DB manifest format version
-    if file_format_version and db_format_version:
-        try:
-            pv_file_fmt = parse_semver(str(file_format_version).strip())
-            pv_db_fmt = parse_semver(str(db_format_version).strip())
-            if pv_file_fmt > pv_db_fmt:
-                return True
-        except Exception:
-            pass
-
-    if not file_version or not str(file_version).strip():
-        return False
-
-    if not db_version or not str(db_version).strip():
+    if _format_version_newer(file_format_version, db_format_version):
         return True
-
-    clean_file_ver = str(file_version).strip()
-    clean_db_ver = str(db_version).strip()
-
-    try:
-        pv_file = parse_semver(clean_file_ver)
-        pv_db = parse_semver(clean_db_ver)
-        if pv_file > pv_db:
-            return True
-        if pv_file == pv_db and file_has_sequences and not db_has_sequences:
-            return True
+    clean_file_ver = str(file_version or "").strip()
+    if not clean_file_ver:
         return False
-    except InvalidVersion:
-        # Fall back to numeric tuple comparison
-        vt_file = _parse_version_tuple(clean_file_ver)
-        vt_db = _parse_version_tuple(clean_db_ver)
-        if vt_file > vt_db:
-            return True
-        if vt_file == vt_db and file_has_sequences and not db_has_sequences:
-            return True
-        return False
+    clean_db_ver = str(db_version or "").strip()
+    if not clean_db_ver:
+        return True
+    return _version_greater(clean_file_ver, clean_db_ver)
 
 
-def scan_available_adventure_files(force_refresh: bool = False) -> list[dict[str, Any]]:
-    """Recursively scans /adventures and /presets directories for .adz and .adv files."""
-    global _SCANNED_FILES_CACHE, _SCANNED_FILES_TIMESTAMP
-
-    now = time.time()
-    if (
-        not force_refresh
-        and (now - _SCANNED_FILES_TIMESTAMP) < _CACHE_TTL_SECONDS
-        and _SCANNED_FILES_CACHE
-    ):
-        return _SCANNED_FILES_CACHE
-
+def _adventure_directories() -> list[str]:
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     candidate_dirs = [
         "adventures",
@@ -115,70 +96,80 @@ def scan_available_adventure_files(force_refresh: bool = False) -> list[dict[str
         os.path.join(settings.DATA_DIR, "presets", "adventures"),
         os.path.join(settings.DATA_DIR, "adventures"),
     ]
-    seen_dirs = set()
-    directories = []
-    for d in candidate_dirs:
-        norm = os.path.abspath(d)
-        if norm not in seen_dirs and os.path.exists(norm):
-            seen_dirs.add(norm)
+    directories: list[str] = []
+    for candidate in candidate_dirs:
+        norm = os.path.abspath(candidate)
+        if norm not in directories and os.path.exists(norm):
             directories.append(norm)
+    return directories
+
+
+def _read_manifest(file_path: str, ext: str) -> Optional[dict[str, Any]]:
+    """Loads the adventure manifest from an .adv file or the adventure.adv inside an .adz."""
+    if ext != ".adz":
+        with open(file_path, encoding="utf-8") as f:
+            return json.load(f)
+    with open(file_path, "rb") as f, zipfile.ZipFile(io.BytesIO(f.read()), "r") as zf:
+        if "adventure.adv" not in zf.namelist():
+            return None
+        return json.loads(zf.read("adventure.adv").decode("utf-8"))
+
+
+def _scan_entry(
+    file_path: str, filename: str, manifest: dict[str, Any]
+) -> Optional[dict[str, Any]]:
+    is_session = manifest.get("type") == "SESSION_BUNDLE"
+    adv_data = (
+        manifest.get("adventure", {}) if is_session else (manifest.get("adventure") or manifest)
+    )
+    title = adv_data.get("title") or manifest.get("title")
+    if not title or not isinstance(title, str):
+        return None
+
+    origin_id = adv_data.get("origin_id") or manifest.get("origin_id")
+    version = adv_data.get("version") or manifest.get("version")
+    sequences = adv_data.get("sequences") or manifest.get("sequences") or []
+    return {
+        "file_path": file_path,
+        "filename": filename,
+        "stem": os.path.splitext(filename)[0],
+        "title": title.strip(),
+        "origin_id": str(origin_id).strip() if origin_id else None,
+        "version": str(version).strip() if version else None,
+        "format_version": str(manifest.get("version") or "").strip(),
+        "sequences": sequences,
+        "has_sequences": isinstance(sequences, list) and len(sequences) > 0,
+    }
+
+
+def _scan_file(root: str, filename: str) -> Optional[dict[str, Any]]:
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in _ADVENTURE_FILE_EXTENSIONS:
+        return None
+    file_path = os.path.abspath(os.path.join(root, filename))
+    try:
+        manifest = _read_manifest(file_path, ext)
+        return _scan_entry(file_path, filename, manifest) if manifest else None
+    except Exception as exc:
+        logger.debug("Could not parse adventure candidate %s: %s", file_path, exc)
+        return None
+
+
+def scan_available_adventure_files(force_refresh: bool = False) -> list[dict[str, Any]]:
+    """Recursively scans /adventures and /presets directories for .adz and .adv files."""
+    now = time.time()
+    cached = _SCAN_CACHE["entries"]
+    if not force_refresh and cached and (now - _SCAN_CACHE["timestamp"]) < _CACHE_TTL_SECONDS:
+        return cached
 
     scanned: list[dict[str, Any]] = []
-
-    for base_dir in directories:
+    for base_dir in _adventure_directories():
         for root, _, files in os.walk(base_dir):
-            for filename in files:
-                ext = os.path.splitext(filename)[1].lower()
-                if ext not in (".adz", ".adv"):
-                    continue
+            entries = (_scan_file(root, filename) for filename in files)
+            scanned.extend(entry for entry in entries if entry)
 
-                file_path = os.path.abspath(os.path.join(root, filename))
-                try:
-                    if ext == ".adz":
-                        with open(file_path, "rb") as f:
-                            with zipfile.ZipFile(io.BytesIO(f.read()), "r") as zf:
-                                if "adventure.adv" not in zf.namelist():
-                                    continue
-                                manifest = json.loads(zf.read("adventure.adv").decode("utf-8"))
-                    else:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            manifest = json.load(f)
-
-                    is_session = manifest.get("type") == "SESSION_BUNDLE"
-                    adv_data = (
-                        manifest.get("adventure", {})
-                        if is_session
-                        else (manifest.get("adventure") or manifest)
-                    )
-
-                    title = adv_data.get("title") or manifest.get("title")
-                    if not title or not isinstance(title, str):
-                        continue
-
-                    origin_id = adv_data.get("origin_id") or manifest.get("origin_id")
-                    version = adv_data.get("version") or manifest.get("version")
-                    format_version = str(manifest.get("version") or "").strip()
-                    sequences = adv_data.get("sequences") or manifest.get("sequences") or []
-                    has_sequences = isinstance(sequences, list) and len(sequences) > 0
-
-                    scanned.append(
-                        {
-                            "file_path": file_path,
-                            "filename": filename,
-                            "stem": os.path.splitext(filename)[0],
-                            "title": title.strip(),
-                            "origin_id": str(origin_id).strip() if origin_id else None,
-                            "version": str(version).strip() if version else None,
-                            "format_version": format_version,
-                            "sequences": sequences,
-                            "has_sequences": has_sequences,
-                        }
-                    )
-                except Exception as exc:
-                    logger.debug("Could not parse adventure candidate %s: %s", file_path, exc)
-
-    _SCANNED_FILES_CACHE = scanned
-    _SCANNED_FILES_TIMESTAMP = now
+    _SCAN_CACHE["entries"] = scanned
+    _SCAN_CACHE["timestamp"] = now
     return scanned
 
 
@@ -223,8 +214,6 @@ def find_matching_file_for_template(
 
     # Pick candidate with newest version or sequence support
     best = candidates[0]
-    db_has_seq = bool(template.sequences and len(template.sequences) > 0)
-    db_fmt_ver = (template.original_manifest or {}).get("version")
     for cand in candidates[1:]:
         if is_version_newer(
             file_version=cand.get("version"),
@@ -255,13 +244,9 @@ def is_legacy_template(template: AdventureTemplate) -> bool:
             if str(manifest_version) < CURRENT_VERSION:
                 return True
 
-    # If it was imported (has origin_id or manifest) and lacks sequences:
-    if (template.origin_id or template.original_manifest) and not (
-        template.sequences and len(template.sequences) > 0
-    ):
-        return True
-
-    return False
+    # Imported (has origin_id or manifest) but lacks sequences:
+    is_imported = bool(template.origin_id or template.original_manifest)
+    return is_imported and not template.sequences
 
 
 def is_legacy_session(
@@ -362,9 +347,10 @@ async def update_single_adventure(
     NOTE: Existing game sessions are NOT updated. Their narrative snapshot and state
     remain preserved as-is.
     """
+    from sqlalchemy import update
+
     from backend.models.game_session import GameSession
     from backend.models.session_state import SessionState
-    from sqlalchemy import update
 
     result = await db.execute(
         select(AdventureTemplate).where(
@@ -499,25 +485,14 @@ async def migrate_single_adventure(
     manifest = template.original_manifest or {}
     adv_manifest = manifest.get("adventure") if isinstance(manifest.get("adventure"), dict) else {}
 
-    walkthrough_text = (
-        template.walkthrough or adv_manifest.get("walkthrough") or manifest.get("walkthrough") or ""
-    )
-
-    if not template.sequences or len(template.sequences) == 0:
-        sequence_1 = {
-            "id": "SEQ_1_MAIN",
-            "order": 1,
-            "title": "Main Journey",
-            "description": template.plot
-            or adv_manifest.get("plot")
-            or "Follow the adventure storyline.",
-            "walkthrough": walkthrough_text or "Follow the main storyline.",
-            "end_condition": template.completed_condition
-            or adv_manifest.get("completed_condition")
-            or "Achieve the victory condition.",
-            "exp_reward": 500,
-        }
-        template.sequences = [sequence_1]
+    if not template.sequences:
+        template.sequences = [
+            legacy_main_sequence(
+                adv_manifest.get("walkthrough") or manifest.get("walkthrough") or "",
+                template.plot or adv_manifest.get("plot"),
+                template.completed_condition or adv_manifest.get("completed_condition"),
+            )
+        ]
 
     # Synchronize manifest format version and sequences
     if template.original_manifest and isinstance(template.original_manifest, dict):

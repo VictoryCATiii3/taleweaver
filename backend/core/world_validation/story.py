@@ -15,14 +15,12 @@ from backend.schemas.validation import ValidationFinding
 
 DECORATIVE_OBJECTS_CAP = 7
 RULES_MIN_LENGTH = 100
-WALKTHROUGH_MIN_LENGTH = 50
 
 _STORY_FIELDS = (
     "teaser",
     "rules",
     "plot",
     "intro_text",
-    "walkthrough",
     "completed_condition",
     "gameover_condition",
 )
@@ -33,11 +31,6 @@ _GUARD_REPLACES = {
 }
 _MIN_LENGTHS = {
     "rules": (RULES_MIN_LENGTH, "rules_too_short", "RPG mode typically needs more guidance"),
-    "walkthrough": (
-        WALKTHROUGH_MIN_LENGTH,
-        "walkthrough_too_short",
-        "secret GM notes look thin",
-    ),
 }
 # Hard rule field -> (kind label, attribute of ValidationContext holding valid IDs).
 _HARD_RULE_FIELDS = {

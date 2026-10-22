@@ -27,7 +27,6 @@ async def _seed_adventure(db: AsyncSession, *, owner: User) -> str:
         rules="r" * 200,
         plot="p",
         intro_text="i",
-        walkthrough="w" * 100,
         completed_condition="done",
         gameover_condition="lost",
         tts_director_notes="notes",

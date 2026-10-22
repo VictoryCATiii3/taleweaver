@@ -36,7 +36,6 @@ async def _seed_simple_adventure(db: AsyncSession, *, owner: User) -> str:
         rules="r",
         plot="p",
         intro_text="i",
-        walkthrough="w",
         completed_condition="done",
         gameover_condition="lost",
         tts_director_notes="notes",
@@ -215,7 +214,7 @@ async def test_suggest_fix_rejects_more_than_three(client, setup_test_db, monkey
                     "target_type": "adventure",
                     "target_id": None,
                     "description": "noop",
-                    "field_updates": {"walkthrough": f"new walkthrough {i}"},
+                    "field_updates": {"intro_text": f"new intro {i}"},
                 }
             ]
 
@@ -1374,15 +1373,15 @@ async def test_apply_fix_to_adventure_field(client, setup_test_db):
         tpl_id = await _seed_simple_adventure(db, owner=user)
 
     chosen_proposal = {
-        "title": "Update walkthrough",
-        "summary": "Rewrite the walkthrough section.",
+        "title": "Update intro",
+        "summary": "Rewrite the intro text.",
         "rationale": None,
         "patches": [
             {
                 "target_type": "adventure",
                 "target_id": None,
-                "description": "Replace the walkthrough.",
-                "field_updates": {"walkthrough": "Step 1: greet the librarian."},
+                "description": "Replace the intro text.",
+                "field_updates": {"intro_text": "Step 1: greet the librarian."},
             }
         ],
     }
@@ -1403,7 +1402,7 @@ async def test_apply_fix_to_adventure_field(client, setup_test_db):
     async with TestSessionLocal() as db:
         tpl_res = await db.get(AdventureTemplate, tpl_id)
         assert tpl_res is not None
-        assert tpl_res.walkthrough == "Step 1: greet the librarian."
+        assert tpl_res.intro_text == "Step 1: greet the librarian."
 
 
 async def test_apply_fix_rejects_unknown_field(client, setup_test_db):

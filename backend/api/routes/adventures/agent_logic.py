@@ -207,6 +207,7 @@ def _build_agent_objective_and_walkthrough(
     if active_seq:
         seq_title = active_seq.get("title") or active_seq.get("name") or ""
 
+    walkthrough_text = "No specific walkthrough available for this sequence."
     if seq_walkthrough:
         header = (
             f"CURRENT SEQUENCE WALKTHROUGH ({seq_title}):"
@@ -214,11 +215,6 @@ def _build_agent_objective_and_walkthrough(
             else "CURRENT SEQUENCE WALKTHROUGH:"
         )
         walkthrough_text = f"{header}\n{seq_walkthrough}"
-    else:
-        fallback = state.walkthrough or getattr(adventure, "walkthrough", "")
-        walkthrough_text = (
-            fallback if fallback else "No specific walkthrough available for this sequence."
-        )
 
     objective = (
         "Your objective is to play through the adventure as efficiently and purposefully as possible, "

@@ -9,11 +9,10 @@ import json
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.auth import create_access_token
-from backend.main import app
 from backend.core.database import get_db
+from backend.main import app
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.user import User
 from backend.models.validation_run import ValidationRun
@@ -65,7 +64,6 @@ async def _seed_template_with_run(*, structural: list[dict], ai: list[dict]) -> 
             rules="r",
             plot="p",
             intro_text="i",
-            walkthrough="w",
             completed_condition="done",
             gameover_condition="lost",
             tts_director_notes="notes",
@@ -97,8 +95,18 @@ async def test_delete_single_structural_finding(client, setup_test_db):
     """A single structural finding can be removed by (source, code, location)."""
     user_id, tpl_id = await _seed_template_with_run(
         structural=[
-            {"severity": "warn", "code": "unreachable_scene", "message": "Scene ORPHAN is unreachable.", "location": "scene:ORPHAN"},
-            {"severity": "error", "code": "dead_end", "message": "Scene X has no exit.", "location": "scene:START"},
+            {
+                "severity": "warn",
+                "code": "unreachable_scene",
+                "message": "Scene ORPHAN is unreachable.",
+                "location": "scene:ORPHAN",
+            },
+            {
+                "severity": "error",
+                "code": "dead_end",
+                "message": "Scene X has no exit.",
+                "location": "scene:START",
+            },
         ],
         ai=[],
     )
@@ -129,10 +137,20 @@ async def test_delete_single_ai_finding(client, setup_test_db):
     """AI bucket is independent of structural bucket and uses the same matching rule."""
     user_id, tpl_id = await _seed_template_with_run(
         structural=[
-            {"severity": "warn", "code": "unreachable_scene", "message": "Scene ORPHAN is unreachable.", "location": "scene:ORPHAN"},
+            {
+                "severity": "warn",
+                "code": "unreachable_scene",
+                "message": "Scene ORPHAN is unreachable.",
+                "location": "scene:ORPHAN",
+            },
         ],
         ai=[
-            {"severity": "warn", "code": "narrative_contradiction", "message": "AI feels the stakes are too low.", "location": "scene:START"},
+            {
+                "severity": "warn",
+                "code": "narrative_contradiction",
+                "message": "AI feels the stakes are too low.",
+                "location": "scene:START",
+            },
         ],
     )
     headers = _auth_headers("validation_findings_user")
@@ -170,9 +188,7 @@ async def test_delete_does_not_match_across_buckets(client, setup_test_db):
         f"/api/adventures/{tpl_id}/editor/validation/latest/findings/delete",
         headers=headers,
         json={
-            "findings": [
-                {"source": "structural", "code": "X", "location": "scene:START"}
-            ],
+            "findings": [{"source": "structural", "code": "X", "location": "scene:START"}],
             "delete_all": False,
         },
     )
@@ -198,9 +214,7 @@ async def test_delete_empty_location_matches_unscoped_findings(client, setup_tes
         f"/api/adventures/{tpl_id}/editor/validation/latest/findings/delete",
         headers=headers,
         json={
-            "findings": [
-                {"source": "structural", "code": "ADV_GLOBAL", "location": ""}
-            ],
+            "findings": [{"source": "structural", "code": "ADV_GLOBAL", "location": ""}],
             "delete_all": False,
         },
     )
@@ -281,9 +295,7 @@ async def test_delete_nonexistent_signature_is_noop(client, setup_test_db):
         f"/api/adventures/{tpl_id}/editor/validation/latest/findings/delete",
         headers=headers,
         json={
-            "findings": [
-                {"source": "structural", "code": "GHOST", "location": "x"}
-            ],
+            "findings": [{"source": "structural", "code": "GHOST", "location": "x"}],
             "delete_all": False,
         },
     )
@@ -308,9 +320,7 @@ async def test_delete_then_latest_does_not_return_deleted(client, setup_test_db)
         f"/api/adventures/{tpl_id}/editor/validation/latest/findings/delete",
         headers=headers,
         json={
-            "findings": [
-                {"source": "structural", "code": "DROPPED", "location": "scene:X"}
-            ],
+            "findings": [{"source": "structural", "code": "DROPPED", "location": "scene:X"}],
             "delete_all": False,
         },
     )
@@ -365,7 +375,6 @@ async def test_delete_with_no_persisted_run_is_clean_noop(client, setup_test_db)
             rules="r",
             plot="p",
             intro_text="i",
-            walkthrough="w",
             completed_condition="done",
             gameover_condition="lost",
             tts_director_notes="notes",

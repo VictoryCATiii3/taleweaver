@@ -1,34 +1,64 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
-from backend.api.routes.adventures.gameplay import _parse_walkthrough_steps
-from backend.api.routes.adventures.gameplay_logic import GameTurnManager, WALKTHROUGH_REVEAL_COST
+from backend.api.routes.adventures.gameplay_logic import GameTurnManager
 from backend.core.auth import get_password_hash
+from backend.engine.sequence_walkthrough import (
+    apply_legacy_walkthrough,
+    format_walkthrough_steps,
+    sequence_walkthrough_steps,
+)
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
 from backend.models.game_session import GameSession
 from backend.models.session_state import SessionState
 from backend.models.user import User
 
-def test_parse_walkthrough_steps_numbered():
-    raw = (
-        "1. Examine the room and search the desk.\n"
-        "2. Take the brass key and unlock door.\n"
-        "3. Escape the dungeon."
-    )
-    steps = _parse_walkthrough_steps(raw)
-    assert len(steps) == 3
-    assert steps[0]["title"] == "Examine the room and search the desk."
+_SEQUENCES = [
+    {"id": "SEQ_2", "order": 2, "title": "The Vault", "walkthrough": "Open the vault."},
+    {
+        "id": "SEQ_1",
+        "order": 1,
+        "title": "The Temple",
+        "walkthrough": "1. Enter temple\n2. Solve puzzle",
+    },
+    {"id": "SEQ_3", "order": 3, "title": "Epilogue", "walkthrough": ""},
+]
 
 
-def test_parse_walkthrough_steps_paragraphs():
-    raw = "First part of walkthrough.\n\nSecond part of walkthrough."
-    steps = _parse_walkthrough_steps(raw)
-    assert len(steps) == 2
-    assert steps[0]["title"] == "Step 1"
-    assert steps[0]["content"] == "First part of walkthrough."
-    assert steps[1]["title"] == "Step 2"
-    assert steps[1]["content"] == "Second part of walkthrough."
+def test_sequence_walkthrough_steps_follow_story_order_and_mark_active():
+    # Act
+    steps = sequence_walkthrough_steps(_SEQUENCES, active_sequence_id="SEQ_2")
+
+    # Assert
+    assert [step["title"] for step in steps] == ["The Temple", "The Vault (current)"]
+    assert steps[0]["content"] == "1. Enter temple\n2. Solve puzzle"
+
+
+def test_sequence_walkthrough_steps_default_to_first_sequence_and_format():
+    # Act
+    steps = sequence_walkthrough_steps(_SEQUENCES)
+    text = format_walkthrough_steps(steps)
+
+    # Assert
+    assert steps[0]["title"] == "The Temple (current)"
+    assert text.startswith("## The Temple (current)\n1. Enter temple")
+    assert sequence_walkthrough_steps(None) == []
+
+
+def test_apply_legacy_walkthrough_only_converts_templates_without_sequences():
+    # Arrange
+    legacy = AdventureTemplate(id="legacy", title="Legacy", plot="Old plot", sequences=None)
+    modern = AdventureTemplate(id="modern", title="Modern", sequences=list(_SEQUENCES))
+
+    # Act
+    apply_legacy_walkthrough(legacy, "Do everything.")
+    apply_legacy_walkthrough(modern, "Ignored.")
+
+    # Assert
+    assert legacy.sequences[0]["id"] == "SEQ_1_MAIN"
+    assert legacy.sequences[0]["walkthrough"] == "Do everything."
+    assert legacy.sequences[0]["description"] == "Old plot"
+    assert modern.sequences == _SEQUENCES
 
 
 @pytest.mark.asyncio
@@ -46,8 +76,15 @@ async def test_walkthrough_reveal_deducts_150_xp_and_grants_negative_award(setup
             id="adv-walkthrough",
             title="Walkthrough Adventure",
             owner_id="owner",
-            walkthrough="1. Enter temple\n2. Solve puzzle",
-            awards=[{"key": "GOLD_EXPLORER", "title": "Gold Explorer", "tier": "gold", "description": "Found gold"}],
+            sequences=[dict(seq) for seq in _SEQUENCES],
+            awards=[
+                {
+                    "key": "GOLD_EXPLORER",
+                    "title": "Gold Explorer",
+                    "tier": "gold",
+                    "description": "Found gold",
+                }
+            ],
         )
         db.add_all([user, adv])
         await db.flush()
@@ -71,7 +108,6 @@ async def test_walkthrough_reveal_deducts_150_xp_and_grants_negative_award(setup
             template_id=adv.id,
             avatar_id=avatar.id,
             user_id=user.id,
-            walkthrough=adv.walkthrough,
             is_walkthrough_revealed=False,
             current_scene_id="SCENE_1",
         )
@@ -83,7 +119,9 @@ async def test_walkthrough_reveal_deducts_150_xp_and_grants_negative_award(setup
 
         # Check that the universal negative award is present even before reveal (unearned)
         initial_awards = await manager.state_applier._build_awards_payload(adv)
-        initial_spoiler = next((aw for aw in initial_awards if aw.get("key") == "SPOILER_SEEKER"), None)
+        initial_spoiler = next(
+            (aw for aw in initial_awards if aw.get("key") == "SPOILER_SEEKER"), None
+        )
         assert initial_spoiler is not None
         assert initial_spoiler.get("tier") == "negative"
         assert initial_spoiler.get("is_earned") is False
@@ -102,11 +140,15 @@ async def test_walkthrough_reveal_deducts_150_xp_and_grants_negative_award(setup
 
         # Check negative award was granted
         awards = user.earned_awards or []
-        assert any(aw.get("key") == "SPOILER_SEEKER" and aw.get("tier") == "negative" for aw in awards)
+        assert any(
+            aw.get("key") == "SPOILER_SEEKER" and aw.get("tier") == "negative" for aw in awards
+        )
 
         # Check _build_awards_payload includes the negative award as earned
         payload_awards = await manager.state_applier._build_awards_payload(adv)
-        spoiler_award = next((aw for aw in payload_awards if aw.get("key") == "SPOILER_SEEKER"), None)
+        spoiler_award = next(
+            (aw for aw in payload_awards if aw.get("key") == "SPOILER_SEEKER"), None
+        )
         assert spoiler_award is not None
         assert spoiler_award.get("tier") == "negative"
         assert spoiler_award.get("is_earned") is True

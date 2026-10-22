@@ -20,7 +20,7 @@ from backend.api.routes.adventures.logic import AdventureLogic
 from backend.api.routes.adventures.schemas import (
     AdventureTemplateDebugResponse,
 )
-from backend.api.routes.adventures.sessions import _backfill_avatar_items_from_template_entities
+from backend.api.routes.adventures.session_items import backfill_avatar_items_from_template_entities
 from backend.core.auth import get_current_user
 from backend.core.database import get_db
 from backend.engine.media_engine import MediaEngine
@@ -194,7 +194,7 @@ def _serialize_protagonist_with_items(
         inventory=list(avatar.inventory or []), equipment=dict(avatar.equipment or {})
     )
     if entities_by_id:
-        _backfill_avatar_items_from_template_entities(items_view, entities_by_id)
+        backfill_avatar_items_from_template_entities(items_view, entities_by_id)
     payload["inventory"] = items_view.inventory
     payload["equipment"] = items_view.equipment
     return payload

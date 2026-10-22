@@ -1,11 +1,6 @@
 import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.auth import create_access_token
-from backend.main import app
-from backend.core.database import get_db
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.user import User
 from backend.models.world_entity import WorldEntity, WorldScene
@@ -39,7 +34,6 @@ async def _seed_template(username: str) -> tuple[str, str]:
             rules="r",
             plot="p",
             intro_text="i",
-            walkthrough="w",
             completed_condition="done",
             gameover_condition="lost",
             tts_director_notes="notes",
@@ -68,13 +62,8 @@ async def test_create_switch_validation(client, setup_test_db):
             "item_type": "SWITCH",
             "name": "Switch",
             "description": "A switch.",
-            "metadata_json": {
-                "switch": {
-                    "states": ["ON"],
-                    "initial_state": "ON"
-                }
-            }
-        }
+            "metadata_json": {"switch": {"states": ["ON"], "initial_state": "ON"}},
+        },
     )
     assert res.status_code == 400
     assert "at least 2 states" in res.text
@@ -90,13 +79,8 @@ async def test_create_switch_validation(client, setup_test_db):
             "item_type": "SWITCH",
             "name": "Switch",
             "description": "A switch.",
-            "metadata_json": {
-                "switch": {
-                    "states": ["ON", "OFF"],
-                    "initial_state": ""
-                }
-            }
-        }
+            "metadata_json": {"switch": {"states": ["ON", "OFF"], "initial_state": ""}},
+        },
     )
     assert res.status_code == 400
     assert "initial state must be defined" in res.text
@@ -112,13 +96,8 @@ async def test_create_switch_validation(client, setup_test_db):
             "item_type": "SWITCH",
             "name": "Switch",
             "description": "A switch.",
-            "metadata_json": {
-                "switch": {
-                    "states": ["ON", "OFF"],
-                    "initial_state": "OTHER"
-                }
-            }
-        }
+            "metadata_json": {"switch": {"states": ["ON", "OFF"], "initial_state": "OTHER"}},
+        },
     )
     assert res.status_code == 400
     assert "is not one of the switch states" in res.text
@@ -134,13 +113,8 @@ async def test_create_switch_validation(client, setup_test_db):
             "item_type": "SWITCH",
             "name": "Switch",
             "description": "A switch.",
-            "metadata_json": {
-                "switch": {
-                    "states": ["ON", "OFF"],
-                    "initial_state": "OFF"
-                }
-            }
-        }
+            "metadata_json": {"switch": {"states": ["ON", "OFF"], "initial_state": "OFF"}},
+        },
     )
     assert res.status_code == 200, res.text
     assert res.json()["entity"]["metadata_json"]["switch"]["states"] == ["ON", "OFF"]
@@ -162,12 +136,7 @@ async def test_update_switch_validation(client, setup_test_db):
             name="Updater Switch",
             description="Desc",
             current_scene_id="SCENE_X",
-            metadata_json={
-                "switch": {
-                    "states": ["UP", "DOWN"],
-                    "initial_state": "UP"
-                }
-            }
+            metadata_json={"switch": {"states": ["UP", "DOWN"], "initial_state": "UP"}},
         )
         db.add(ent)
         await db.commit()
@@ -177,11 +146,7 @@ async def test_update_switch_validation(client, setup_test_db):
     res = await client.patch(
         f"/api/adventures/{tpl_id}/editor/entity",
         headers=headers,
-        json={
-            "target_type": "object",
-            "target_id": "SWITCH_UPD",
-            "switch_states": ["UP"]
-        }
+        json={"target_type": "object", "target_id": "SWITCH_UPD", "switch_states": ["UP"]},
     )
     assert res.status_code == 400
     assert "at least 2 states" in res.text
@@ -193,8 +158,8 @@ async def test_update_switch_validation(client, setup_test_db):
         json={
             "target_type": "object",
             "target_id": "SWITCH_UPD",
-            "switch_initial_state": "INVALID_STATE"
-        }
+            "switch_initial_state": "INVALID_STATE",
+        },
     )
     assert res.status_code == 400
     assert "is not one of the switch states" in res.text
@@ -207,8 +172,8 @@ async def test_update_switch_validation(client, setup_test_db):
             "target_type": "object",
             "target_id": "SWITCH_UPD",
             "switch_states": ["LEFT", "RIGHT"],
-            "switch_initial_state": "RIGHT"
-        }
+            "switch_initial_state": "RIGHT",
+        },
     )
     assert res.status_code == 200, res.text
 

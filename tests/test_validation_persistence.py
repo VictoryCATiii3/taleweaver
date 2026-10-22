@@ -35,7 +35,6 @@ async def _seed_validation_adventure(db: AsyncSession, *, owner: User) -> str:
         rules="r",
         plot="p",
         intro_text="i",
-        walkthrough="w",
         completed_condition="done",
         gameover_condition="lost",
         tts_director_notes="notes",

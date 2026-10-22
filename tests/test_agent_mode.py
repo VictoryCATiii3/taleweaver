@@ -692,7 +692,14 @@ async def test_agent_prompt_walkthrough_disabled_vs_enabled(setup_test_db, monke
             owner_id=user.id,
             title="Walkthrough Prompt Test",
             is_ready=True,
-            walkthrough="Secret spoiler: push the blue brick on the wall.",
+            sequences=[
+                {
+                    "id": "SEQ_1",
+                    "order": 1,
+                    "title": "The Wall",
+                    "walkthrough": "Secret spoiler: push the blue brick on the wall.",
+                }
+            ],
         )
         db.add(adv)
         await db.commit()

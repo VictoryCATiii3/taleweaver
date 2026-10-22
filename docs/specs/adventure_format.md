@@ -46,7 +46,6 @@ General configuration, narrative constraints, and gameplay settings.
 | `context` | `string` | Foundational world-building lore and background for the AI Game Master. |
 | `plot` | `string` | Compact plot overview and story milestones for AI narrative consistency. |
 | `rules` | `string` | Special world rules (e.g. "Magic requires physical sacrifice", "NPCs cannot be harmed"). |
-| `walkthrough` | `string` | Recommended walkthrough and puzzle solution steps for the GM / agent modes. |
 | `completed_condition` | `string` | Custom condition defining game victory (defaults to all main quests in RPG mode). |
 | `gameover_condition` | `string` | Custom condition defining game over (defaults to player HP <= 0 in RPG mode). |
 | `original_prompt` | `string` | The original prompt used during generation (for documentation purposes). |

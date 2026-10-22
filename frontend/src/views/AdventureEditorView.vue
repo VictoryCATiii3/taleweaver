@@ -657,7 +657,6 @@ const form = ref({
   plot: '',
   rules: '',
   intro_text: '',
-  walkthrough: '',
   completed_condition: '',
   gameover_condition: '',
   completed_guard_expression: '',
@@ -692,7 +691,6 @@ async function handleGenerateField(field: string) {
       plot: form.value.plot,
       rules: form.value.rules,
       intro_text: form.value.intro_text,
-      walkthrough: form.value.walkthrough,
       completed_condition: form.value.completed_condition,
       gameover_condition: form.value.gameover_condition,
       completed_guard_expression: form.value.completed_guard_expression,
@@ -723,7 +721,6 @@ async function saveField() {
     plot: 5000,
     rules: 5000,
     intro_text: 20000,
-    walkthrough: 20000,
     completed_condition: 2000,
     gameover_condition: 2000,
     completed_guard_expression: 2000,
@@ -909,7 +906,6 @@ async function fetchAdventure() {
     form.value.npcs_can_damage_protagonist = data.npcs_can_damage_protagonist ?? true
     form.value.rules = data.rules || ''
     form.value.intro_text = data.intro_text || ''
-    form.value.walkthrough = data.walkthrough || ''
     form.value.completed_condition = data.completed_condition || ''
     form.value.gameover_condition = data.gameover_condition || ''
     form.value.completed_guard_expression = data.completed_guard_expression || ''

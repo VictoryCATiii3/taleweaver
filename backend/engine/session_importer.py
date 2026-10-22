@@ -127,7 +127,10 @@ def _add_world_scenes_and_exits(
 
 
 def _add_world_map(
-    db: AsyncSession, world_map_data: Optional[dict], template_id: Optional[str], new_session_id: str
+    db: AsyncSession,
+    world_map_data: Optional[dict],
+    template_id: Optional[str],
+    new_session_id: str,
 ) -> None:
     if not world_map_data:
         return
@@ -276,7 +279,6 @@ class SessionImporter:
                     start_datetime=session_state_data.get("start_datetime"),
                     plot=session_state_data.get("plot"),
                     rules=session_state_data.get("rules"),
-                    walkthrough=session_state_data.get("walkthrough"),
                     completed_condition=session_state_data.get("completed_condition"),
                     gameover_condition=session_state_data.get("gameover_condition"),
                     completed_guard_expression=session_state_data.get("completed_guard_expression"),
@@ -286,7 +288,9 @@ class SessionImporter:
                     selected_tone=session_state_data.get("selected_tone"),
                     is_completed=session_state_data.get("is_completed", False),
                     is_debug_enabled=session_state_data.get("is_debug_enabled", False),
-                    is_walkthrough_revealed=session_state_data.get("is_walkthrough_revealed", False),
+                    is_walkthrough_revealed=session_state_data.get(
+                        "is_walkthrough_revealed", False
+                    ),
                     allow_dynamic_items=session_state_data.get("allow_dynamic_items", False),
                 )
                 db.add(session_state)

@@ -41,7 +41,6 @@ _FIX_ADVENTURE_FIELDS = frozenset(
         "plot",
         "rules",
         "intro_text",
-        "walkthrough",
         "tts_director_notes",
         "completed_condition",
         "gameover_condition",

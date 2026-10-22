@@ -13,7 +13,7 @@ flowchart TD
         subgraph ApplyLogic [Entity & Asset Application]
             direction TB
             ClearDB[Clear Existing Template Data] --> Protagonist[Sync Protagonist Avatar & Stats]
-            Protagonist --> Meta[Save Plot, Rules, Walkthrough & Win/Loss Conditions]
+            Protagonist --> Meta[Save Plot, Rules, Sequences & Win/Loss Conditions]
             Meta --> Quests[Initialize Quests & Achievements]
             Quests --> Scenes[Create Scenes & Generate Background Visuals]
             Scenes --> NPCs[Create NPCs with Voice Tags & Portraits]

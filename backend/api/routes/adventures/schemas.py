@@ -369,7 +369,6 @@ class AdventureTemplateResponse(BaseModel):
     plot: Optional[str] = None
     rules: Optional[str] = None
     intro_text: Optional[str] = None
-    walkthrough: Optional[str] = None
     completed_condition: Optional[str] = None
     gameover_condition: Optional[str] = None
     completed_guard_expression: Optional[str] = None
@@ -641,7 +640,6 @@ class AdventureTemplateUpdate(BaseModel):
     quest_generation_enabled: Optional[bool] = None
     plot: Optional[str] = None
     rules: Optional[str] = None
-    walkthrough: Optional[str] = None
     completed_condition: Optional[str] = None
     gameover_condition: Optional[str] = None
     completed_guard_expression: Optional[str] = None
@@ -727,7 +725,7 @@ class AdventureTemplateUpdate(BaseModel):
             raise ValueError("length must be at most 5000 characters")
         return value
 
-    @field_validator("intro_text", "walkthrough")
+    @field_validator("intro_text")
     @classmethod
     def validate_20k_fields(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
@@ -803,7 +801,6 @@ class TemplateFieldGenerationRequest(BaseModel):
         "plot",
         "rules",
         "intro_text",
-        "walkthrough",
         "completed_condition",
         "gameover_condition",
         "tts_director_notes",
@@ -813,7 +810,6 @@ class TemplateFieldGenerationRequest(BaseModel):
     plot: Optional[str] = None
     rules: Optional[str] = None
     intro_text: Optional[str] = None
-    walkthrough: Optional[str] = None
     completed_condition: Optional[str] = None
     gameover_condition: Optional[str] = None
     tts_director_notes: Optional[str] = None

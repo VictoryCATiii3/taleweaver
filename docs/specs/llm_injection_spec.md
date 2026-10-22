@@ -74,7 +74,7 @@ Every turn, `GameTurnManager` builds a comprehensive prompt context depending on
 | `world_context` | `AdventureTemplate` | Foundational lore, story premise, and atmospheric guidelines. |
 | `plot` | `AdventureTemplate` | Core plot summary and story milestones. |
 | `rules` | `AdventureTemplate` | Special world laws and universal constraints. |
-| `walkthrough` | `AdventureTemplate` | Intended puzzle solutions and quest progression steps. |
+| `walkthrough` | Active sequence (`AdventureTemplate.sequences`) | Mini-walkthrough of the current sequence: intended puzzle solutions and progression steps. |
 | `tone` | `AdventureTemplate` | Selected tone instructions (e.g., vocabulary, grit, dark fantasy). |
 | `CURRENT GAME TIME` | `SessionState` | In-game clock formatted as `Day X, HH:MM`. |
 | `quests_json` | `SessionState` | All active and completed quests with completion criteria. |

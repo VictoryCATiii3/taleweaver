@@ -8,11 +8,10 @@ metadata that no longer applies to the new type.
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.auth import create_access_token
-from backend.main import app
 from backend.core.database import get_db
+from backend.main import app
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.user import User
 from backend.models.world_entity import WorldEntity, WorldScene
@@ -65,7 +64,6 @@ async def _seed_template_with_item(item_kwargs: dict) -> tuple[str, str, str, in
             rules="r",
             plot="p",
             intro_text="i",
-            walkthrough="w",
             completed_condition="done",
             gameover_condition="lost",
             tts_director_notes="notes",
@@ -92,10 +90,12 @@ async def _seed_template_with_item(item_kwargs: dict) -> tuple[str, str, str, in
 
 async def test_change_item_type_preserves_pickable_to_readable_metadata(client, setup_test_db):
     """PICKABLE (DEFAULT) -> READABLE: text_log_content added, no other cleanup needed."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "DEFAULT",
-        "metadata_json": {"is_portable_extra": "keep_me"},
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "DEFAULT",
+            "metadata_json": {"is_portable_extra": "keep_me"},
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -118,15 +118,17 @@ async def test_change_item_type_preserves_pickable_to_readable_metadata(client, 
 
 async def test_change_item_type_container_to_default_strips_lock(client, setup_test_db):
     """CONTAINER -> DEFAULT: lock fields and unlock_rule must be cleared."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "CONTAINER",
-        "metadata_json": {
-            "code_to_unlock": "1337",
-            "item_to_unlock": "",
-            "rule_to_unlock": "",
-            "locked": True,
-        },
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "CONTAINER",
+            "metadata_json": {
+                "code_to_unlock": "1337",
+                "item_to_unlock": "",
+                "rule_to_unlock": "",
+                "locked": True,
+            },
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -152,10 +154,12 @@ async def test_change_item_type_container_to_default_strips_lock(client, setup_t
 
 async def test_change_item_type_readable_to_switch_strips_text_log(client, setup_test_db):
     """READABLE -> SWITCH: text_log_content + text_log_format must be cleared."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "READABLE",
-        "metadata_json": {"text_log_content": "ancient runes", "text_log_format": "SCROLL"},
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "READABLE",
+            "metadata_json": {"text_log_content": "ancient runes", "text_log_format": "SCROLL"},
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -181,10 +185,12 @@ async def test_change_item_type_readable_to_switch_strips_text_log(client, setup
 
 async def test_change_item_type_consumable_to_default_strips_effects(client, setup_test_db):
     """CONSUMABLE -> DEFAULT: effects metadata must be cleared."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "CONSUMABLE",
-        "metadata_json": {"effects": {"heal": 50}},
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "CONSUMABLE",
+            "metadata_json": {"effects": {"heal": 50}},
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -225,10 +231,12 @@ async def test_change_item_type_rejects_unknown_type(client, setup_test_db):
 
 async def test_change_item_type_same_value_is_noop(client, setup_test_db):
     """Setting item_type to the same value must be a clean no-op (no extra writes)."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "DEFAULT",
-        "metadata_json": {"keep": True},
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "DEFAULT",
+            "metadata_json": {"keep": True},
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -358,10 +366,12 @@ async def test_combinable_supports_single_ingredient(client, setup_test_db):
 
 async def test_combinable_supports_empty_ingredient_list(client, setup_test_db):
     """Wiping ingredients must succeed — the field is fully optional."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "COMBINABLE",
-        "combination_ingredients": ["WILL_BE_WIPED"],
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "COMBINABLE",
+            "combination_ingredients": ["WILL_BE_WIPED"],
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -413,13 +423,15 @@ async def test_persist_combinable_metadata_fields(client, setup_test_db):
 
 async def test_combinable_metadata_fields_can_be_cleared(client, setup_test_db):
     """Setting each field to its zero-value (empty string / False) must persist cleanly."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "COMBINABLE",
-        "reveal_rule": "old",
-        "is_hidden": True,
-        "spatial_position": "old place",
-        "reveals_item_id": "OLD_KEY",
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "COMBINABLE",
+            "reveal_rule": "old",
+            "is_hidden": True,
+            "spatial_position": "old place",
+            "reveals_item_id": "OLD_KEY",
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -447,11 +459,13 @@ async def test_combinable_metadata_fields_can_be_cleared(client, setup_test_db):
 
 async def test_combinable_metadata_fields_omitted_unchanged(client, setup_test_db):
     """Omitting fields in PATCH must NOT clear them — empty values are explicit."""
-    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item({
-        "item_type": "COMBINABLE",
-        "reveal_rule": "untouched",
-        "spatial_position": "untouched",
-    })
+    user_id, tpl_id, item_id, item_pk = await _seed_template_with_item(
+        {
+            "item_type": "COMBINABLE",
+            "reveal_rule": "untouched",
+            "spatial_position": "untouched",
+        }
+    )
     headers = _auth_headers("type_change_user")
 
     res = await client.patch(
@@ -553,7 +567,9 @@ async def test_modify_hidden_status_and_reveal_rule_on_npc(client, setup_test_db
 
         tpl = AdventureTemplate(id="tpl_npc_hidden", owner_id=user.id, title="NPC Hidden Test")
         db.add(tpl)
-        scene = WorldScene(id="SCENE_A", template_id="tpl_npc_hidden", label="Scene A", description="...")
+        scene = WorldScene(
+            id="SCENE_A", template_id="tpl_npc_hidden", label="Scene A", description="..."
+        )
         db.add(scene)
         npc = WorldEntity(
             id="SHADOW_ASSASSIN",
@@ -589,4 +605,3 @@ async def test_modify_hidden_status_and_reveal_rule_on_npc(client, setup_test_db
         assert saved_npc.is_hidden is True
         assert saved_npc.spatial_position == "Hiding in the rafters above"
         assert saved_npc.reveal_rule == "When the player casts light or looks up"
-
