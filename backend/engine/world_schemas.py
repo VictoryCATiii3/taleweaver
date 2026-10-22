@@ -822,12 +822,12 @@ class ProtagonistSchema(WorldBaseSchema):
         default="",
         description="Comma-separated English visual keywords for the image generator (build, face, hair, clothing, gear), max 100 characters.",
     )
-    strength: int = Field(..., description="Base strength stat (1-99)")
-    dexterity: int = Field(..., description="Base dexterity stat (1-99)")
-    intelligence: int = Field(..., description="Base intelligence stat (1-99)")
-    wisdom: int = Field(..., description="Base wisdom stat (1-99)")
-    charisma: int = Field(..., description="Base charisma stat (1-99)")
-    armor_class: int = Field(..., description="Base armor class stat (1-99)")
+    strength: int = Field(10, description="Base strength stat (1-99)")
+    dexterity: int = Field(10, description="Base dexterity stat (1-99)")
+    intelligence: int = Field(10, description="Base intelligence stat (1-99)")
+    wisdom: int = Field(10, description="Base wisdom stat (1-99)")
+    charisma: int = Field(10, description="Base charisma stat (1-99)")
+    armor_class: int = Field(10, description="Base armor class stat (1-99)")
     starting_inventory: list[str] = Field(
         default_factory=list, description="List of object IDs in player's pocket. Use [] if none."
     )
