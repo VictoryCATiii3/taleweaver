@@ -5,6 +5,7 @@ import ReferenceTextarea from '@/components/editor/ReferenceTextarea.vue'
 import ScriptEditor from '@/components/editor/ScriptEditor.vue'
 import NpcCombatSettings from '@/components/editor/NpcCombatSettings.vue'
 import AppearanceField from '@/components/editor/AppearanceField.vue'
+import EntityImagePreview from '@/components/editor/EntityImagePreview.vue'
 import { Plus, Trash2, Key, FileText, Lock, Code2, Sparkles, ToggleLeft, ChevronDown, ChevronRight, Edit3 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -312,6 +313,16 @@ const containedItemReferenceOptions = computed(() => {
   return itemReferenceOptions.value.filter((option) => {
     return String(option.id || '').toUpperCase() !== currentEntityId.value
   })
+})
+
+const entityImageUrl = computed(() => {
+  if (props.isCreateEntityMode || !props.context) return null
+  const targetId = String(props.context.id || '').toUpperCase()
+  const targetType = props.context.type.toUpperCase()
+  const match = (props.referenceOptions || []).find(
+    (option) => String(option.id || '').toUpperCase() === targetId && option.type === targetType
+  )
+  return match?.imageUrl || null
 })
 
 const currentItemType = computed(() => String(localForm.value.item_type || '').toUpperCase())
@@ -736,9 +747,12 @@ const textLogPreviewClass = computed(() => {
         <div class="modal-content w-full max-w-4xl bg-slate-900 border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
           <!-- Fixed Header -->
           <div class="px-8 py-5 flex justify-between items-center border-b border-white/5">
-            <div class="space-y-1">
-              <h3 class="text-xs font-black text-emerald-500 uppercase tracking-widest">{{ isCreateEntityMode ? ('Create ' + (context.type === 'npc' ? 'NPC' : context.type.toUpperCase())) : ('Editing ' + context.type) }}</h3>
-              <p class="text-slate-500 text-xs uppercase font-bold tracking-tighter">{{ isCreateEntityMode ? 'New Entity' : 'ID: ' + context.id }}</p>
+            <div class="flex items-center gap-4">
+              <EntityImagePreview :image-url="entityImageUrl" :label="localForm.name || context.id" />
+              <div class="space-y-1">
+                <h3 class="text-xs font-black text-emerald-500 uppercase tracking-widest">{{ isCreateEntityMode ? ('Create ' + (context.type === 'npc' ? 'NPC' : context.type.toUpperCase())) : ('Editing ' + context.type) }}</h3>
+                <p class="text-slate-500 text-xs uppercase font-bold tracking-tighter">{{ isCreateEntityMode ? 'New Entity' : 'ID: ' + context.id }}</p>
+              </div>
             </div>
             <button @click="emit('close')" class="text-slate-500 hover:text-white transition-colors">
               <i class="ra ra-cancel text-xl"></i>
