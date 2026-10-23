@@ -423,10 +423,29 @@ def scan_source(source: "Path") -> tuple[list[Bundle], list[str]]:
 # --- Release classification -----------------------------------------------------
 
 def load_releases(repo: str) -> dict[str, dict[str, Any]]:
-    data = gh_json(
-        ["release", "list"] + repo_args(repo)
-        + ["--limit", "300", "--json", "tagName,assets"]
-    )
+    try:
+        data = gh_json(
+            ["release", "list"] + repo_args(repo)
+            + ["--limit", "300", "--json", "tagName,assets"]
+        )
+    except RuntimeError:
+        data = None
+
+    if data is None:
+        # Fallback to gh api: real gh CLI release list does not support --json assets
+        try:
+            api_data = gh_json(["api", f"/repos/{repo}/releases?per_page=100"])
+            if isinstance(api_data, list):
+                out: dict[str, dict[str, Any]] = {}
+                for rel in api_data:
+                    assets = {a.get("name"): a for a in (rel.get("assets") or [])}
+                    tag = rel.get("tag_name") or rel.get("tagName")
+                    if tag:
+                        out[tag] = {"tag": tag, "assets": assets}
+                return out
+        except RuntimeError:
+            data = []
+
     out: dict[str, dict[str, Any]] = {}
     for rel in data or []:
         assets = {a.get("name"): a for a in (rel.get("assets") or [])}
