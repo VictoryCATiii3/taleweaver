@@ -891,6 +891,49 @@ async def test_adventure_generator_emits_proposal_event_before_generation(setup_
         last_req = state.exit_states["__ag_last_generation_request__"]
         assert last_req["title"] == "Neon Foundry"
         assert last_req["selected_tone"] == "mystery"
+        proposal_chunk = next(c for c in turn1_chunks if "event: adventure_generator_proposal" in c)
+        assert '"auto_start": false' in proposal_chunk
+
+
+async def test_confirmed_adventure_generation_proposal_auto_starts(setup_test_db, monkeypatch):
+    """A blueprint the player confirmed in chat must ask the client to open the progress view directly."""
+    from tests.conftest import TestSessionLocal
+
+    async with TestSessionLocal() as db:
+        user, adv, _avatar, _state = await _seed_game_context(db)
+        adv.strict_rules = False
+        adv.rule_enforcement_mode = "chat"
+        adv.is_adventure_generator = True
+        await db.commit()
+
+        mock_llm_instance = MagicMock()
+        mock_llm_instance.aexecute_complex_task = AsyncMock(
+            return_value=AdventureGeneratorToolIntent(
+                requested_adventure_generation={
+                    "title": "Glass Archive",
+                    "prompt": "A library that rewrites itself every night.",
+                },
+                generation_confirmed=True,
+            )
+        )
+
+        async def empty_stream():
+            if False:
+                yield None
+
+        mock_llm_instance.stream_simple_task = AsyncMock(return_value=empty_stream())
+
+        monkeypatch.setattr(
+            "backend.api.routes.adventures.gameplay_logic.GameMasterLLM",
+            lambda *args, **kwargs: mock_llm_instance,
+        )
+
+        manager = GameTurnManager(db, "session-1", user)
+        chunks = [chunk async for chunk in manager.process_turn("yes, weave it")]
+
+        proposal_chunk = next(c for c in chunks if "event: adventure_generator_proposal" in c)
+        assert '"auto_start": true' in proposal_chunk
+        assert "Glass Archive" in proposal_chunk
 
 
 async def test_token_limit_error_is_user_safe_in_chat(setup_test_db, monkeypatch):
@@ -1119,9 +1162,10 @@ async def test_adventure_generator_retry_uses_last_request(setup_test_db, monkey
         async for chunk in manager.process_turn("bitte nochmal erstellen"):
             chunks.append(chunk)
 
-        # A proposal event should be emitted for the client dialog.
-        assert any("event: adventure_generator_proposal\ndata:" in c for c in chunks)
-        assert any("Bundy Boulevard" in c for c in chunks)
+        # A proposal event should be emitted for the client dialog; a retry starts weaving right away.
+        proposal_chunk = next(c for c in chunks if "event: adventure_generator_proposal\ndata:" in c)
+        assert "Bundy Boulevard" in proposal_chunk
+        assert '"auto_start": true' in proposal_chunk
 
 
 async def test_chat_mode_runs_progression_pass_and_keeps_progress_unchanged(setup_test_db, monkeypatch):
@@ -1673,7 +1717,7 @@ async def test_rule_engine_apply_ticks():
     assert any("Poisoned" in m for m in messages)
 
 async def test_rule_engine_apply_event_game_over():
-    """Verifies that the rule engine raises GameOverException when HP reaches 0."""
+    """Verifies that the rule engine raises GameOverError when HP reaches 0."""
     avatar = Avatar(name="Hero", hp=10, stamina=10, mana=10)
     event = GameEvent(
         narrative_description="A fatal blow!",
@@ -1683,8 +1727,8 @@ async def test_rule_engine_apply_event_game_over():
         new_status_effects=[],
         new_inventory_items=[]
     )
-    from backend.engine.rule_engine import GameOverException, RuleEngine
-    with pytest.raises(GameOverException):
+    from backend.engine.rule_engine import GameOverError, RuleEngine
+    with pytest.raises(GameOverError):
         RuleEngine.apply_event(avatar, event)
     assert avatar.hp == 0
 

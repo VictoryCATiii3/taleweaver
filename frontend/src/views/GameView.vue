@@ -206,6 +206,7 @@ const {
   isCheckpointSaving,
   isSceneTransitioning: socketIsSceneTransitioning,
   generatorProposal,
+  generatorAutoStart,
   showGeneratorModal,
   openGeneratorModal,
   closeGeneratorModal,
@@ -1922,6 +1923,7 @@ usePlayAgentAutoLoop()
     <AdventureGeneratorModal
       :open="showGeneratorModal"
       :proposal="generatorProposal"
+      :auto-start="generatorAutoStart"
       @close="closeGeneratorModal"
       @completed="(advId, title) => {
         emitSystemMessage(`SYSTEM: Adventure '${title}' successfully created and added to your archives.`)

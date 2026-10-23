@@ -53,7 +53,7 @@ from backend.engine.rule_engine import (
     AdventureGeneratorToolIntent,
     AttackResult,
     GameEvent,
-    GameOverException,
+    GameOverError,
     SkillCheckResult,
     WorldEntityUpdate,
 )
@@ -1454,7 +1454,7 @@ class GameTurnManager:
 
                 if game_event.game_completed:
                     await self._finalize_session("completed", game_event.status_note)
-            except GameOverException as goe:
+            except GameOverError as goe:
                 await self._finalize_session("game_over", str(goe))
                 # Ensure the narration knows about the game over
                 game_event.game_over = True
@@ -1531,6 +1531,8 @@ class GameTurnManager:
                     if self._get_last_ag_generation_error() == "token_limit":
                         last_request.generate_scene_images = False
                     game_event.requested_adventure_generation = last_request
+                    # An explicit retry request counts as confirmation.
+                    game_event.generation_confirmed = True
                     if not game_event.narrative_description:
                         game_event.narrative_description = (
                             "Understood. I will retry the last adventure generation now."
@@ -1539,14 +1541,12 @@ class GameTurnManager:
             if game_event.requested_adventure_generation:
                 req = game_event.requested_adventure_generation
                 self._set_last_ag_generation_request(req)
-                pending_generator_proposal = {
-                    "request": req.model_dump(),
-                    "message": "The Architect has prepared a world proposal based on your vision.",
-                }
+                pending_generator_proposal = self.adventure_gen.build_generator_proposal(
+                    req, auto_start=game_event.generation_confirmed
+                )
                 if not game_event.narrative_description:
-                    game_event.narrative_description = (
-                        "The Architect inclines his head and gestures toward the Loom. "
-                        "The blueprint of your vision has materialized for your review."
+                    game_event.narrative_description = self.adventure_gen.proposal_narrative(
+                        auto_start=game_event.generation_confirmed
                     )
                 game_event.requested_adventure_generation = None
 
@@ -1671,7 +1671,7 @@ class GameTurnManager:
                     await self._finalize_session(
                         "game_over", game_event.status_note or "Game over."
                     )
-            except GameOverException as goe:
+            except GameOverError as goe:
                 await self._finalize_session("game_over", str(goe))
                 game_event.game_over = True
                 game_event.status_note = str(goe)
@@ -1687,7 +1687,7 @@ class GameTurnManager:
                     for sm in sys_msgs:
                         role = getattr(sm, "role", "system")
                         yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
-            except GameOverException as goe:
+            except GameOverError as goe:
                 await self._finalize_session("game_over", str(goe))
                 if isinstance(game_event, GameEvent):
                     game_event.game_over = True
@@ -1951,7 +1951,7 @@ class GameTurnManager:
                     for sm in sys_msgs:
                         role = getattr(sm, "role", "system")
                         yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
-            except GameOverException as goe:
+            except GameOverError as goe:
                 await self._finalize_session("game_over", str(goe))
                 if isinstance(game_event, GameEvent):
                     game_event.game_over = True
@@ -2877,7 +2877,7 @@ class GameTurnManager:
                 finally:
                     self._in_protagonist_hp_trigger = False
             if self.avatar.hp <= 0:
-                raise GameOverException(f"{self.avatar.name} has fallen! Game Over.")
+                raise GameOverError(f"{self.avatar.name} has fallen! Game Over.")
 
         if changeset.player_mana_change:
             self.avatar.mana = max(
@@ -3068,7 +3068,7 @@ class GameTurnManager:
         if changeset.game_completed:
             await self._finalize_session("completed", changeset.status_note)
         elif changeset.game_over:
-            raise GameOverException(
+            raise GameOverError(
                 changeset.status_note or f"{self.avatar.name} has met their end."
             )
 

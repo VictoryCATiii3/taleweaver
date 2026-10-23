@@ -5,7 +5,8 @@ import json
 import logging
 import re
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
 from sqlalchemy.orm.attributes import flag_modified
@@ -87,7 +88,9 @@ class TurnAdventureGenManager:
             self.manager.state.exit_states = exit_states
             flag_modified(self.manager.state, "exit_states")
 
-    async def classify_short_intent(self, user_msg: str, system_prompt: str, phase: str) -> dict[str, Any] | None:
+    async def classify_short_intent(
+        self, user_msg: str, system_prompt: str, phase: str
+    ) -> dict[str, Any] | None:
         """Run a tiny intent classification call and parse a strict JSON object response."""
         text = (user_msg or "").strip()
         if not text:
@@ -103,7 +106,9 @@ class TurnAdventureGenManager:
         small_model = llm_settings.get("small_model") or "gpt-4o-mini"
 
         try:
-            llm = GameMasterLLM(self.manager.user, provider=small_model_provider, model_category="small")
+            llm = GameMasterLLM(
+                self.manager.user, provider=small_model_provider, model_category="small"
+            )
             raw = await llm.aexecute_simple_task(
                 system_prompt,
                 text,
@@ -116,7 +121,9 @@ class TurnAdventureGenManager:
             parsed = self._parse_json_object(raw)
             return parsed if isinstance(parsed, dict) else None
         except Exception as exc:
-            logger.debug("[Turn %s] Intent classifier skipped (%s): %s", self.manager.game_id, phase, exc)
+            logger.debug(
+                "[Turn %s] Intent classifier skipped (%s): %s", self.manager.game_id, phase, exc
+            )
             return None
 
     async def parse_ag_image_confirmation_decision(self, user_msg: str) -> str:
@@ -126,9 +133,11 @@ class TurnAdventureGenManager:
 
         intent_prompt = (
             "Classify the user's response to an image-mode confirmation question. "
-            "Return ONLY strict JSON with schema: {\"decision\":\"with_images\"|\"without_images\"|\"cancel\"|\"unknown\"}."
+            'Return ONLY strict JSON with schema: {"decision":"with_images"|"without_images"|"cancel"|"unknown"}.'
         )
-        parsed = await self.classify_short_intent(user_msg, intent_prompt, "ag_image_confirmation_intent")
+        parsed = await self.classify_short_intent(
+            user_msg, intent_prompt, "ag_image_confirmation_intent"
+        )
         decision = str((parsed or {}).get("decision") or "").strip().lower()
         if decision in {"with_images", "without_images", "cancel", "unknown"}:
             return decision
@@ -171,7 +180,7 @@ class TurnAdventureGenManager:
 
         intent_prompt = (
             "Determine if the user asks to retry the last generation attempt. "
-            "Return ONLY strict JSON with schema: {\"retry\": true|false}."
+            'Return ONLY strict JSON with schema: {"retry": true|false}.'
         )
         parsed = await self.classify_short_intent(user_msg, intent_prompt, "ag_retry_intent")
         retry_val = (parsed or {}).get("retry")
@@ -221,29 +230,42 @@ class TurnAdventureGenManager:
         if not normalized_message:
             return False
 
-        aliases: set[str] = set()
-
-        def _add_alias(raw: Any) -> None:
-            token = self._normalize_target_token(str(raw or ""))
-            if token and len(token) >= 3:
-                aliases.add(token)
-
         target_scene_id = str(target_scene_id or "").strip()
-        _add_alias(target_scene_id)
-        _add_alias(exit_label)
-
-        for scene in reduced_scenes or []:
-            if str(scene.get("id") or "").strip() == target_scene_id:
-                _add_alias(scene.get("label"))
-                break
-
-        for ex in reduced_exits or []:
-            if str(ex.get("to_scene_id") or "").strip() == target_scene_id:
-                _add_alias(ex.get("label"))
-
+        aliases = self._collect_transition_aliases(
+            target_scene_id, exit_label, reduced_scenes, reduced_exits
+        )
         if any(alias in normalized_message for alias in aliases):
             return True
 
+        return self._matches_single_exit_direction(lowered, target_scene_id, reduced_exits)
+
+    def _collect_transition_aliases(
+        self,
+        target_scene_id: str,
+        exit_label: str | None,
+        reduced_scenes: list[dict],
+        reduced_exits: list[dict],
+    ) -> set[str]:
+        target_scene = next(
+            (s for s in reduced_scenes or [] if str(s.get("id") or "").strip() == target_scene_id),
+            None,
+        )
+        raw_aliases: list[Any] = [target_scene_id, exit_label]
+        if target_scene:
+            raw_aliases.append(target_scene.get("label"))
+        raw_aliases.extend(
+            ex.get("label")
+            for ex in reduced_exits or []
+            if str(ex.get("to_scene_id") or "").strip() == target_scene_id
+        )
+
+        tokens = (self._normalize_target_token(str(raw or "")) for raw in raw_aliases)
+        return {token for token in tokens if token and len(token) >= 3}
+
+    @staticmethod
+    def _matches_single_exit_direction(
+        lowered: str, target_scene_id: str, reduced_exits: list[dict]
+    ) -> bool:
         # With exactly one open destination, allow directional movement phrasing without explicit label mention.
         open_destinations = {
             str(ex.get("to_scene_id") or "").strip()
@@ -268,9 +290,11 @@ class TurnAdventureGenManager:
         intent_prompt = (
             "Decide whether the user is explicitly requesting immediate physical movement to another scene now "
             "(not hypothetical/planning talk). "
-            "Return ONLY strict JSON with schema: {\"explicit_transition\": true|false}."
+            'Return ONLY strict JSON with schema: {"explicit_transition": true|false}.'
         )
-        parsed = await self.classify_short_intent(user_msg, intent_prompt, "scene_transition_intent")
+        parsed = await self.classify_short_intent(
+            user_msg, intent_prompt, "scene_transition_intent"
+        )
         transition_val = (parsed or {}).get("explicit_transition")
         if isinstance(transition_val, bool):
             return transition_val and self.contains_transition_movement_cue(text)
@@ -294,6 +318,33 @@ class TurnAdventureGenManager:
             return False
 
         return self.contains_transition_movement_cue(text)
+
+    @staticmethod
+    def build_generator_proposal(
+        request: AdventureGenerationRequest, *, auto_start: bool
+    ) -> dict[str, Any]:
+        """Build the `adventure_generator_proposal` SSE payload.
+
+        With `auto_start`, the client skips the review form and opens the live progress view.
+        """
+        message = (
+            "The Architect begins weaving your confirmed world."
+            if auto_start
+            else "The Architect has prepared a world proposal based on your vision."
+        )
+        return {"request": request.model_dump(), "message": message, "auto_start": auto_start}
+
+    @staticmethod
+    def proposal_narrative(*, auto_start: bool) -> str:
+        if auto_start:
+            return (
+                "The Architect inclines his head and sets the Loom in motion. "
+                "Threads of light begin weaving the world you envisioned."
+            )
+        return (
+            "The Architect inclines his head and gestures toward the Loom. "
+            "The blueprint of your vision has materialized for your review."
+        )
 
     def set_last_ag_generation_request(self, request: AdventureGenerationRequest) -> None:
         exit_states = dict(self.manager.state.exit_states or {})
@@ -362,74 +413,89 @@ class TurnAdventureGenManager:
 
         if event.request_available_image_styles:
             styles = await AdventureGeneratorService.get_available_image_styles(self.manager.user)
-            if not event.tool_results:
-                event.tool_results = ToolResults()
-            event.tool_results.available_image_styles = styles
+            self._ensure_tool_results(event).available_image_styles = styles
 
             msg = f"SYSTEM: Available Image Styles: {', '.join(styles)}"
             await self.manager._emit_system_message(msg, stream_callback=stream_callback)
 
         if event.request_available_tones:
             tones = await AdventureGeneratorService.get_available_tones(self.manager.user)
-            if not event.tool_results:
-                event.tool_results = ToolResults()
-            event.tool_results.available_tones = tones
+            self._ensure_tool_results(event).available_tones = tones
 
             msg = f"SYSTEM: Available Tones: {', '.join(tones)}"
             await self.manager._emit_system_message(msg, stream_callback=stream_callback)
 
         if event.requested_adventure_generation:
-            self.set_last_ag_generation_request(event.requested_adventure_generation)
+            await self._run_adventure_generation(event, stream_callback)
 
-            async def _post_generation_system_message(status: str) -> None:
-                msg = f"SYSTEM: Adventure Generator: {status}"
-                await self.manager._emit_system_message(msg, stream_callback=stream_callback)
+    @staticmethod
+    def _ensure_tool_results(event: Any) -> ToolResults:
+        if not event.tool_results:
+            event.tool_results = ToolResults()
+        return event.tool_results
 
-            try:
-                await _post_generation_system_message(
-                    f"Preparing generation for '{event.requested_adventure_generation.title}'..."
-                )
+    async def _run_adventure_generation(
+        self,
+        event: Any,
+        stream_callback: Callable[[str], Awaitable[None] | None] = None,
+    ) -> None:
+        request = event.requested_adventure_generation
+        self.set_last_ag_generation_request(request)
 
-                new_adv_id = await AdventureGeneratorService.generate_adventure(
-                    self.manager.db,
-                    self.manager.user,
-                    event.requested_adventure_generation,
-                    progress_callback=_post_generation_system_message,
-                )
-                if not event.tool_results:
-                    event.tool_results = ToolResults()
-                event.tool_results.generation_success = True
-                event.tool_results.new_adventure_id = new_adv_id
-                self.set_last_ag_generation_error(None)
+        async def _post_generation_system_message(status: str) -> None:
+            msg = f"SYSTEM: Adventure Generator: {status}"
+            await self.manager._emit_system_message(msg, stream_callback=stream_callback)
 
-                await _post_generation_system_message("Generation finished successfully.")
+        try:
+            await _post_generation_system_message(f"Preparing generation for '{request.title}'...")
 
-                msg = f"SYSTEM: Adventure '{event.requested_adventure_generation.title}' generated successfully and added to library (ID: {new_adv_id})."
-                await self.manager._emit_system_message(msg, stream_callback=stream_callback)
-            except Exception as e:
-                logger.exception("Adventure generation tool failed")
-                if not event.tool_results:
-                    event.tool_results = ToolResults()
-                from backend.api.routes.adventures.gameplay_logic import (
-                    _friendly_llm_error_message,
-                    _llm_error_type,
-                )
-                user_safe_error = _friendly_llm_error_message(e)
-                event.tool_results.generation_success = False
-                event.tool_results.generation_error = user_safe_error or "Adventure generation failed."
-                self.set_last_ag_generation_error(_llm_error_type(e))
+            new_adv_id = await AdventureGeneratorService.generate_adventure(
+                self.manager.db,
+                self.manager.user,
+                request,
+                progress_callback=_post_generation_system_message,
+            )
+            tool_results = self._ensure_tool_results(event)
+            tool_results.generation_success = True
+            tool_results.new_adventure_id = new_adv_id
+            self.set_last_ag_generation_error(None)
 
-                await _post_generation_system_message("Generation aborted due to an error.")
+            await _post_generation_system_message("Generation finished successfully.")
 
-                if user_safe_error:
-                    msg = f"SYSTEM: {user_safe_error}"
-                else:
-                    msg = "SYSTEM: Adventure generation failed due to an unexpected error."
-                await self.manager._emit_system_message(msg, stream_callback=stream_callback)
+            msg = f"SYSTEM: Adventure '{request.title}' generated successfully and added to library (ID: {new_adv_id})."
+            await self.manager._emit_system_message(msg, stream_callback=stream_callback)
+        except Exception as e:
+            logger.exception("Adventure generation tool failed")
+            from backend.api.routes.adventures.gameplay_logic import (
+                _friendly_llm_error_message,
+                _llm_error_type,
+            )
+
+            user_safe_error = _friendly_llm_error_message(e)
+            tool_results = self._ensure_tool_results(event)
+            tool_results.generation_success = False
+            tool_results.generation_error = user_safe_error or "Adventure generation failed."
+            self.set_last_ag_generation_error(_llm_error_type(e))
+
+            await _post_generation_system_message("Generation aborted due to an error.")
+
+            if user_safe_error:
+                msg = f"SYSTEM: {user_safe_error}"
+            else:
+                msg = "SYSTEM: Adventure generation failed due to an unexpected error."
+            await self.manager._emit_system_message(msg, stream_callback=stream_callback)
 
     async def generate_terminal_epilogue_text(self, language: str | None = None) -> str:
-        status = self.manager.state.session.status if self.manager.state and self.manager.state.session else None
-        status_note = self.manager.state.session.status_note if self.manager.state and self.manager.state.session else None
+        status = (
+            self.manager.state.session.status
+            if self.manager.state and self.manager.state.session
+            else None
+        )
+        status_note = (
+            self.manager.state.session.status_note
+            if self.manager.state and self.manager.state.session
+            else None
+        )
 
         quests = list(self.manager.state.quests or []) if self.manager.state else []
         main_quests = [q for q in quests if q.get("is_main")]
@@ -437,17 +503,28 @@ class TurnAdventureGenManager:
         side_quests = [q for q in quests if not q.get("is_main")]
         completed_side = [q for q in side_quests if q.get("status") == "completed"]
 
-        adventure_awards = list(self.manager.adventure.awards or []) if self.manager.adventure else []
+        adventure_awards = (
+            list(self.manager.adventure.awards or []) if self.manager.adventure else []
+        )
         earned_awards = list(self.manager.user.earned_awards or []) if self.manager.user else []
-        earned_for_adventure = [
-            ea
-            for ea in earned_awards
-            if (ea.get("template_id") == self.manager.adventure.id or ea.get("adventure_id") == self.manager.adventure.id)
-        ] if self.manager.adventure else []
+        earned_for_adventure = (
+            [
+                ea
+                for ea in earned_awards
+                if (
+                    ea.get("template_id") == self.manager.adventure.id
+                    or ea.get("adventure_id") == self.manager.adventure.id
+                )
+            ]
+            if self.manager.adventure
+            else []
+        )
 
         report_payload = {
             "session_id": self.manager.game_id,
-            "adventure_title": self.manager.adventure.title if self.manager.adventure else "Adventure",
+            "adventure_title": self.manager.adventure.title
+            if self.manager.adventure
+            else "Adventure",
             "status": status,
             "status_note": status_note,
             "quests": {
@@ -471,7 +548,9 @@ class TurnAdventureGenManager:
             or llm_settings.get("preferred_provider")
             or "openai"
         )
-        model_name = llm_settings.get("complex_model") or llm_settings.get("small_model") or "gpt-4o"
+        model_name = (
+            llm_settings.get("complex_model") or llm_settings.get("small_model") or "gpt-4o"
+        )
 
         if status == "completed":
             system_prompt = FINAL_REPORT_COMPLETED_SYSTEM_PROMPT
@@ -483,10 +562,14 @@ class TurnAdventureGenManager:
         if language:
             system_prompt += f" Respond only in {language.upper()}."
 
-        user_prompt = "Create the final narrative from this session report JSON:\n" + json.dumps(report_payload)
+        user_prompt = "Create the final narrative from this session report JSON:\n" + json.dumps(
+            report_payload
+        )
 
         try:
-            llm = GameMasterLLM(self.manager.user, provider=model_provider, model_category="complex")
+            llm = GameMasterLLM(
+                self.manager.user, provider=model_provider, model_category="complex"
+            )
             stream = await llm.stream_simple_task(system_prompt, user_prompt, model_name)
             content = ""
             async for chunk in stream:

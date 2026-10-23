@@ -32,6 +32,8 @@ import AutoValidateFixToggle from '@/components/create-adventure/AutoValidateFix
 const props = defineProps<{
   open: boolean
   proposal?: any | null
+  // The player already confirmed the blueprint in chat: skip the form and start weaving right away.
+  autoStart?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -227,30 +229,43 @@ let pollTimer: number | null = null
 const DEFAULT_TONES = ['Heroic', 'Grimdark', 'Whimsical', 'Mystery', 'Cyberpunk', 'Horror', 'Sci-Fi', 'Satirical']
 const DEFAULT_STYLES = ['cinematic-realism', 'dark-fantasy', 'anime', 'pixel-art', 'vintage-comic', 'watercolor']
 
+const isGenerating = computed(
+  () => viewState.value === 'progress' && !!createdAdventureId.value && !isReady.value && !hasError.value
+)
+
 // Pre-fill form from proposal whenever proposal updates or modal opens
 watch(
   () => [props.open, props.proposal],
   ([isOpen, newProposal]) => {
-    if (isOpen) {
-      viewState.value = 'form'
-      errorMessage.value = ''
-      createdAdventureId.value = null
-      currentStatusText.value = 'Initializing world weaving...'
-      isReady.value = false
-      hasError.value = false
-      logs.value = []
-      isLoadingLogs.value = true
-      previewImageUrl.value = null
-      void loadCatalogs()
-
-      if (newProposal) {
-        populateFromProposal(newProposal)
-      } else if (!form.value.title) {
-        form.value.title = 'A New Reality'
-        form.value.storyIdea = 'A mysterious uncharted realm awaiting its champions.'
-      }
-    } else {
+    if (!isOpen) {
       stopPolling()
+      return
+    }
+    // Never reset a world that is still being woven.
+    if (isGenerating.value) return
+
+    const shouldAutoStart = !!newProposal && !!props.autoStart
+    viewState.value = shouldAutoStart ? 'progress' : 'form'
+    errorMessage.value = ''
+    createdAdventureId.value = null
+    currentStatusText.value = 'Initializing world weaving...'
+    isReady.value = false
+    hasError.value = false
+    logs.value = []
+    isLoadingLogs.value = true
+    previewImageUrl.value = null
+    const catalogsLoaded = loadCatalogs()
+
+    if (newProposal) {
+      populateFromProposal(newProposal)
+    } else if (!form.value.title) {
+      form.value.title = 'A New Reality'
+      form.value.storyIdea = 'A mysterious uncharted realm awaiting its champions.'
+    }
+
+    if (shouldAutoStart) {
+      // Catalogs resolve the full style/tone objects sent with the generation payload.
+      void catalogsLoaded.then(startGeneration)
     }
   },
   { immediate: true }
@@ -275,10 +290,14 @@ function populateFromProposal(p: any) {
     form.value.selected_style_id = p.selected_style
   }
 
-  // Image flags
-  if (p.generate_scene_images !== undefined) form.value.generate_scene_images = !!p.generate_scene_images
-  if (p.generate_npc_images !== undefined) form.value.generate_npc_images = !!p.generate_npc_images
-  if (p.generate_item_images !== undefined) form.value.generate_item_images = !!p.generate_item_images
+  // Image flags. Chat proposals only carry `generate_scene_images`, which the backend applies to all
+  // image kinds, so it is the fallback for NPC and item images too.
+  const sceneImages = p.generate_scene_images
+  if (sceneImages !== undefined) form.value.generate_scene_images = !!sceneImages
+  const npcImages = p.generate_npc_images ?? sceneImages
+  if (npcImages !== undefined) form.value.generate_npc_images = !!npcImages
+  const itemImages = p.generate_item_images ?? sceneImages
+  if (itemImages !== undefined) form.value.generate_item_images = !!itemImages
 
   // Bounds & feature toggles
   if (p.min_scenes !== undefined && p.min_scenes !== null) form.value.min_scenes = p.min_scenes
@@ -464,6 +483,7 @@ async function startGeneration() {
       const words = firstLine.split(/\s+/).slice(0, 5).join(' ')
       form.value.title = words.slice(0, 45) || 'A New Reality'
     } else {
+      viewState.value = 'form'
       errorMessage.value = 'Please provide an adventure title or story blueprint.'
       return
     }
@@ -632,7 +652,7 @@ async function cancelActiveGeneration() {
 async function handlePlayNow() {
   if (!createdAdventureId.value) return
   try {
-    const res = await api.startSession(createdAdventureId.value)
+    const res = await api.startSessionForTemplate(createdAdventureId.value)
     if (res?.game_id) {
       emit('close')
       router.push({ name: 'game', params: { id: res.game_id } })
