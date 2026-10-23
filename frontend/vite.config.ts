@@ -39,6 +39,9 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: frontendPort,
+      // Fail instead of silently moving to another port: the backend's CORS origin and
+      // the run scripts rely on FRONTEND_PORT from .env.
+      strictPort: true,
       proxy: {
         // Proxy REST API calls to the FastAPI backend
         '/api': {

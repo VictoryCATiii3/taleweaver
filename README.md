@@ -217,7 +217,7 @@ TaleWeaver uses an adapter layer ([LiteLLM](https://github.com/BerriAI/litellm))
 
 ### Option A: Automatic Setup Script (Recommended)
 
-The setup script creates a virtual environment, installs backend and frontend dependencies, runs database migrations, and initializes your environment keys.
+The setup script installs the backend dependencies with Poetry (falling back to a local `venv` with Poetry if it is not installed) and the frontend dependencies, runs database migrations, initializes your environment keys, and asks for the backend/frontend ports when it creates `.env`.
 
 **Linux / macOS:**
 ```bash
@@ -232,6 +232,15 @@ git clone https://github.com/jschm42/taleweaver.git
 cd taleweaver
 .\setup.ps1
 ```
+
+Afterwards, start TaleWeaver with the run script. It pulls the latest changes, reinstalls dependencies when lock files changed, checks that the ports from `.env` are free, and starts backend and frontend:
+
+```bash
+./run.sh        # Linux / macOS
+.\run.ps1       # Windows (PowerShell)
+```
+
+> Running several checkouts side by side? Give each one its own `BACKEND_PORT` and `FRONTEND_PORT` in `.env`.
 
 ---
 

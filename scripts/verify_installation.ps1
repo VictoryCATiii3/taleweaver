@@ -109,13 +109,14 @@ Set-Content "tests/test_adventures_api.py" $advTests
 
 # 2. Run Setup
 Write-Host "[*] Executing setup.ps1..." -ForegroundColor Yellow
-# We pipe empty strings for ports/data-dir and 'n' for the start prompt
-"", "", "", "n" | powershell -File .\setup.ps1
+# Empty answers keep the default ports; 'n' declines the start prompt
+"", "", "n" | powershell -File .\setup.ps1
 
 # 3. Verify Backend
 Write-Host "[*] Verifying backend (running subset of tests)..." -ForegroundColor Yellow
 # Running heartbeat and config tests as a smoke test
-.\venv\Scripts\python.exe -m pytest tests/test_heartbeat.py tests/test_config_api.py
+$poetry = if (Get-Command poetry -ErrorAction SilentlyContinue) { "poetry" } else { ".\venv\Scripts\poetry.exe" }
+& $poetry run pytest tests/test_heartbeat.py tests/test_config_api.py
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[!] Backend verification failed. Please check the logs." -ForegroundColor Red
@@ -135,4 +136,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "`n--- Verification SUCCESSFUL ---" -ForegroundColor Green
 Write-Host "The repository has been reset to GitHub state and the installation is verified."
-Write-Host "You can now start the application using the commands listed in setup.ps1."
+Write-Host "You can now start the application with .\run.ps1"

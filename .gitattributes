@@ -1,0 +1,2 @@
+# Shell scripts must keep LF endings (bash, Git Bash and Docker break on CRLF)
+*.sh text eol=lf

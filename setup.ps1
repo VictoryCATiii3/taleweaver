@@ -13,10 +13,25 @@ if ($scriptPath) { Set-Location $scriptPath } else { $scriptPath = (Get-Location
 
 Write-Host "--- TaleWeaver Setup ---" -ForegroundColor Cyan
 
+# Helper: set or append a key=value pair in .env
+# If the key line already exists it is replaced, otherwise appended.
+function Set-EnvKey {
+    param([string]$Key, [string]$Value)
+    $content = Get-Content ".env" -Raw
+    if ($content -match "(?m)^${Key}=") {
+        $content = $content -replace "(?m)^${Key}=.*", "${Key}=${Value}"
+    } else {
+        $content = $content.TrimEnd() + "`r`n${Key}=${Value}`r`n"
+    }
+    Set-Content ".env" $content -NoNewline
+}
+
 # 1. Environment Variables (.env)
+$envCreated = $false
 if (-not (Test-Path ".env")) {
     Write-Host "[*] Creating .env from .env.example..." -ForegroundColor Yellow
     Copy-Item ".env.example" ".env"
+    $envCreated = $true
 }
 
 $envFile = Get-Content ".env" -Raw
@@ -54,23 +69,19 @@ if (Get-Command poetry -ErrorAction SilentlyContinue) {
     $RUN_CMD = ".\venv\Scripts\poetry.exe run"
 }
 
+# 3. Ports (asked once for a new .env; run.ps1 checks them before every start)
+if ($envCreated) {
+    Write-Host "[*] Configure ports (press Enter for the default). Use different ports per checkout." -ForegroundColor Yellow
+    $backendPort = Read-Host "Backend port [8000]"
+    $frontendPort = Read-Host "Frontend port [5173]"
+    if ($backendPort -match "^\d+$") { Set-EnvKey "BACKEND_PORT" $backendPort }
+    if ($frontendPort -match "^\d+$") { Set-EnvKey "FRONTEND_PORT" $frontendPort }
+}
+
 # 4. Security Keys
 if (-not (Test-Path "data")) {
     Write-Host "[*] Creating data directory..." -ForegroundColor Yellow
     New-Item -ItemType Directory -Path "data" | Out-Null
-}
-
-# Helper: set or append a key=value pair in .env
-# If the key line already exists it is replaced, otherwise appended.
-function Set-EnvKey {
-    param([string]$Key, [string]$Value)
-    $content = Get-Content ".env" -Raw
-    if ($content -match "(?m)^${Key}=") {
-        $content = $content -replace "(?m)^${Key}=.*", "${Key}=${Value}"
-    } else {
-        $content = $content.TrimEnd() + "`r`n${Key}=${Value}`r`n"
-    }
-    Set-Content ".env" $content -NoNewline
 }
 
 $envFile = Get-Content ".env" -Raw
@@ -133,16 +144,13 @@ if (Test-Path ".git") {
 }
 
 Write-Host "`n--- Setup Complete! ---" -ForegroundColor Green
-Write-Host "To start the application:"
-Write-Host "Backend: $RUN_CMD python -m backend.main  (or: $RUN_CMD taleweaver)"
-Write-Host "Frontend: cd frontend; npm run dev`n"
+Write-Host "Start the application with: .\run.ps1"
+Write-Host "(Backend only: $RUN_CMD taleweaver | Frontend only: cd frontend; npm run dev)`n"
 
-# 7. Start (Optional / Interactive)
+# 8. Start (Optional / Interactive) - run.ps1 owns the start logic incl. port checks
 if (-not $SkipStart) {
     $start = Read-Host "Would you like to start the application now? (y/n)"
-    if ($start -eq "y") {
-        Write-Host "[*] Starting backend and frontend in new windows..." -ForegroundColor Cyan
-        Start-Process powershell -WorkingDirectory $scriptPath -ArgumentList "-NoExit", "-Command", "$RUN_CMD python -m backend.main"
-        Start-Process powershell -WorkingDirectory (Join-Path $scriptPath 'frontend') -ArgumentList "-NoExit", "-Command", "npm run dev"
+    if ($start -eq "y" -or $start -eq "Y") {
+        & (Join-Path $scriptPath "run.ps1") -NoPull
     }
 }

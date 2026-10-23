@@ -15,9 +15,11 @@ done
 echo "--- TaleWeaver Setup ---"
 
 # 1. Environment Variables (.env)
+ENV_CREATED=false
 if [ ! -f .env ]; then
     echo "[*] Creating .env from .env.example..."
     cp .env.example .env
+    ENV_CREATED=true
 fi
 
 if ! grep -q "PROJECT_NAME=" .env; then
@@ -57,7 +59,7 @@ else
 fi
 
 
-# 4. Security Keys
+# 3. Data Directory
 mkdir -p data
 
 # Helper: set or append a key=value pair in .env
@@ -78,6 +80,16 @@ set_env_key() {
     fi
 }
 
+# 4. Ports (asked once for a new .env; run.sh checks them before every start)
+if [ "$ENV_CREATED" = true ]; then
+    echo "[*] Configure ports (press Enter for the default). Use different ports per checkout."
+    read -rp "Backend port [8000]: " BACKEND_PORT_INPUT || true
+    read -rp "Frontend port [5173]: " FRONTEND_PORT_INPUT || true
+    if [[ "$BACKEND_PORT_INPUT" =~ ^[0-9]+$ ]]; then set_env_key "BACKEND_PORT" "$BACKEND_PORT_INPUT"; fi
+    if [[ "$FRONTEND_PORT_INPUT" =~ ^[0-9]+$ ]]; then set_env_key "FRONTEND_PORT" "$FRONTEND_PORT_INPUT"; fi
+fi
+
+# 5. Security Keys
 # ENCRYPTION_KEY
 if ! grep -qE "^ENCRYPTION_KEY=[a-zA-Z0-9+/=_-]{20,}" .env; then
     echo "[*] Generating ENCRYPTION_KEY..."
@@ -94,11 +106,11 @@ if ! grep -qE "^SECRET_KEY=[a-fA-F0-9]{64}" .env; then
     echo "[+] SECRET_KEY written to .env"
 fi
 
-# 5. Database Setup (Migrations)
+# 6. Database Setup (Migrations)
 echo "[*] Running database migrations..."
 $PYTHON_CMD -m alembic upgrade head
 
-# 6. Frontend Setup
+# 7. Frontend Setup
 echo "[*] Installing frontend dependencies..."
 if ! command -v npm &> /dev/null; then
     echo "[!] Error: 'npm' is not installed or not in PATH. Please install Node.js and npm first."
@@ -115,7 +127,7 @@ if [ ! -f "frontend/node_modules/.bin/vite" ]; then
     exit 1
 fi
 
-# 7. Git Hooks Setup
+# 8. Git Hooks Setup
 if [ -d ".git" ]; then
     echo "[*] Configuring Git pre-commit hooks..."
     git config core.hooksPath .githooks
@@ -123,26 +135,15 @@ if [ -d ".git" ]; then
 fi
 
 echo -e "\n--- Setup Complete! ---"
-echo "To start the application:"
-echo "Backend: $RUN_CMD python -m backend.main (or: $RUN_CMD taleweaver)"
-echo "Frontend: cd frontend && npm run dev"
+echo "Start the application with: ./run.sh"
+echo "(Backend only: $RUN_CMD taleweaver | Frontend only: cd frontend && npm run dev)"
 
-# 7. Start (Optional)
+# 9. Start (Optional) - run.sh owns the start logic incl. port checks
 if [ "$SKIP_START" = false ]; then
     echo
     read -p "Would you like to start the application now? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "[*] Starting backend..."
-        $RUN_CMD python -m backend.main &
-        BACKEND_PID=$!
-        
-        echo "[*] Starting frontend..."
-        cd frontend && npm run dev &
-        FRONTEND_PID=$!
-        
-        echo "Processes started. PIDs: Backend=$BACKEND_PID, Frontend=$FRONTEND_PID"
-        echo "Press Ctrl+C to stop (though background processes might need manual kill if shell exits)"
-        wait
+        exec bash ./run.sh --no-pull
     fi
 fi

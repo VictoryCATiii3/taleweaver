@@ -105,19 +105,21 @@ fi
 
 # 2. Run Setup
 echo "[*] Executing setup.sh..."
-# Pass 'n' to the optional start prompt at the end of setup.sh
-echo "n" | bash ./setup.sh
+# Empty answers keep the default ports; 'n' declines the start prompt
+printf '\n\nn\n' | bash ./setup.sh
 
-# Determine python command
-if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-    PYTHON_CMD="./venv/Scripts/python"
+# Poetry from PATH, else the venv fallback created by setup.sh
+if command -v poetry &> /dev/null; then
+    POETRY="poetry"
+elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+    POETRY="./venv/Scripts/poetry"
 else
-    PYTHON_CMD="./venv/bin/python3"
+    POETRY="./venv/bin/poetry"
 fi
 
 # 3. Verify Backend
 echo "[*] Verifying backend (running subset of tests)..."
-$PYTHON_CMD -m pytest tests/test_heartbeat.py tests/test_config_api.py
+"$POETRY" run pytest tests/test_heartbeat.py tests/test_config_api.py
 if [ $? -ne 0 ]; then
     echo "[!] Backend verification failed. Please check the logs."
     exit 1
@@ -136,4 +138,4 @@ fi
 echo ""
 echo "--- Verification SUCCESSFUL ---"
 echo "The repository has been reset to GitHub state and the installation is verified."
-echo "You can now start the application using the commands listed in setup.sh."
+echo "You can now start the application with ./run.sh"
