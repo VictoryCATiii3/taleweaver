@@ -36,7 +36,7 @@ _FETCH_TIMEOUT = httpx.Timeout(10.0)
 _FALLBACK_TTL_SECONDS = 60.0
 
 # Process-wide in-memory cache; tests reset it via ``_MEMORY_CACHE.update(...)``.
-_MEMORY_CACHE: dict[str, Any] = {"catalog": None, "timestamp": 0.0, "ttl": 0.0}
+_MEMORY_CACHE: dict[str, Any] = {"catalog": None, "timestamp": 0.0, "ttl": 0.0, "stale": False}
 
 
 class CatalogError(Exception):
@@ -184,8 +184,8 @@ def load_snapshot() -> AdventureCatalog:
         return AdventureCatalog(schema=SUPPORTED_CATALOG_SCHEMA, generator="empty-fallback")
 
 
-def _remember(catalog: AdventureCatalog, ttl: float) -> AdventureCatalog:
-    _MEMORY_CACHE.update(catalog=catalog, timestamp=time.monotonic(), ttl=ttl)
+def _remember(catalog: AdventureCatalog, ttl: float, *, stale: bool = False) -> AdventureCatalog:
+    _MEMORY_CACHE.update(catalog=catalog, timestamp=time.monotonic(), ttl=ttl, stale=stale)
     return catalog
 
 
@@ -223,10 +223,10 @@ class CatalogService:
         stale = _try_parse(record["payload"], "stale disk cache") if record else None
         if stale is not None:
             logger.warning("Using stale adventure catalog cache: %s", reason)
-            return _remember(stale, _FALLBACK_TTL_SECONDS)
+            return _remember(stale, _FALLBACK_TTL_SECONDS, stale=True)
 
         logger.warning("Falling back to bundled adventure catalog snapshot: %s", reason)
-        return _remember(load_snapshot(), _FALLBACK_TTL_SECONDS)
+        return _remember(load_snapshot(), _FALLBACK_TTL_SECONDS, stale=True)
 
     async def refresh(self) -> AdventureCatalog:
         """Bypass the memory and TTL caches (ETag revalidation still applies)."""
@@ -234,7 +234,11 @@ class CatalogService:
 
     def invalidate(self) -> None:
         """Drop the in-memory catalog so the next call re-reads disk or network."""
-        _MEMORY_CACHE.update(catalog=None, timestamp=0.0, ttl=0.0)
+        _MEMORY_CACHE.update(catalog=None, timestamp=0.0, ttl=0.0, stale=False)
+
+    def is_stale(self) -> bool:
+        """True when the last catalog served came from a stale cache or the snapshot."""
+        return bool(_MEMORY_CACHE.get("stale", False))
 
     def resolve_entry(self, catalog: AdventureCatalog, adventure_id: str) -> CatalogEntry | None:
         """Look up an entry by its id (``origin_id``); the only way to obtain a URL."""

@@ -110,24 +110,33 @@ class Settings(BaseSettings):
 
     # Adventure library: remote catalog of downloadable .adz bundles.
     # The catalog URL is configuration only; the API never accepts a URL from clients.
+    # Points at the separate distribution repository (spec D5); override to use a mirror.
     ADVENTURE_CATALOG_URL: str = (
-        "https://raw.githubusercontent.com/jschm42/taleweaver/main/catalog.json"
+        "https://raw.githubusercontent.com/jschm42/taleweaver-adventures/main/catalog.json"
     )
     # Seconds a fetched catalog is reused before it is fetched again.
     ADVENTURE_CATALOG_TTL: int = 3600
+    # Target directory for downloaded bundles; empty means DATA_DIR/adventures.
+    ADVENTURE_DOWNLOAD_DIR: str = ""
     # Hard cap per downloaded bundle (100 MiB = GitHub release asset limit).
     ADVENTURE_DOWNLOAD_MAX_BYTES: int = 104857600
     # Maximum number of bundle downloads running at the same time.
     ADVENTURE_DOWNLOAD_CONCURRENCY: int = 2
+    # Wall-clock deadline in seconds for one download job (download + verify + import).
+    ADVENTURE_DOWNLOAD_JOB_TIMEOUT: int = 900
+    # Docker/CI opt-in: pre-download the adventure library on first boot.
+    TALEWEAVER_PREFETCH_ADVENTURES: bool = False
 
     @property
     def adventure_download_dir(self) -> str:
         """Return the directory downloaded adventure bundles are installed into.
 
-        Hard-wired to DATA_DIR/adventures on purpose: `_adventure_directories()`
-        in backend/engine/adventure_updates.py scans exactly this path, so a
-        configurable directory would silently break install detection.
+        Defaults to DATA_DIR/adventures. Warning: any other value takes the directory
+        out of `_adventure_directories()` in backend/engine/adventure_updates.py, which
+        scans DATA_DIR/adventures, so the update scanner stops seeing those bundles.
         """
+        if self.ADVENTURE_DOWNLOAD_DIR:
+            return self.ADVENTURE_DOWNLOAD_DIR
         return os.path.join(self.DATA_DIR, "adventures")
 
     @property
