@@ -12,6 +12,7 @@ import {
 } from '@/utils/editor_utils'
 import { Save, X, Trash2, ArrowLeft, Sparkles, Brain } from 'lucide-vue-next'
 import InlineEditableField from '@/components/editor/InlineEditableField.vue'
+import EntityImagePreview from '@/components/editor/EntityImagePreview.vue'
 
 const props = defineProps<{
   adventureId: string
@@ -219,6 +220,11 @@ const routeSceneDetails = computed<any | null>(() => {
   const sId = String(props.sceneId || '').trim()
   if (!sId) return null
   return editorScenes.value.find((scene: any) => String(scene.id) === sId) || null
+})
+
+const routeSceneImageUrl = computed(() => {
+  const imagePath = routeSceneDetails.value?.image_url
+  return imagePath ? buildVisualImageUrl(imagePath) : null
 })
 
 const routeSceneNpcs = computed<any[]>(() => {
@@ -499,6 +505,7 @@ function editRouteEntity(type: 'npc' | 'object', entity: any) {
       <!-- Card Header -->
       <div class="flex items-center justify-between gap-4 border-b border-white/5 pb-4">
         <div class="flex items-center gap-3 flex-1 min-w-0">
+          <EntityImagePreview :image-url="routeSceneImageUrl" :label="routeSceneDetails?.label || routeSceneDetails?.name || sceneId" />
           <!-- Inline Scene ID Editor -->
           <div class="flex items-center gap-2 flex-1 min-w-0">
             <template v-if="isEditingSceneId">

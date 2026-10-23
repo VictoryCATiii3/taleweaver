@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { Maximize2 } from 'lucide-vue-next'
-import GeneratorLightbox from '@/components/game/generator/GeneratorLightbox.vue'
+import EditorImageLightbox from '@/components/editor/EditorImageLightbox.vue'
 
 const props = defineProps<{
   imageUrl: string | null
@@ -34,10 +34,5 @@ function openLightbox() {
     </span>
   </button>
 
-  <!-- Teleported with its own stacking layer so it renders above the z-[200] editor modal -->
-  <Teleport to="body">
-    <div v-if="enlargedUrl" class="relative z-[300]">
-      <GeneratorLightbox :image-url="enlargedUrl" @close="enlargedUrl = null" />
-    </div>
-  </Teleport>
+  <EditorImageLightbox :image-url="enlargedUrl" @close="enlargedUrl = null" />
 </template>

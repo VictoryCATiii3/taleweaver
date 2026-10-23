@@ -6,6 +6,7 @@ import InlineEditableField from '@/components/editor/InlineEditableField.vue'
 import EntityReferenceCombobox from '@/components/editor/EntityReferenceCombobox.vue'
 import ScriptEditor from '@/components/editor/ScriptEditor.vue'
 import SpecialAttacksEditor from '@/components/editor/SpecialAttacksEditor.vue'
+import EditorImageLightbox from '@/components/editor/EditorImageLightbox.vue'
 
 const props = defineProps<{
   debugData: any
@@ -32,6 +33,7 @@ const emit = defineEmits<{
 }>()
 
 const activeEditId = ref<string | null>(null)
+const enlargedPortraitUrl = ref<string | null>(null)
 const activeSubTab = ref<'general' | 'advanced'>('general')
 
 const localHpScript = ref(props.debugData?.protagonist?.on_hp_change_script || '')
@@ -166,7 +168,9 @@ function saveEquipmentSlot(slotKey: string, itemId: string) {
             <img
               v-if="debugData.protagonist.profile_image"
               :src="buildVisualImageUrl(debugData.protagonist.profile_image)"
-              class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              title="View portrait in full size"
+              class="absolute inset-0 w-full h-full object-cover cursor-zoom-in group-hover:scale-105 transition-transform duration-700"
+              @click="enlargedPortraitUrl = buildVisualImageUrl(debugData.protagonist.profile_image)"
             />
             <div v-else class="absolute inset-0 flex items-center justify-center text-slate-600">
               <i class="ra ra-person text-4xl"></i>
@@ -798,6 +802,8 @@ function saveEquipmentSlot(slotKey: string, itemId: string) {
           </div>
         </div>
       </div>
+
+    <EditorImageLightbox :image-url="enlargedPortraitUrl" @close="enlargedPortraitUrl = null" />
   </div>
 </template>
 
