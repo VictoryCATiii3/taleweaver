@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  type: 'defaults' | 'samples'
+  type: 'defaults'
   conflicts: Array<{ title: string; already_exists: boolean }>
   isImporting: boolean
 }>()

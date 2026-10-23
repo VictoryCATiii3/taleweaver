@@ -23,7 +23,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'create'): void
   (e: 'generate-world'): void
-  (e: 'import-samples'): void
+  (e: 'open-library'): void
   (e: 'remove-failed-pending', adventureId: string, kind: 'creation' | 'import'): void
   (e: 'cancel-pending', adventureId: string): void
   (e: 'start-session', templateId: string): void
@@ -89,7 +89,7 @@ onUnmounted(() => {
       
       <ImportExamplesCard 
         v-if="!isSeeding" 
-        @import="$emit('import-samples')" 
+        @open-library="$emit('open-library')" 
       />
 
       <!-- Loading indicator for seeding -->
