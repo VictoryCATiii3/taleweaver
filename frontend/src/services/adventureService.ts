@@ -437,6 +437,7 @@ export type FixTargetType =
   | 'exit'
   | 'protagonist'
   | 'adventure'
+  | 'sequence'
 
 export interface FixProposalEntityPatch {
   target_type: FixTargetType

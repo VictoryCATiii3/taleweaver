@@ -4,6 +4,11 @@ import json
 import logging
 from typing import Any, Optional
 
+from backend.api.routes.adventures.editing.ai_fix_sequences import (
+    focus_sequence,
+    format_sequence_outline,
+    summarize_sequences,
+)
 from backend.schemas.validation import (
     AIFixSuggestionsRequest,
     FixProposal,
@@ -135,6 +140,7 @@ def _summarize_world_for_fix(payload: Any) -> dict[str, Any]:
         "npcs": [_npc_summary(n) for n in npcs],
         "objects": [_object_summary(o) for o in objects],
         "quests": quests,
+        "sequences": summarize_sequences(adventure.get("sequences")),
     }
 
 
@@ -201,7 +207,7 @@ def _format_world_context_block(summary: dict[str, Any]) -> str:
         f"=== QUESTS ({len(summary.get('quests') or [])}) ===\n"
         f"{json.dumps(summary.get('quests') or [], ensure_ascii=False)}\n\n"
         f"=== SEQUENCES (with walkthroughs) ===\n"
-        f"{json.dumps(adventure.get('sequences') or [], ensure_ascii=False)}\n"
+        f"{json.dumps(summary.get('sequences') or [], ensure_ascii=False)}\n"
     )
 
 
@@ -216,7 +222,7 @@ def _parse_finding_location(
         return None, None
     ttype = parts[0].strip().lower()
     tid = parts[1].strip()
-    if ttype not in {"scene", "object", "npc", "exit", "entity"} or not tid:
+    if ttype not in {"scene", "object", "npc", "exit", "entity", "sequence"} or not tid:
         return None, None
     return ttype, tid
 
@@ -302,6 +308,8 @@ def _focus_target(
         return _focus_entity(summary, target_type, target_id or "")
     if target_type == "exit":
         return _focus_exit(summary, target_id or "")
+    if target_type == "sequence":
+        return focus_sequence(summary, target_id or "")
     return "", []
 
 
@@ -338,7 +346,7 @@ def _format_focused_world_block(
         f"=== STORY METADATA ===\n"
         f"Plot: {_short_state(adventure.get('plot') or '', limit=600)}\n"
         f"Rules: {_short_state(adventure.get('rules') or '', limit=400)}\n"
-        f"Sequences: {_short_state(json.dumps(adventure.get('sequences') or [], ensure_ascii=False), limit=1200)}\n\n"
+        f"Sequences (outline, in chapter order): {format_sequence_outline(summary)}\n\n"
         f"{target_block}\n"
         f"=== ADJACENT ENTITIES ===\n"
         f"{neighbor_block or '(none)'}\n"

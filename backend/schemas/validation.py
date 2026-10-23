@@ -50,6 +50,7 @@ FixTargetType = Literal[
     "exit",
     "protagonist",
     "adventure",
+    "sequence",
 ]
 
 
@@ -59,7 +60,7 @@ class FixProposalEntityPatch(BaseModel):
     target_type: FixTargetType = Field(..., description="Which entity kind the patch targets.")
     target_id: Optional[str] = Field(
         None,
-        description="ID of the targeted scene/object/npc/exit. None for 'adventure' or 'protagonist'.",
+        description="ID of the targeted scene/object/npc/exit/sequence. None for 'adventure' or 'protagonist'.",
     )
     description: str = Field(..., description="Human-readable explanation of this patch.")
     field_updates: dict[str, Any] = Field(

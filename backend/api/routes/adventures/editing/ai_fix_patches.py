@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from backend.api.routes.adventures.editing.ai_fix_sequences import patch_sequence
 from backend.api.routes.adventures.editing.ai_fix_targets import (
     _allowed_fields_for,
     _normalize_field_value,
@@ -31,17 +32,33 @@ _LOCK_FIELDS = ("code_to_unlock", "item_to_unlock", "rule_to_unlock")
 _VITALS = {"hp": "max_hp", "mana": "max_mana", "stamina": "max_stamina"}
 _TEXT_LOG_FORMATS = {"DOCUMENT", "SCROLL", "BOOK", "SIGN"}
 _MAX_DECORATIVE_OBJECTS = 7
+# Optional gates where an empty string means "remove", not "missing value".
+_CLEARABLE_SEQUENCE_FIELDS = frozenset(
+    {
+        "guard_expression",
+        "completion_guard_expression",
+        "required_item_id",
+        "required_scene_id",
+        "required_defeated_npc_id",
+    }
+)
+
+
+def _keeps_value(target_type: str, field: str, value: Any) -> bool:
+    if value is None:
+        return False
+    if not isinstance(value, str) or value.strip():
+        return True
+    return target_type == "sequence" and field in _CLEARABLE_SEQUENCE_FIELDS
 
 
 def _clean_updates(target_type: str, field_updates: Optional[dict[str, Any]]) -> dict[str, Any]:
-    """Keep only allowlisted, non-empty field updates for the target type."""
+    """Keep only allowlisted, non-empty (or explicitly clearable) field updates."""
     allowed = _allowed_fields_for(target_type)
     return {
         field: value
         for field, value in (field_updates or {}).items()
-        if field in allowed
-        and value is not None
-        and not (isinstance(value, str) and not value.strip())
+        if field in allowed and _keeps_value(target_type, field, value)
     }
 
 
@@ -283,6 +300,8 @@ async def _apply_proposal_patch(
             status_code=400,
             detail=f"{patch.target_type} patch is missing target_id",
         )
+    if patch.target_type == "sequence":
+        return patch_sequence(adv, raw_target_id, updates)
     patcher = _TARGETED_PATCHERS.get(patch.target_type)
     if patcher is None:
         raise HTTPException(

@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, get_args
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,13 +34,15 @@ from backend.schemas.validation import (
     AIFixSuggestionsResponse,
     FixProposal,
     FixProposalEntityPatch,
+    FixTargetType,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Editor"])
 
 _MAX_PROPOSALS = 3
-_PATCH_TARGET_TYPES = {"scene", "object", "npc", "exit", "protagonist", "adventure"}
+_PATCH_TARGET_TYPES = frozenset(get_args(FixTargetType))
+_MAX_REJECTED_LISTED = 5
 _PROPOSAL_FIELDS = (
     "title",
     "summary",
@@ -54,6 +56,11 @@ _PROPOSAL_FIELDS = (
 )
 _TIMEOUT_MESSAGE = "The AI service did not respond in time. Please retry in a moment."
 _UNAVAILABLE_MESSAGE = "The AI service is currently unavailable. Please retry in a moment."
+_DROPPED_MESSAGE = (
+    "The AI proposed changes the editor cannot apply automatically ({rejected}). "
+    "Try fixing it manually or request new suggestions."
+)
+_DROPPED_FALLBACK = "incomplete proposals without applicable patches"
 
 
 def _as_dict(value: Any) -> Optional[dict[str, Any]]:
@@ -78,15 +85,16 @@ def _clean_patch(raw: Any) -> Optional[FixProposalEntityPatch]:
     field_updates = p_dict.get("field_updates") or {}
     if target_type not in _PATCH_TARGET_TYPES or not isinstance(field_updates, dict):
         return None
-    if not field_updates:
-        return None
     allowed = _allowed_fields_for(target_type)
+    kept_updates = {str(k): v for k, v in field_updates.items() if k in allowed}
+    if not kept_updates:
+        return None
     target_id = p_dict.get("target_id")
     return FixProposalEntityPatch(
         target_type=target_type,  # type: ignore[arg-type]
         target_id=str(target_id).strip() if target_id is not None else None,
         description=str(p_dict.get("description") or "").strip()[:280],
-        field_updates={str(k): v for k, v in field_updates.items() if k in allowed},
+        field_updates=kept_updates,
     )
 
 
@@ -108,6 +116,31 @@ def _clean_proposal(raw: Any) -> Optional[FixProposal]:
         rationale=(str(rationale).strip()[:400] if rationale else None),
         patches=patches,
     )
+
+
+def _rejected_parts(raw_patch: Any) -> list[str]:
+    """Unsupported target types or ``type.field`` keys of one raw patch."""
+    p_dict = _as_dict(raw_patch) or {}
+    target_type = str(p_dict.get("target_type") or "").strip() or "?"
+    if target_type not in _PATCH_TARGET_TYPES:
+        return [target_type]
+    updates = p_dict.get("field_updates")
+    allowed = _allowed_fields_for(target_type)
+    return [
+        f"{target_type}.{k}"
+        for k in (updates if isinstance(updates, dict) else {})
+        if k not in allowed
+    ]
+
+
+def _dropped_message(raw_proposals: list[Any]) -> str:
+    """Explain why every LLM proposal was discarded by the sanitizer."""
+    rejected: list[str] = []
+    for raw in raw_proposals:
+        for raw_patch in (_as_dict(raw) or {}).get("patches") or []:
+            rejected += [r for r in _rejected_parts(raw_patch) if r not in rejected]
+    listed = ", ".join(rejected[:_MAX_REJECTED_LISTED]) or _DROPPED_FALLBACK
+    return _DROPPED_MESSAGE.format(rejected=listed)
 
 
 def _suggestion_prompt(payload: AIFixSuggestionsRequest, summary: dict[str, Any]) -> str:
@@ -225,6 +258,17 @@ async def generate_fix_proposals(
         proposals=[p for p in (_clean_proposal(raw) for raw in raw_proposals) if p],
         generated_at=generated_at,
     )
+    if not raw_proposals:
+        logger.info("AI declined to suggest fixes for %s (%s)", template_id, payload.finding_code)
+    elif not response.proposals:
+        response.error = _dropped_message(raw_proposals)
+        logger.warning(
+            "All %d AI fix proposal(s) for %s (%s) were discarded: %s",
+            len(raw_proposals),
+            template_id,
+            payload.finding_code,
+            response.error,
+        )
     if response.proposals:
         await _cache_response(db, template_id, user_id, response)
     return response

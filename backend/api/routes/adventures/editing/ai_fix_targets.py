@@ -125,6 +125,25 @@ _FIX_OBJECT_FIELDS = frozenset(
 )
 
 
+_FIX_SEQUENCE_FIELDS = frozenset(
+    {
+        "title",
+        "description",
+        "walkthrough",
+        "end_condition",
+        "required_item_id",
+        "required_scene_id",
+        "required_defeated_npc_id",
+        "guard_expression",
+        "completion_guard_expression",
+        "on_start_sequence_script",
+        "on_start_sequence_text",
+        "on_end_sequence_script",
+        "on_end_sequence_text",
+    }
+)
+
+
 def _allowed_fields_for(target_type: str) -> frozenset[str]:
     return {
         "scene": _FIX_SCENE_FIELDS,
@@ -133,6 +152,7 @@ def _allowed_fields_for(target_type: str) -> frozenset[str]:
         "object": _FIX_OBJECT_FIELDS,
         "protagonist": _FIX_PROTAGONIST_FIELDS,
         "adventure": _FIX_ADVENTURE_FIELDS,
+        "sequence": _FIX_SEQUENCE_FIELDS,
     }.get(target_type, frozenset())
 
 

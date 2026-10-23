@@ -144,7 +144,7 @@ For each option, emit a JSON object matching this exact schema:
       "rationale": "<optional 1-2 sentence reason for this approach>",
       "patches": [
         {
-          "target_type": "scene" | "object" | "npc" | "exit" | "protagonist" | "adventure",
+          "target_type": "scene" | "object" | "npc" | "exit" | "protagonist" | "adventure" | "sequence",
           "target_id": "<id of the target, null for adventure/protagonist>",
           "description": "<what this individual patch does, 1 sentence>",
           "field_updates": {
@@ -170,7 +170,7 @@ RULES
 - For structural fixes that touch more than one entity (e.g. move an orphaned code
   hint into a text log): emit MULTIPLE patches inside ONE proposal, all sharing the
   same fix idea. The engine applies them in order.
-- Allowed `target_type` values: scene, object, npc, exit, protagonist, adventure.
+- Allowed `target_type` values: scene, object, npc, exit, protagonist, adventure, sequence.
 - Allowed `field_updates` keys MUST match the editor's patch payload exactly:
     - scene: label, description, decorative_objects
     - object (CONTAINER): description, code_to_unlock, item_to_unlock, rule_to_unlock, locked,
@@ -183,6 +183,16 @@ RULES
       wisdom, dexterity, charisma, armor_class, exp
     - adventure: title, teaser, plot, rules, intro_text, tts_director_notes,
       completed_condition, gameover_condition
+    - sequence: title, description, walkthrough, end_condition, required_item_id,
+      required_scene_id, required_defeated_npc_id, guard_expression,
+      completion_guard_expression, on_start_sequence_text, on_end_sequence_text,
+      on_start_sequence_script, on_end_sequence_script
+- Sequence findings (location `sequence:<id>`): target the sequence itself with its id.
+  `guard_expression` gates when the chapter may START, so it must only reference state
+  that earlier chapters establish, never flags the chapter's own walkthrough sets.
+  `completion_guard_expression` gates when the chapter ENDS. Keep guards valid boolean
+  expressions in the same syntax and with the same flag/variable names as the existing
+  guards; use an empty string to remove a guard.
 - Do NOT add fields outside this allowlist. If the fix requires something else,
   pick the closest narrative field and put a short, in-fiction note inside it.
 - Do NOT emit fields unrelated to the finding.
