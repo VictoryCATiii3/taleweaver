@@ -1,9 +1,9 @@
-import base64
 import json
 import logging
 import os
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
@@ -13,7 +13,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def get_app_version() -> str:
     try:
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "version.json")
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "version.json"
+        )
         with open(path) as f:
             data = json.load(f)
             v = data.get("version", "0.1.0")
@@ -22,7 +24,23 @@ def get_app_version() -> str:
     except Exception:
         return "0.1.0"
 
+
 logger = logging.getLogger(__name__)
+
+# Provider name -> Settings attribute names holding its env API key, in order of precedence.
+_ENV_API_KEY_ATTRS: dict[str, tuple[str, ...]] = {
+    "openai": ("OPENAI_API_KEY",),
+    "anthropic": ("ANTHROPIC_API_KEY",),
+    "google": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+    "gemini": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+    "deepseek": ("DEEPSEEK_API_KEY",),
+    "kimi": ("KIMI_API_KEY",),
+    "openrouter": ("OPENROUTER_API_KEY",),
+    "mistral": ("MISTRAL_API_KEY",),
+    "groq": ("GROQ_API_KEY",),
+    "black_forest_labs": ("BLACK_FOREST_LABS_API_KEY",),
+    "minimax": ("MINIMAX_API_KEY",),
+}
 
 
 class TTSSettings(BaseModel):
@@ -34,13 +52,39 @@ class TTSSettings(BaseModel):
     use_vocal_tags: bool = True
     use_streaming: bool = False
     voice_list: list[str] = [
-        "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe",
-        "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome",
-        "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux",
-        "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager"
+        "Zephyr",
+        "Puck",
+        "Charon",
+        "Kore",
+        "Fenrir",
+        "Leda",
+        "Orus",
+        "Aoede",
+        "Callirrhoe",
+        "Autonoe",
+        "Enceladus",
+        "Iapetus",
+        "Umbriel",
+        "Algieba",
+        "Despina",
+        "Erinome",
+        "Algenib",
+        "Rasalgethi",
+        "Laomedeia",
+        "Achernar",
+        "Alnilam",
+        "Schedar",
+        "Gacrux",
+        "Pulcherrima",
+        "Achird",
+        "Zubenelgenubi",
+        "Vindemiatrix",
+        "Sadachbia",
+        "Sadaltager",
     ]
     voice_catalog: list[dict] = []
     speech_rate: float = 1.0
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "TaleWeaver"
@@ -62,8 +106,42 @@ class Settings(BaseSettings):
         """Return ALLOWED_HOSTS as a list, splitting on commas."""
         return [h.strip() for h in self.ALLOWED_HOSTS.split(",") if h.strip()]
 
-
     DATA_DIR: str = "data"
+
+    # Adventure library: remote catalog of downloadable .adz bundles.
+    # The catalog URL is configuration only; the API never accepts a URL from clients.
+    ADVENTURE_CATALOG_URL: str = (
+        "https://raw.githubusercontent.com/jschm42/taleweaver/main/catalog.json"
+    )
+    # Seconds a fetched catalog is reused before it is fetched again.
+    ADVENTURE_CATALOG_TTL: int = 3600
+    # Hard cap per downloaded bundle (100 MiB = GitHub release asset limit).
+    ADVENTURE_DOWNLOAD_MAX_BYTES: int = 104857600
+    # Maximum number of bundle downloads running at the same time.
+    ADVENTURE_DOWNLOAD_CONCURRENCY: int = 2
+
+    @property
+    def adventure_download_dir(self) -> str:
+        """Return the directory downloaded adventure bundles are installed into.
+
+        Hard-wired to DATA_DIR/adventures on purpose: `_adventure_directories()`
+        in backend/engine/adventure_updates.py scans exactly this path, so a
+        configurable directory would silently break install detection.
+        """
+        return os.path.join(self.DATA_DIR, "adventures")
+
+    @property
+    def adventure_catalog_allowed_hosts(self) -> list[str]:
+        """Return the hosts the adventure library may fetch from (SSRF allowlist).
+
+        Contains the catalog host plus github.com and objects.githubusercontent.com,
+        because GitHub release downloads answer with a redirect to
+        objects.githubusercontent.com, so both hops have to pass the allowlist.
+        """
+        catalog_host = (urlsplit(self.ADVENTURE_CATALOG_URL).hostname or "").lower()
+        hosts = [catalog_host, "github.com", "objects.githubusercontent.com"]
+        return list(dict.fromkeys(h for h in hosts if h))
+
     # When set, LLM debug logs are written here (recommended: outside DATA_DIR).
     # When unset (default), logs are written to DATA_DIR/logs — in that case
     # the SafeStaticFiles mount blocks access to .jsonl files via HTTP.
@@ -184,22 +262,23 @@ class Settings(BaseSettings):
 
     def get_env_api_key(self, provider: str) -> Optional[str]:
         """Returns the API key for a provider if set in environment variables."""
-        p = provider.lower()
-        if p == "openai": return self.OPENAI_API_KEY
-        if p == "anthropic": return self.ANTHROPIC_API_KEY
-        if p in ["google", "gemini"]: return self.GOOGLE_API_KEY or self.GEMINI_API_KEY
-        if p == "deepseek": return self.DEEPSEEK_API_KEY
-        if p == "kimi": return self.KIMI_API_KEY
-        if p == "openrouter": return self.OPENROUTER_API_KEY
-        if p == "mistral": return self.MISTRAL_API_KEY
-        if p == "groq": return self.GROQ_API_KEY
-        if p == "black_forest_labs": return self.BLACK_FOREST_LABS_API_KEY
-        if p == "minimax": return self.MINIMAX_API_KEY
-        return None
-    
+        attrs = _ENV_API_KEY_ATTRS.get(provider.lower(), ())
+        for attr in attrs:
+            value = getattr(self, attr)
+            if value:
+                return value
+        # Mirror the old `a or b` semantics: the last attribute's value is
+        # returned even when falsy (e.g. "" stays "", None stays None).
+        return getattr(self, attrs[-1]) if attrs else None
+
     # Resolve .env against the project root so loading does not depend on the CWD
     model_config = {"env_file": PROJECT_ROOT / ".env", "extra": "ignore"}
 
+
 settings = Settings()
-print(f"DEBUG: TaleWeaver Debug Mode: {'ENABLED' if settings.TALEWEAVER_DEBUG_ENABLED else 'DISABLED'}")
-logger.info(f"TaleWeaver Debug Mode: {'ENABLED' if settings.TALEWEAVER_DEBUG_ENABLED else 'DISABLED'}")
+print(
+    f"DEBUG: TaleWeaver Debug Mode: {'ENABLED' if settings.TALEWEAVER_DEBUG_ENABLED else 'DISABLED'}"
+)
+logger.info(
+    f"TaleWeaver Debug Mode: {'ENABLED' if settings.TALEWEAVER_DEBUG_ENABLED else 'DISABLED'}"
+)
