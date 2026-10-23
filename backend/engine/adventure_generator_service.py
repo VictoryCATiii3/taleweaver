@@ -11,6 +11,7 @@ from backend.core.generation_error_log import (
     record_generation_error,
 )
 from backend.core.style_catalog import default_image_styles_catalog
+from backend.engine.license_defaults import default_license_fields
 from backend.engine.rule_engine import AdventureGenerationRequest
 from backend.engine.world_generator import WorldGenerator, is_image_moderation_error
 from backend.models.adventure_template import AdventureTemplate
@@ -62,6 +63,7 @@ def _create_initial_template(
         generation_strictness=getattr(request, "generation_strictness", "creative"),
         creation_status="Initializing...",
         is_ready=False,
+        **default_license_fields(user.username),
     )
 
 

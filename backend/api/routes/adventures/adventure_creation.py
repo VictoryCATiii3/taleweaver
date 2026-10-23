@@ -22,6 +22,7 @@ from backend.core.generation_error_log import (
     format_creation_error,
     record_generation_error,
 )
+from backend.engine.license_defaults import default_license_fields
 from backend.engine.world_generator import WorldGenerator, is_image_moderation_error
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
@@ -119,12 +120,12 @@ def _pacing_minutes(payload: CreateAdventureTemplatePayload) -> Optional[int]:
 
 
 def build_template(
-    payload: CreateAdventureTemplatePayload, template_id: str, owner_id: str, cover: CoverSource
+    payload: CreateAdventureTemplatePayload, template_id: str, owner: User, cover: CoverSource
 ) -> AdventureTemplate:
     chat_mode = is_chat_mode(payload)
     return AdventureTemplate(
         id=template_id,
-        owner_id=owner_id,
+        owner_id=owner.id,
         title=payload.title,
         original_prompt=payload.original_prompt,
         strict_rules=payload.rule_enforcement_mode != "chat",
@@ -163,7 +164,6 @@ def build_template(
         creation_status="Ready" if payload.skip_generation else "Initializing...",
         original_manifest=payload.original_manifest,
         teaser=payload.teaser,
-        version=payload.version,
         language=payload.language,
         intro_text=payload.intro_text,
         is_adventure_generator=payload.is_adventure_generator,
@@ -171,6 +171,14 @@ def build_template(
         cover_source_adventure_name=cover.name,
         cover_similarity_percent=_similarity_percent(payload),
         allow_reuse_source_assets=bool(payload.allow_reuse_source_assets),
+        **default_license_fields(
+            owner.username,
+            version=payload.version,
+            creator=payload.creator,
+            copyright=payload.copyright,
+            license=payload.license,
+            license_url=payload.license_url,
+        ),
     )
 
 
@@ -259,7 +267,7 @@ async def create_adventure_records(
     cover = await resolve_cover_source(db, payload, user.id)
     template_id = payload.id or generate_adventure_id(payload.title)
 
-    adv = build_template(payload, template_id, user.id, cover)
+    adv = build_template(payload, template_id, user, cover)
     db.add(adv)
 
     avatar = Avatar(
