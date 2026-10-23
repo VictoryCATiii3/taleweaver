@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.adventure_format import CURRENT_VERSION
+from backend.core.adventure_identity import new_origin_id
 from backend.core.config import settings
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
@@ -398,6 +399,7 @@ def _record_to_dict(obj: Any) -> dict[str, Any] | None:
 
 def _build_adventure_section(adv: AdventureTemplate) -> dict[str, Any]:
     return {
+        "origin_id": adv.origin_id,
         "title": adv.title,
         "teaser": adv.teaser,
         "cover_appearance": adv.cover_appearance,
@@ -547,6 +549,11 @@ class AdventureExporter:
         adv = await db.get(AdventureTemplate, template_id)
         if not adv:
             raise ValueError("Adventure not found")
+        if not adv.origin_id:
+            # Legacy templates get their stable ID on first export so re-exports keep it.
+            adv.origin_id = new_origin_id()  # type: ignore[assignment]
+            await db.commit()
+            await db.refresh(adv)
 
         # 1. Fetch World State
         scene_res = await db.execute(

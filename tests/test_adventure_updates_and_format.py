@@ -334,3 +334,76 @@ async def test_migrate_legacy_template(auth_client: AsyncClient, db_session):
     assert any(n["id"] == "SKELETON_GUARD" for n in editor_data["npcs"])
     assert len(editor_data["objects"]) >= 1
     assert any(o["id"] == "SILVER_CHALICE" for o in editor_data["objects"])
+
+
+@pytest.mark.asyncio
+async def test_update_replaces_template_when_file_title_differs(
+    auth_client: AsyncClient, db_session, monkeypatch
+):
+    """An update matched by filename stem must replace the old template, not duplicate it."""
+    from backend.engine import adventure_updates
+    from backend.engine.adventure_importer import AdventureTemplateImporter
+
+    # Arrange
+    user = (
+        (await db_session.execute(select(User).where(User.username == "test_user")))
+        .scalars()
+        .first()
+    )
+    old_tpl = AdventureTemplate(
+        id="stem-update-old", title="Crazy Job Interview", owner_id=user.id, version="2.0.0"
+    )
+    avatar = Avatar(id="stem-update-avatar", user_id=user.id, name="Hero")
+    session = GameSession(
+        id="stem-update-session", template_id=old_tpl.id, user_id=user.id, avatar_id=avatar.id
+    )
+    db_session.add_all([avatar, old_tpl, session])
+    await db_session.commit()
+
+    new_title = "Crazy Job Interview (Copy)"
+    monkeypatch.setattr(
+        adventure_updates,
+        "scan_available_adventure_files",
+        lambda force_refresh=False: [
+            {
+                "file_path": "/fake/Crazy_Job_Interview.adz",
+                "stem": "Crazy_Job_Interview",
+                "title": new_title,
+                "origin_id": None,
+                "version": "3.0.0",
+                "format_version": CURRENT_VERSION,
+                "has_sequences": True,
+            }
+        ],
+    )
+
+    async def fake_import_file(db, file_path, owner_id=None, allow_session=True, overwrite=False):
+        db.add(
+            AdventureTemplate(
+                id="stem-update-new", title=new_title, owner_id=owner_id, version="3.0.0"
+            )
+        )
+        await db.commit()
+        return True
+
+    monkeypatch.setattr(AdventureTemplateImporter, "import_file", fake_import_file)
+
+    # Act
+    result = await adventure_updates.update_single_adventure(db_session, old_tpl.id, user.id)
+
+    # Assert
+    assert result["template_id"] == "stem-update-new"
+    remaining = (
+        (
+            await db_session.execute(
+                select(AdventureTemplate.id).where(AdventureTemplate.owner_id == user.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert "stem-update-old" not in remaining
+    assert "stem-update-new" in remaining
+    relinked = await db_session.get(GameSession, "stem-update-session")
+    await db_session.refresh(relinked)
+    assert relinked.template_id == "stem-update-new"

@@ -16,6 +16,7 @@ from backend.api.routes.adventures.session_assets import copy_data_asset_to_sess
 from backend.api.routes.adventures.session_materializer import (
     materialize_initial_session_from_template,
 )
+from backend.core.adventure_identity import new_origin_id
 from backend.core.config import settings
 from backend.core.generation_error_log import (
     append_generation_log_entry,
@@ -126,6 +127,7 @@ def build_template(
     return AdventureTemplate(
         id=template_id,
         owner_id=owner.id,
+        origin_id=new_origin_id(),
         title=payload.title,
         original_prompt=payload.original_prompt,
         strict_rules=payload.rule_enforcement_mode != "chat",

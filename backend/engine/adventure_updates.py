@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.routes.adventures.logic import AdventureLogic
 from backend.core.adventure_format import CURRENT_VERSION
+from backend.core.adventure_identity import manifest_origin_id
 from backend.core.config import settings
 from backend.engine.adventure_importer import AdventureTemplateImporter
 from backend.engine.sequence_walkthrough import legacy_main_sequence
@@ -126,7 +127,7 @@ def _scan_entry(
     if not title or not isinstance(title, str):
         return None
 
-    origin_id = adv_data.get("origin_id") or manifest.get("origin_id")
+    origin_id = manifest_origin_id(manifest)
     version = adv_data.get("version") or manifest.get("version")
     sequences = adv_data.get("sequences") or manifest.get("sequences") or []
     return {
@@ -134,7 +135,7 @@ def _scan_entry(
         "filename": filename,
         "stem": os.path.splitext(filename)[0],
         "title": title.strip(),
-        "origin_id": str(origin_id).strip() if origin_id else None,
+        "origin_id": origin_id,
         "version": str(version).strip() if version else None,
         "format_version": str(manifest.get("version") or "").strip(),
         "sequences": sequences,
@@ -181,34 +182,32 @@ def _normalize_string(s: Optional[str]) -> str:
     return cleaned
 
 
+def _matches_by_name(t_title_norm: str, f: dict[str, Any]) -> bool:
+    """Legacy fallback: normalized title or filename stem equals the template title."""
+    if not t_title_norm:
+        return False
+    names = (_normalize_string(f.get("title")), _normalize_string(f.get("stem")))
+    return t_title_norm in names
+
+
 def find_matching_file_for_template(
     template: AdventureTemplate,
     available_files: list[dict[str, Any]],
 ) -> Optional[dict[str, Any]]:
-    """Matches an AdventureTemplate to the most relevant file in /adventures."""
+    """Matches an AdventureTemplate to the most relevant file in /adventures.
+
+    An origin_id match is authoritative. Title/stem matching is only a fallback when one side
+    has no origin_id yet; two different origin_ids are always different adventures.
+    """
     t_origin = str(template.origin_id or "").strip()
-    t_title_norm = _normalize_string(template.title)
-
-    candidates: list[dict[str, Any]] = []
-
-    for f in available_files:
-        # 1. Exact origin_id match (highest priority)
-        if t_origin and f.get("origin_id") and t_origin == f.get("origin_id"):
-            candidates.append(f)
-            continue
-
-        # 2. Normalized title match
-        f_title_norm = _normalize_string(f.get("title"))
-        if t_title_norm and f_title_norm and t_title_norm == f_title_norm:
-            candidates.append(f)
-            continue
-
-        # 3. Normalized filename stem match
-        f_stem_norm = _normalize_string(f.get("stem"))
-        if t_title_norm and f_stem_norm and t_title_norm == f_stem_norm:
-            candidates.append(f)
-            continue
-
+    candidates = [f for f in available_files if t_origin and f.get("origin_id") == t_origin]
+    if not candidates:
+        t_title_norm = _normalize_string(template.title)
+        candidates = [
+            f
+            for f in available_files
+            if not (t_origin and f.get("origin_id")) and _matches_by_name(t_title_norm, f)
+        ]
     if not candidates:
         return None
 
@@ -244,8 +243,8 @@ def is_legacy_template(template: AdventureTemplate) -> bool:
             if str(manifest_version) < CURRENT_VERSION:
                 return True
 
-    # Imported (has origin_id or manifest) but lacks sequences:
-    is_imported = bool(template.origin_id or template.original_manifest)
+    # Imported (has a manifest) but lacks sequences; origin_id is set on every template now.
+    is_imported = bool(template.original_manifest)
     return is_imported and not template.sequences
 
 
@@ -277,9 +276,7 @@ def is_legacy_session(
                     return True
 
         # Check if imported but lacks sequences
-        is_imported = bool(
-            manifest or (template and (template.origin_id or template.original_manifest))
-        )
+        is_imported = bool(manifest or (template and template.original_manifest))
         has_sequences = bool(
             (manifest.get("sequences") and len(manifest["sequences"]) > 0)
             or (template and template.sequences and len(template.sequences) > 0)
@@ -337,6 +334,17 @@ def check_template_update(
     }
 
 
+async def _delete_replaced_template(db: AsyncSession, template_id: str) -> None:
+    """Deletes the outdated template if the import did not already overwrite it."""
+    still_exists = await db.execute(
+        select(AdventureTemplate.id).where(AdventureTemplate.id == template_id)
+    )
+    if not still_exists.scalars().first():
+        return
+    logger.info("Removing replaced adventure template %s after update.", template_id)
+    await AdventureTemplateImporter.delete_template_for_overwrite(db, template_id)
+
+
 async def update_single_adventure(
     db: AsyncSession,
     template_id: str,
@@ -387,16 +395,23 @@ async def update_single_adventure(
     if not success:
         raise RuntimeError(f"Failed to import update from {file_path}")
 
-    # Fetch newly created / updated template to confirm
+    # Fetch the newly imported template (by stable ID when the file carries one)
+    identity_clause = (
+        AdventureTemplate.origin_id == matching["origin_id"]
+        if matching.get("origin_id")
+        else AdventureTemplate.title == matching["title"]
+    )
     updated_res = await db.execute(
         select(AdventureTemplate)
-        .where(
-            AdventureTemplate.owner_id == user_id,
-            AdventureTemplate.title == matching["title"],
-        )
+        .where(AdventureTemplate.owner_id == user_id, identity_clause)
         .order_by(AdventureTemplate.created_at.desc())
     )
     updated_template = updated_res.scalars().first()
+
+    # The importer only overwrites origin_id/exact-title matches; a legacy template matched by
+    # filename stem (e.g. a renamed title) would otherwise remain as a duplicate.
+    if updated_template and updated_template.id != template_id:
+        await _delete_replaced_template(db, template_id)
 
     # Re-link existing session records to the new template without modifying their state
     if linked_session_ids and updated_template:

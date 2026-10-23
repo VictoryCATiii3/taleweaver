@@ -35,7 +35,7 @@ WORLD_GENERATION_SYSTEM_PROMPT = (
     "JSON STRUCTURE REQUIREMENTS (CRITICAL):\n"
     "Return one JSON object (no markdown, no wrapper list).\n"
     'CRITICAL JSON FORMATTING: In string fields (descriptions, text logs, notes), NEVER use raw unescaped double quotes (") inside string values. If you quote words, ALWAYS use single quotes (\') or properly escape them (\\").\n'
-    "Required top-level keys: protagonist, scenes, exits, npcs, objects, sequences, quests, awards, scripts, language, teaser, plot, rules, completed_condition, gameover_condition, completed_guard_expression, gameover_guard_expression, intro_text, origin_id.\n\n"
+    "Required top-level keys: protagonist, scenes, exits, npcs, objects, sequences, quests, awards, scripts, language, teaser, plot, rules, completed_condition, gameover_condition, completed_guard_expression, gameover_guard_expression, intro_text.\n\n"
     "CARDINAL PRINCIPLE - SOFT RULES VS. HARD RULES (SCRIPTED GUARDS) MUTUAL EXCLUSIVITY:\n"
     "For ALL assets and mechanics in the adventure (Win/Loss Conditions, Sequences, Quests, Awards, Exits, Containers, and Switches), you MUST follow this cardinal rule:\n"
     "Use EITHER a soft narrative rule (for conversational interpretation by the AI GM) OR deterministic hard rules / scripted guards (for tamper-proof engine enforcement), but PREFERABLY NOT BOTH on the same asset!\n"
@@ -61,7 +61,7 @@ WORLD_GENERATION_SYSTEM_PROMPT = (
     "Each scene in `scenes` MUST include a `decorative_objects` field as a JSON array of up to 7 short strings (max 100 characters each), describing simple, non-interactable background details, features, or static furniture (e.g., ['metal table', 'hanging light fixture', 'cracked stone floor']). Do NOT put these items in the top-level `objects` or `npcs` list — they live ONLY as a structured `decorative_objects` array on the scene. Do NOT embed them into the `description` string either; the scene description must remain clean prose.\n\n"
     "INTRO TEXT & STARTING SCENE INTEGRITY:\n"
     "`intro_text` (1-2 paragraphs) introduces the adventure and sets the mood when starting.\n"
-    "CRITICAL RULE: `intro_text` MUST describe ONLY the starting scene (`origin_id`). It is STRICTLY FORBIDDEN to move the player to a different room, open doors to adjacent scenes, or introduce NPCs from other scenes inside `intro_text`. The player must always begin in `origin_id`, and other scenes/NPCs will only be discovered when the player explicitly moves to them.\n\n"
+    "CRITICAL RULE: `intro_text` MUST describe ONLY the starting scene (the first entry in `scenes`). It is STRICTLY FORBIDDEN to move the player to a different room, open doors to adjacent scenes, or introduce NPCs from other scenes inside `intro_text`. The player must always begin in that starting scene, and other scenes/NPCs will only be discovered when the player explicitly moves to them.\n\n"
     "MANDATORY FIELDS & DEFAULTS:\n"
     'Every required schema field must be present. If not applicable, use defaults: empty string "", empty list [], false for booleans, and 0 for numbers.\n\n'
     "NPC & OBJECT SPATIAL LOGIC:\n"

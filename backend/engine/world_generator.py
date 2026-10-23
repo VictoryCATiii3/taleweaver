@@ -11,21 +11,19 @@ implementation is split across focused sub-modules:
 All previously public symbols are re-exported here so existing imports remain
 unaffected.
 """
+
 import datetime
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from typing import Any, Optional, Union, Literal
+from typing import Any, Literal, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core import prompts
+from backend.core.adventure_identity import new_origin_id
 from backend.core.config import settings
 from backend.core.llm_logger import log_structured_event
 from backend.core.llm_router import GameMasterLLM
-from backend.models.adventure_template import AdventureTemplate, GenerationCancelled
-from backend.models.user import User
-from backend.utils.text_utils import slugify
 
 # --- Re-exports so existing imports stay valid ---
 from backend.engine.world_schemas import (  # noqa: F401
@@ -39,6 +37,9 @@ from backend.engine.world_schemas import (  # noqa: F401
     WorldObjectSchema,
     WorldSceneSchema,
 )
+from backend.models.adventure_template import AdventureTemplate, GenerationCancelled
+from backend.models.user import User
+from backend.utils.text_utils import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,8 @@ IMAGE_MODERATION_MARKERS = (
 # Module-level utilities (kept here: used by tests & other modules directly)
 # ---------------------------------------------------------------------------
 
-def is_image_moderation_error(error: Union[Exception, str, None]) -> bool:
+
+def is_image_moderation_error(error: Exception | str | None) -> bool:
     if error is None:
         return False
     message = str(error).lower()
@@ -81,6 +83,16 @@ def _image_generation_timeout_seconds() -> float:
     return max(10.0, timeout)
 
 
+def _check_image_provider_credentials(provider: str, user: User, model_type: str) -> None:
+    if provider in ("ollama", "stable_diffusion"):
+        return
+    if settings.get_env_api_key(provider):
+        return
+    encrypted_api_keys = user.encrypted_api_keys or {}
+    if provider not in encrypted_api_keys:
+        raise ValueError(f"API key missing for {model_type} image provider '{provider}'.")
+
+
 def _validate_t2i_prerequisites(
     user: Optional[User],
     *,
@@ -91,7 +103,9 @@ def _validate_t2i_prerequisites(
 ) -> None:
     if not user:
         return
-    needs_any_images = need_scene_images or need_npc_images or need_item_images or need_protagonist_image
+    needs_any_images = (
+        need_scene_images or need_npc_images or need_item_images or need_protagonist_image
+    )
     if not needs_any_images:
         return
 
@@ -105,24 +119,24 @@ def _validate_t2i_prerequisites(
     if need_scene_images:
         model = (t2i_settings.get("advanced_model") or "").strip()
         if not model:
-            raise ValueError("Image generation is enabled for scenes, but advanced_model is missing.")
-        provider = (t2i_settings.get("advanced_model_provider") or t2i_settings.get("provider", "openai")).lower()
-        if provider not in ("ollama", "stable_diffusion"):
-            if not settings.get_env_api_key(provider):
-                encrypted_api_keys = user.encrypted_api_keys or {}
-                if provider not in encrypted_api_keys:
-                    raise ValueError(f"API key missing for advanced image provider '{provider}'.")
+            raise ValueError(
+                "Image generation is enabled for scenes, but advanced_model is missing."
+            )
+        provider = (
+            t2i_settings.get("advanced_model_provider") or t2i_settings.get("provider", "openai")
+        ).lower()
+        _check_image_provider_credentials(provider, user, "advanced")
 
     if need_npc_images or need_item_images or need_protagonist_image:
         model = (t2i_settings.get("simple_model") or "").strip()
         if not model:
-            raise ValueError("Image generation is enabled for portraits/items, but simple_model is missing.")
-        provider = (t2i_settings.get("simple_model_provider") or t2i_settings.get("provider", "openai")).lower()
-        if provider not in ("ollama", "stable_diffusion"):
-            if not settings.get_env_api_key(provider):
-                encrypted_api_keys = user.encrypted_api_keys or {}
-                if provider not in encrypted_api_keys:
-                    raise ValueError(f"API key missing for simple image provider '{provider}'.")
+            raise ValueError(
+                "Image generation is enabled for portraits/items, but simple_model is missing."
+            )
+        provider = (
+            t2i_settings.get("simple_model_provider") or t2i_settings.get("provider", "openai")
+        ).lower()
+        _check_image_provider_credentials(provider, user, "simple")
 
 
 async def _publish_generation_status(
@@ -138,11 +152,13 @@ async def _publish_generation_status(
         raise GenerationCancelled("Generation was cancelled by the user.")
     adventure.creation_status = status  # type: ignore[assignment]
     logs = list(adventure.generation_logs or [])
-    logs.append({
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "type": "status",
-        "content": status,
-    })
+    logs.append(
+        {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "type": "status",
+            "content": status,
+        }
+    )
     adventure.generation_logs = logs  # type: ignore[assignment]
     await db.commit()
     await db.refresh(adventure)
@@ -158,12 +174,14 @@ async def _log_image_generation(
     if not adventure or not image_url or image_url.startswith("assets/"):
         return
     logs = list(adventure.generation_logs or [])
-    logs.append({
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "type": "image_generation",
-        "content": prompt,
-        "image_url": image_url,
-    })
+    logs.append(
+        {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "type": "image_generation",
+            "content": prompt,
+            "image_url": image_url,
+        }
+    )
     adventure.generation_logs = logs  # type: ignore[assignment]
     await db.commit()
     await db.refresh(adventure)
@@ -179,12 +197,14 @@ async def _log_reused_asset(
     if not adventure or not image_url or image_url.startswith("assets/"):
         return
     logs = list(adventure.generation_logs or [])
-    logs.append({
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "type": "image_generation",
-        "content": f"Reused source asset: {entity_name}",
-        "image_url": image_url,
-    })
+    logs.append(
+        {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "type": "image_generation",
+            "content": f"Reused source asset: {entity_name}",
+            "image_url": image_url,
+        }
+    )
     adventure.generation_logs = logs  # type: ignore[assignment]
     await db.commit()
     await db.refresh(adventure)
@@ -272,6 +292,21 @@ def _extract_item_id(entry: Any) -> Optional[str]:
     return None
 
 
+def _normalize_container_inventory(
+    raw_inventory: Any, object_ids_set: set[str], container_id: str
+) -> list[str]:
+    if not isinstance(raw_inventory, list):
+        return []
+    normalized: list[str] = []
+    for entry in raw_inventory:
+        item_id = _extract_item_id(entry)
+        if not item_id or item_id not in object_ids_set or item_id == container_id:
+            continue
+        if item_id not in normalized:
+            normalized.append(item_id)
+    return normalized
+
+
 def _ensure_containers_have_minimum_inventory(objects: list[dict[str, Any]]) -> None:
     """Ensure every generated CONTAINER references at least one item ID in inventory.
 
@@ -280,61 +315,286 @@ def _ensure_containers_have_minimum_inventory(objects: list[dict[str, Any]]) -> 
     if not isinstance(objects, list) or not objects:
         return
 
-    container_objs: list[dict[str, Any]] = []
-    object_ids_in_order: list[str] = []
-    seen_ids: set[str] = set()
-
-    for obj in objects:
-        if not isinstance(obj, dict):
-            continue
-        obj_id = str(obj.get("id") or "").strip()
-        if obj_id and obj_id not in seen_ids:
-            seen_ids.add(obj_id)
-            object_ids_in_order.append(obj_id)
-        if str(obj.get("item_type") or "").upper() == "CONTAINER":
-            container_objs.append(obj)
-
+    container_objs = [
+        obj
+        for obj in objects
+        if isinstance(obj, dict) and str(obj.get("item_type") or "").upper() == "CONTAINER"
+    ]
     if not container_objs:
         return
 
-    object_ids_set = set(object_ids_in_order)
+    valid_objects = [obj for obj in objects if isinstance(obj, dict)]
+    seen_ids = {
+        str(obj.get("id") or "").strip()
+        for obj in valid_objects
+        if str(obj.get("id") or "").strip()
+    }
     candidate_item_ids = [
         str(obj.get("id") or "").strip()
-        for obj in objects
-        if isinstance(obj, dict)
-        and str(obj.get("id") or "").strip()
+        for obj in valid_objects
+        if str(obj.get("id") or "").strip()
         and str(obj.get("item_type") or "").upper() != "CONTAINER"
     ]
 
     assigned_ids: set[str] = set()
     for container in container_objs:
         container_id = str(container.get("id") or "").strip()
-        raw_inventory = container.get("inventory")
-        normalized_inventory: list[str] = []
-        if isinstance(raw_inventory, list):
-            for entry in raw_inventory:
-                item_id = _extract_item_id(entry)
-                if not item_id or item_id not in object_ids_set or item_id == container_id:
-                    continue
-                if item_id in normalized_inventory:
-                    continue
-                normalized_inventory.append(item_id)
-        container["inventory"] = normalized_inventory
-        assigned_ids.update(normalized_inventory)
+        normalized = _normalize_container_inventory(
+            container.get("inventory"), seen_ids, container_id
+        )
+        container["inventory"] = normalized
+        assigned_ids.update(normalized)
 
     unassigned_candidates = [iid for iid in candidate_item_ids if iid not in assigned_ids]
     for container in container_objs:
-        if container.get("inventory"):
+        if container.get("inventory") or not unassigned_candidates:
             continue
-        if unassigned_candidates:
-            chosen_item_id = unassigned_candidates.pop(0)
-            container["inventory"] = [chosen_item_id]
-            assigned_ids.add(chosen_item_id)
+        chosen_item_id = unassigned_candidates.pop(0)
+        container["inventory"] = [chosen_item_id]
+        assigned_ids.add(chosen_item_id)
+
+
+def _resolve_generator_provider_and_model(
+    user: User, provider: Optional[str], model: Optional[str]
+) -> tuple[str, str]:
+    llm_settings = user.llm_settings or {}
+    resolved_provider = (
+        provider
+        or llm_settings.get("generator_model_provider")
+        or llm_settings.get("complex_model_provider")
+        or llm_settings.get("small_model_provider")
+        or llm_settings.get("preferred_provider")
+    )
+    resolved_model = (
+        model
+        or llm_settings.get("generator_model")
+        or llm_settings.get("complex_model")
+        or llm_settings.get("small_model")
+        or "gpt-4o"
+    )
+    if not resolved_provider:
+        raise ValueError(
+            "No adventure generator LLM provider configured for this user. "
+            "Open Settings -> Intelligence and set Generator Model Provider."
+        )
+    return resolved_provider, resolved_model
+
+
+async def _load_cover_source_assets(
+    db: AsyncSession, cover_source_adventure_id: str
+) -> Optional[dict[str, Any]]:
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from backend.models.avatar import Avatar  # noqa: PLC0415
+    from backend.models.world_entity import WorldEntity, WorldScene  # noqa: PLC0415
+
+    src_adv = await db.get(AdventureTemplate, cover_source_adventure_id)
+    if not src_adv:
+        return None
+
+    src_avatar_res = await db.execute(
+        select(Avatar)
+        .where(Avatar.template_id == cover_source_adventure_id)
+        .order_by(Avatar.created_at.asc(), Avatar.id.asc())
+        .limit(1)
+    )
+    src_avatar = src_avatar_res.scalars().first()
+    src_scene_res = await db.execute(
+        select(WorldScene).where(WorldScene.template_id == cover_source_adventure_id)
+    )
+    src_scenes = [
+        s for s in src_scene_res.scalars().all() if getattr(s, "session_id", None) is None
+    ]
+    src_entity_res = await db.execute(
+        select(WorldEntity).where(WorldEntity.template_id == cover_source_adventure_id)
+    )
+    src_entities = [
+        e for e in src_entity_res.scalars().all() if getattr(e, "session_id", None) is None
+    ]
+    return {
+        "cover": src_adv.image_url,
+        "protagonist": {
+            "id": "PROTAGONIST",
+            "name": (src_avatar.name if src_avatar else ""),
+            "image_url": (src_avatar.profile_image if src_avatar else None),
+        },
+        "scenes": [{"id": s.id, "name": s.label, "image_url": s.image_url} for s in src_scenes],
+        "npcs": [
+            {"id": e.id, "name": e.name, "image_url": e.image_url}
+            for e in src_entities
+            if e.entity_type == "NPC"
+        ],
+        "objects": [
+            {"id": e.id, "name": e.name, "image_url": e.image_url}
+            for e in src_entities
+            if e.entity_type == "OBJECT"
+        ],
+    }
+
+
+def _reset_container_to_pickable(obj: dict[str, Any]) -> None:
+    obj["item_type"] = "PICKABLE"
+    obj["inventory"] = []
+    obj["code_to_unlock"] = ""
+    obj["item_to_unlock"] = ""
+    obj["rule_to_unlock"] = ""
+
+
+def _postprocess_containers(
+    objects: list[dict[str, Any]],
+    container_generation_enabled: bool,
+    max_containers: Optional[int],
+) -> None:
+    clamped_max_containers = (
+        max(0, min(30, int(max_containers))) if max_containers is not None else 9999
+    )
+    container_indices = [
+        idx
+        for idx, obj in enumerate(objects)
+        if isinstance(obj, dict) and str(obj.get("item_type", "")).upper() == "CONTAINER"
+    ]
+    if not container_generation_enabled:
+        for idx in container_indices:
+            _reset_container_to_pickable(objects[idx])
+        return
+
+    if len(container_indices) > clamped_max_containers:
+        for idx in container_indices[clamped_max_containers:]:
+            _reset_container_to_pickable(objects[idx])
+
+    for idx in container_indices[:clamped_max_containers]:
+        obj = objects[idx]
+        code, item, rule = _normalize_unlock_requirements(
+            obj.get("code_to_unlock"), obj.get("item_to_unlock"), obj.get("rule_to_unlock")
+        )
+        obj["code_to_unlock"] = code
+        obj["item_to_unlock"] = item
+        obj["rule_to_unlock"] = rule
+
+    _ensure_containers_have_minimum_inventory(objects)
+
+
+def _postprocess_readable_logs(
+    objects: list[dict[str, Any]],
+    text_log_generation_enabled: bool,
+    max_text_logs: Optional[int],
+) -> None:
+    clamped_max_text_logs = (
+        max(0, min(30, int(max_text_logs))) if max_text_logs is not None else 9999
+    )
+    readable_indices = [
+        idx
+        for idx, obj in enumerate(objects)
+        if isinstance(obj, dict) and str(obj.get("item_type", "")).upper() == "READABLE"
+    ]
+    if not text_log_generation_enabled:
+        for idx in readable_indices:
+            obj = objects[idx]
+            obj["item_type"] = "PICKABLE"
+            obj["text_log_content"] = ""
+            obj["text_log_format"] = ""
+        return
+
+    if len(readable_indices) > clamped_max_text_logs:
+        for idx in readable_indices[clamped_max_text_logs:]:
+            obj = objects[idx]
+            obj["item_type"] = "PICKABLE"
+            obj["text_log_content"] = ""
+            obj["text_log_format"] = ""
+
+    for idx in readable_indices[:clamped_max_text_logs]:
+        obj = objects[idx]
+        meta = obj.get("metadata_json") or {}
+        obj["text_log_content"] = _normalize_text_log_content(
+            obj.get("text_log_content") or meta.get("text_log_content"),
+            obj.get("description"),
+            obj.get("name"),
+        )
+        raw_format = (
+            str(obj.get("text_log_format") or meta.get("text_log_format") or "DOCUMENT")
+            .strip()
+            .upper()
+        )
+        obj["text_log_format"] = (
+            raw_format if raw_format in {"DOCUMENT", "SCROLL", "BOOK", "SIGN"} else "DOCUMENT"
+        )
+
+
+async def _update_generated_adventure_narrative(
+    db: AsyncSession,
+    template_id: str,
+    manifest_dict: dict[str, Any],
+    original_prompt: str,
+    language: Optional[str],
+    status_callback: Optional[Callable[[str], Awaitable[None]]],
+) -> None:
+    adventure = await db.get(AdventureTemplate, template_id)
+    if not adventure:
+        return
+    await db.refresh(adventure)
+    await _publish_generation_status_with_callback(
+        db, adventure, "Building Scenes & Plot...", status_callback=status_callback
+    )
+    log_structured_event(
+        "adventure.generation.status",
+        template_id=template_id,
+        status=adventure.creation_status,
+        phase="apply_manifest",
+    )
+    adventure.teaser = manifest_dict.get("teaser") or ""  # type: ignore[assignment]
+    adventure.original_prompt = original_prompt  # type: ignore[assignment]
+    if language:
+        adventure.language = language  # type: ignore[assignment]
+    if not adventure.origin_id:
+        adventure.origin_id = new_origin_id()  # type: ignore[assignment]
+    if not adventure.original_manifest:
+        adventure.original_manifest = manifest_dict  # type: ignore[assignment]
+    await db.commit()
+
+
+def _replace_ids_in_text(text: Any, object_ids: list[str]) -> Any:
+    if not isinstance(text, str) or not text:
+        return text
+    for obj_id in object_ids:
+        pattern = rf"(?<!##)\b{re.escape(obj_id)}\b"
+        text = re.sub(pattern, f"##{obj_id}", text, flags=re.IGNORECASE)
+    return text
+
+
+def _replace_fields_in_dict(target: Any, fields: tuple[str, ...], object_ids: list[str]) -> None:
+    if not isinstance(target, dict):
+        return
+    for f in fields:
+        if f in target:
+            target[f] = _replace_ids_in_text(target[f], object_ids)
+
+
+def _replace_fields_in_list(
+    target_list: Any, fields: tuple[str, ...], object_ids: list[str]
+) -> None:
+    if not isinstance(target_list, list):
+        return
+    for item in target_list:
+        _replace_fields_in_dict(item, fields, object_ids)
+
+
+def _clean_sequence_item(seq: Any, object_ids: list[str]) -> None:
+    if not isinstance(seq, dict):
+        return
+    _replace_fields_in_dict(
+        seq, ("title", "description", "walkthrough", "end_condition"), object_ids
+    )
+    for hard_field in ("required_item_id", "required_scene_id", "required_defeated_npc_id"):
+        val = str(seq.get(hard_field) or "").replace("##", "").strip()
+        seq[hard_field] = (
+            "" if val.upper() in ("NONE", "NULL", "UNDEFINED", "N/A", "FALSE") else val.upper()
+        )
 
 
 # ---------------------------------------------------------------------------
 # WorldGenerator (public API facade)
 # ---------------------------------------------------------------------------
+
 
 class WorldGenerator:
     @staticmethod
@@ -360,79 +620,54 @@ class WorldGenerator:
 
         object_ids.sort(key=len, reverse=True)
 
-        def replace_ids_in_text(text: Any) -> Any:
-            if not isinstance(text, str) or not text:
-                return text
-            for obj_id in object_ids:
-                pattern = rf"(?<!##)\b{re.escape(obj_id)}\b"
-                text = re.sub(pattern, f"##{obj_id}", text, flags=re.IGNORECASE)
-            return text
+        _replace_fields_in_dict(
+            manifest_dict,
+            ("teaser", "plot", "rules", "intro_text", "completed_condition", "gameover_condition"),
+            object_ids,
+        )
+        _replace_fields_in_dict(
+            manifest_dict.get("protagonist"), ("description", "goal", "character"), object_ids
+        )
+        _replace_fields_in_list(manifest_dict.get("scenes"), ("description",), object_ids)
+        _replace_fields_in_list(
+            manifest_dict.get("exits"), ("label", "lock_description", "rule_to_unlock"), object_ids
+        )
+        _replace_fields_in_list(
+            manifest_dict.get("npcs"),
+            ("description", "goal", "character", "spatial_position", "reveal_rule"),
+            object_ids,
+        )
+        _replace_fields_in_list(
+            objects,
+            (
+                "description",
+                "spatial_position",
+                "reveal_rule",
+                "text_log_content",
+                "rule_to_unlock",
+            ),
+            object_ids,
+        )
+        _replace_fields_in_list(
+            manifest_dict.get("quests"), ("title", "description", "goal", "impact"), object_ids
+        )
+        _replace_fields_in_list(
+            manifest_dict.get("awards"), ("title", "description", "requirement"), object_ids
+        )
 
-        for field in ("teaser", "plot", "rules", "intro_text", "completed_condition", "gameover_condition"):
-            if field in manifest_dict:
-                manifest_dict[field] = replace_ids_in_text(manifest_dict[field])
-
-        protagonist = manifest_dict.get("protagonist")
-        if isinstance(protagonist, dict):
-            for field in ("description", "goal", "character"):
-                if field in protagonist:
-                    protagonist[field] = replace_ids_in_text(protagonist[field])
-
-        for scene in (manifest_dict.get("scenes") or []):
-            if isinstance(scene, dict) and "description" in scene:
-                scene["description"] = replace_ids_in_text(scene["description"])
-
-        for exit_val in (manifest_dict.get("exits") or []):
-            if isinstance(exit_val, dict):
-                for field in ("label", "lock_description", "rule_to_unlock"):
-                    if field in exit_val:
-                        exit_val[field] = replace_ids_in_text(exit_val[field])
-
-        for npc in (manifest_dict.get("npcs") or []):
-            if isinstance(npc, dict):
-                for field in ("description", "goal", "character", "spatial_position", "reveal_rule"):
-                    if field in npc:
-                        npc[field] = replace_ids_in_text(npc[field])
-
-        for obj in objects:
-            if isinstance(obj, dict):
-                for field in ("description", "spatial_position", "reveal_rule", "text_log_content", "rule_to_unlock"):
-                    if field in obj:
-                        obj[field] = replace_ids_in_text(obj[field])
-
-        for quest in (manifest_dict.get("quests") or []):
-            if isinstance(quest, dict):
-                for field in ("title", "description", "goal", "impact"):
-                    if field in quest:
-                        quest[field] = replace_ids_in_text(quest[field])
-
-        for award in (manifest_dict.get("awards") or []):
-            if isinstance(award, dict):
-                for field in ("title", "description", "requirement"):
-                    if field in award:
-                        award[field] = replace_ids_in_text(award[field])
-
-        for seq in (manifest_dict.get("sequences") or []):
-            if isinstance(seq, dict):
-                for field in ("title", "description", "walkthrough", "end_condition"):
-                    if field in seq:
-                        seq[field] = replace_ids_in_text(seq[field])
-                for hard_field in ("required_item_id", "required_scene_id", "required_defeated_npc_id"):
-                    val = str(seq.get(hard_field) or "").replace("##", "").strip()
-                    if val.upper() in ("NONE", "NULL", "UNDEFINED", "N/A", "FALSE"):
-                        val = ""
-                    seq[hard_field] = val.upper() if val else ""
+        for seq in manifest_dict.get("sequences") or []:
+            _clean_sequence_item(seq, object_ids)
 
     @staticmethod
-    def _extract_sequences_from_prompt(prompt_str: str) -> tuple[str, list[dict[str, Any]]]:
-        if not prompt_str:
-            return prompt_str, []
-        seq_regex = re.compile(r'\[Sequence[\s:]*\d*\]', re.IGNORECASE)
-        if not seq_regex.search(prompt_str):
-            return prompt_str, []
-        blocks = seq_regex.split(prompt_str)
-        cleaned_prompt = blocks[0].strip()
-        sequences: list[dict[str, Any]] = []
+    def _parse_sequence_block(i: int, block: str) -> dict[str, Any]:
+        lines = [line.strip() for line in block.strip().split("\n") if line.strip()]
+        title = lines[0] if lines else f"Sequence {i}"
+        raw_lines = lines[1:] if len(lines) > 1 else []
+        desc_lines: list[str] = []
+        req_item = ""
+        req_scene = ""
+        req_defeated_npc = ""
+        custom_end_condition = ""
 
         def _clean_id(raw_val: str) -> str:
             clean = raw_val.replace("##", "").strip().strip("\"'").strip()
@@ -440,65 +675,67 @@ class WorldGenerator:
                 return ""
             return clean.upper()
 
-        for i, block in enumerate(blocks[1:], start=1):
-            if len(sequences) >= 15:
-                break
-            lines = [l.strip() for l in block.strip().split("\n") if l.strip()]
-            title = lines[0] if lines else f"Sequence {i}"
-            raw_lines = lines[1:] if len(lines) > 1 else []
-            desc_lines: list[str] = []
-            req_item = ""
-            req_scene = ""
-            req_defeated_npc = ""
-            custom_end_condition = ""
+        for line in raw_lines:
+            item_match = re.match(
+                r"^(?:required[_\s]+item(?:[_\s]+id)?|key[_\s]+item|item(?:[_\s]+id)?)\s*:\s*(.+)$",
+                line,
+                re.IGNORECASE,
+            )
+            scene_match = re.match(
+                r"^(?:required[_\s]+scene(?:[_\s]+id)?|target[_\s]+scene|scene(?:[_\s]+id)?)\s*:\s*(.+)$",
+                line,
+                re.IGNORECASE,
+            )
+            npc_match = re.match(
+                r"^(?:required[_\s]+defeated[_\s]+npc(?:[_\s]+id)?|defeated[_\s]+npc(?:[_\s]+id)?|defeat[_\s]+npc(?:[_\s]+id)?|defeat|npc[_\s]+to[_\s]+defeat)\s*:\s*(.+)$",
+                line,
+                re.IGNORECASE,
+            )
+            cond_match = re.match(
+                r"^(?:end[_\s]+condition|completion[_\s]+condition|condition)\s*:\s*(.+)$",
+                line,
+                re.IGNORECASE,
+            )
 
-            for line in raw_lines:
-                item_match = re.match(
-                    r'^(?:required[_\s]+item(?:[_\s]+id)?|key[_\s]+item|item(?:[_\s]+id)?)\s*:\s*(.+)$',
-                    line,
-                    re.IGNORECASE,
-                )
-                scene_match = re.match(
-                    r'^(?:required[_\s]+scene(?:[_\s]+id)?|target[_\s]+scene|scene(?:[_\s]+id)?)\s*:\s*(.+)$',
-                    line,
-                    re.IGNORECASE,
-                )
-                npc_match = re.match(
-                    r'^(?:required[_\s]+defeated[_\s]+npc(?:[_\s]+id)?|defeated[_\s]+npc(?:[_\s]+id)?|defeat[_\s]+npc(?:[_\s]+id)?|defeat|npc[_\s]+to[_\s]+defeat)\s*:\s*(.+)$',
-                    line,
-                    re.IGNORECASE,
-                )
-                cond_match = re.match(
-                    r'^(?:end[_\s]+condition|completion[_\s]+condition|condition)\s*:\s*(.+)$',
-                    line,
-                    re.IGNORECASE,
-                )
+            if item_match:
+                req_item = _clean_id(item_match.group(1))
+            elif scene_match:
+                req_scene = _clean_id(scene_match.group(1))
+            elif npc_match:
+                req_defeated_npc = _clean_id(npc_match.group(1))
+            elif cond_match:
+                custom_end_condition = cond_match.group(1).strip()
+            else:
+                desc_lines.append(line)
 
-                if item_match:
-                    req_item = _clean_id(item_match.group(1))
-                elif scene_match:
-                    req_scene = _clean_id(scene_match.group(1))
-                elif npc_match:
-                    req_defeated_npc = _clean_id(npc_match.group(1))
-                elif cond_match:
-                    custom_end_condition = cond_match.group(1).strip()
-                else:
-                    desc_lines.append(line)
+        desc = "\n".join(desc_lines) if desc_lines else "Follow the sequence blueprint."
+        end_cond = custom_end_condition or "Complete the sequence objectives."
+        return {
+            "id": f"SEQ_{i}",
+            "order": i,
+            "title": title,
+            "description": desc[:500],
+            "walkthrough": desc,
+            "end_condition": end_cond,
+            "required_item_id": req_item,
+            "required_scene_id": req_scene,
+            "required_defeated_npc_id": req_defeated_npc,
+            "exp_reward": 100,
+        }
 
-            desc = "\n".join(desc_lines) if desc_lines else "Follow the sequence blueprint."
-            end_cond = custom_end_condition or "Complete the sequence objectives."
-            sequences.append({
-                "id": f"SEQ_{i}",
-                "order": i,
-                "title": title,
-                "description": desc[:500],
-                "walkthrough": desc,
-                "end_condition": end_cond,
-                "required_item_id": req_item,
-                "required_scene_id": req_scene,
-                "required_defeated_npc_id": req_defeated_npc,
-                "exp_reward": 100,
-            })
+    @staticmethod
+    def _extract_sequences_from_prompt(prompt_str: str) -> tuple[str, list[dict[str, Any]]]:
+        if not prompt_str:
+            return prompt_str, []
+        seq_regex = re.compile(r"\[Sequence[\s:]*\d*\]", re.IGNORECASE)
+        if not seq_regex.search(prompt_str):
+            return prompt_str, []
+        blocks = seq_regex.split(prompt_str)
+        cleaned_prompt = blocks[0].strip()
+        sequences = [
+            WorldGenerator._parse_sequence_block(i, block)
+            for i, block in enumerate(blocks[1:16], start=1)
+        ]
         return cleaned_prompt, sequences
 
     @staticmethod
@@ -551,41 +788,25 @@ class WorldGenerator:
 
         Persists the result to the WorldScene, WorldExit, and WorldEntity tables.
         """
+
         from backend.engine.world_manifest_applier import apply_manifest  # noqa: PLC0415
-        from backend.engine.world_prompt_builder import build_world_generation_prompts  # noqa: PLC0415
-        from sqlalchemy import select  # noqa: PLC0415
-        from backend.models.avatar import Avatar  # noqa: PLC0415
+        from backend.engine.world_prompt_builder import (  # noqa: PLC0415
+            build_world_generation_prompts,
+        )
 
         if not re.match(r"^[a-zA-Z0-9_-]{1,128}$", template_id):
             raise ValueError("Invalid template_id")
-        if cover_source_adventure_id and not re.match(r"^[a-zA-Z0-9_-]{1,128}$", cover_source_adventure_id):
+        if cover_source_adventure_id and not re.match(
+            r"^[a-zA-Z0-9_-]{1,128}$", cover_source_adventure_id
+        ):
             raise ValueError("Invalid cover_source_adventure_id")
 
-        # Resolve provider and model from user settings if not provided
-        llm_settings = user.llm_settings or {}
-        if not provider:
-            provider = (
-                llm_settings.get("generator_model_provider")
-                or llm_settings.get("complex_model_provider")
-                or llm_settings.get("small_model_provider")
-                or llm_settings.get("preferred_provider")
-            )
-        if not model:
-            model = (
-                llm_settings.get("generator_model")
-                or llm_settings.get("complex_model")
-                or llm_settings.get("small_model")
-                or "gpt-4o"
-            )
+        provider, model = _resolve_generator_provider_and_model(user, provider, model)
 
         tts_settings = user.tts_settings or {}
-        available_voice_list = tts_settings.get("voice_list") if isinstance(tts_settings, dict) else None
-
-        if not provider:
-            raise ValueError(
-                "No adventure generator LLM provider configured for this user. "
-                "Open Settings -> Intelligence and set Generator Model Provider."
-            )
+        available_voice_list = (
+            tts_settings.get("voice_list") if isinstance(tts_settings, dict) else None
+        )
 
         llm = GameMasterLLM(user, provider=provider, model_category="generator")
 
@@ -605,7 +826,9 @@ class WorldGenerator:
         )
 
         if not sequences and original_prompt:
-            cleaned_prompt, extracted_seqs = WorldGenerator._extract_sequences_from_prompt(original_prompt)
+            cleaned_prompt, extracted_seqs = WorldGenerator._extract_sequences_from_prompt(
+                original_prompt
+            )
             if extracted_seqs:
                 sequences = extracted_seqs
                 original_prompt = cleaned_prompt
@@ -646,7 +869,6 @@ class WorldGenerator:
             allow_reuse_source_assets=allow_reuse_source_assets,
         )
 
-        # 1. Update Status
         adventure = await db.get(AdventureTemplate, template_id)
         if adventure:
             adventure.generation_logs = []  # type: ignore[assignment]
@@ -704,137 +926,26 @@ class WorldGenerator:
             object_count=len(manifesto.objects),
         )
 
-        # 2. Update Status + persist narrative fields
-        if adventure:
-            await db.refresh(adventure)
-            await _publish_generation_status_with_callback(
-                db, adventure, "Building Scenes & Plot...", status_callback=status_callback
-            )
-            log_structured_event(
-                "adventure.generation.status",
-                template_id=template_id,
-                status=adventure.creation_status,
-                phase="apply_manifest",
-            )
-            adventure.teaser = manifest_dict.get("teaser") or ""  # type: ignore[assignment]
-            adventure.original_prompt = original_prompt  # type: ignore[assignment]
-            if language:
-                adventure.language = language  # type: ignore[assignment]
-            if not adventure.origin_id:
-                adventure.origin_id = manifest_dict.get("origin_id") or template_id  # type: ignore[assignment]
-            if not adventure.original_manifest:
-                adventure.original_manifest = manifest_dict  # type: ignore[assignment]
-            await db.commit()
+        await _update_generated_adventure_narrative(
+            db, template_id, manifest_dict, original_prompt, language, status_callback
+        )
 
-        # Load source assets for cover-mode image reuse
         cover_source_assets = None
         if allow_reuse_source_assets and cover_source_adventure_id:
-            from backend.models.world_entity import WorldScene, WorldEntity  # noqa: PLC0415
-            from backend.models.avatar import Avatar  # noqa: PLC0415
+            cover_source_assets = await _load_cover_source_assets(db, cover_source_adventure_id)
 
-            src_adv = await db.get(AdventureTemplate, cover_source_adventure_id)
-            if src_adv:
-                src_avatar_res = await db.execute(
-                    select(Avatar)
-                    .where(Avatar.template_id == cover_source_adventure_id)
-                    .order_by(Avatar.created_at.asc(), Avatar.id.asc())
-                    .limit(1)
-                )
-                src_avatar = src_avatar_res.scalars().first()
-                src_scene_res = await db.execute(
-                    select(WorldScene).where(WorldScene.template_id == cover_source_adventure_id)
-                )
-                src_scenes = [s for s in src_scene_res.scalars().all() if getattr(s, "session_id", None) is None]
-                src_entity_res = await db.execute(
-                    select(WorldEntity).where(WorldEntity.template_id == cover_source_adventure_id)
-                )
-                src_entities = [e for e in src_entity_res.scalars().all() if getattr(e, "session_id", None) is None]
-                cover_source_assets = {
-                    "cover": src_adv.image_url,
-                    "protagonist": {
-                        "id": "PROTAGONIST",
-                        "name": (src_avatar.name if src_avatar else ""),
-                        "image_url": (src_avatar.profile_image if src_avatar else None),
-                    },
-                    "scenes": [{"id": s.id, "name": s.label, "image_url": s.image_url} for s in src_scenes],
-                    "npcs": [{"id": e.id, "name": e.name, "image_url": e.image_url} for e in src_entities if e.entity_type == "NPC"],
-                    "objects": [{"id": e.id, "name": e.name, "image_url": e.image_url} for e in src_entities if e.entity_type == "OBJECT"],
-                }
-
-        # Post-processing: clamp container and text-log counts
-        clamped_max_containers = max(0, min(30, int(max_containers))) if max_containers is not None else 9999
-        clamped_max_text_logs = max(0, min(30, int(max_text_logs))) if max_text_logs is not None else 9999
         if not scripts_generation_enabled:
             manifest_dict["scripts"] = []
 
         objects = manifest_dict.get("objects") or []
-        container_indices = [
-            idx for idx, obj in enumerate(objects)
-            if isinstance(obj, dict) and str(obj.get("item_type", "")).upper() == "CONTAINER"
-        ]
-        if not container_generation_enabled:
-            for idx in container_indices:
-                obj = objects[idx]
-                obj["item_type"] = "PICKABLE"
-                obj["inventory"] = []
-                obj["code_to_unlock"] = ""
-                obj["item_to_unlock"] = ""
-                obj["rule_to_unlock"] = ""
-        elif len(container_indices) > clamped_max_containers:
-            for idx in container_indices[clamped_max_containers:]:
-                obj = objects[idx]
-                obj["item_type"] = "PICKABLE"
-                obj["inventory"] = []
-                obj["code_to_unlock"] = ""
-                obj["item_to_unlock"] = ""
-                obj["rule_to_unlock"] = ""
-
-        for idx in container_indices[:clamped_max_containers]:
-            obj = objects[idx]
-            code, item, rule = _normalize_unlock_requirements(
-                obj.get("code_to_unlock"), obj.get("item_to_unlock"), obj.get("rule_to_unlock")
-            )
-            obj["code_to_unlock"] = code
-            obj["item_to_unlock"] = item
-            obj["rule_to_unlock"] = rule
-
-        _ensure_containers_have_minimum_inventory(objects)
-
-        readable_indices = [
-            idx for idx, obj in enumerate(objects)
-            if isinstance(obj, dict) and str(obj.get("item_type", "")).upper() == "READABLE"
-        ]
-        if not text_log_generation_enabled:
-            for idx in readable_indices:
-                obj = objects[idx]
-                obj["item_type"] = "PICKABLE"
-                obj["text_log_content"] = ""
-                obj["text_log_format"] = ""
-        else:
-            if len(readable_indices) > clamped_max_text_logs:
-                for idx in readable_indices[clamped_max_text_logs:]:
-                    obj = objects[idx]
-                    obj["item_type"] = "PICKABLE"
-                    obj["text_log_content"] = ""
-                    obj["text_log_format"] = ""
-            for idx in readable_indices[:clamped_max_text_logs]:
-                obj = objects[idx]
-                _obj_meta = obj.get("metadata_json") or {}
-                obj["text_log_content"] = _normalize_text_log_content(
-                    obj.get("text_log_content") or _obj_meta.get("text_log_content"),
-                    obj.get("description"),
-                    obj.get("name"),
-                )
-                text_log_format = str(
-                    obj.get("text_log_format") or _obj_meta.get("text_log_format") or "DOCUMENT"
-                ).strip().upper()
-                if text_log_format not in {"DOCUMENT", "SCROLL", "BOOK", "SIGN"}:
-                    text_log_format = "DOCUMENT"
-                obj["text_log_format"] = text_log_format
+        _postprocess_containers(objects, container_generation_enabled, max_containers)
+        _postprocess_readable_logs(objects, text_log_generation_enabled, max_text_logs)
 
         manifest_dict["cover_source_adventure_id"] = cover_source_adventure_id
         manifest_dict["cover_source_adventure_name"] = cover_source_adventure_name
-        manifest_dict["cover_similarity_percent"] = max(0, min(100, int(cover_similarity_percent or 0)))
+        manifest_dict["cover_similarity_percent"] = max(
+            0, min(100, int(cover_similarity_percent or 0))
+        )
         manifest_dict["allow_reuse_source_assets"] = bool(allow_reuse_source_assets)
         manifest_dict["scripts_generation_enabled"] = bool(scripts_generation_enabled)
 
@@ -842,7 +953,9 @@ class WorldGenerator:
             db,
             template_id,
             manifest_dict,
-            user=user if (generate_npc_images or generate_item_images or generate_scene_images) else None,
+            user=user
+            if (generate_npc_images or generate_item_images or generate_scene_images)
+            else None,
             gen_npc=generate_npc_images,
             gen_items=generate_item_images,
             gen_scenes=generate_scene_images,

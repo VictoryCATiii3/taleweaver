@@ -75,7 +75,6 @@ _FINAL_FIELDS: tuple[tuple[str, Any], ...] = (
     ("copyright", None),
     ("license", None),
     ("license_url", None),
-    ("origin_id", ""),
     ("is_adventure_generator", False),
     ("can_damage_npcs", True),
     ("npcs_can_damage_protagonist", True),

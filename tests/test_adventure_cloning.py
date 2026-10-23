@@ -181,7 +181,9 @@ async def test_duplicate_adventure_success(setup_test_db, setup_adventure_data, 
             new_id = res_data["id"]
             assert new_id != data["template_id"]
             assert res_data["title"] == "Mystic Cavern (Copy)"
-            assert res_data["origin_id"] is None
+            # A copy is a new adventure and must get its own stable identity
+            assert res_data["origin_id"]
+            assert res_data["origin_id"] != "sample-origin-123"
             assert res_data["image_url"] == f"/data/adventures/library/{new_id}/cover.png"
 
             # Check database records

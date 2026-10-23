@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.core.adventure_identity import new_origin_id
 from backend.core.generation_error_log import (
     append_generation_log_entry,
     format_creation_error,
@@ -37,6 +38,7 @@ def _create_initial_template(
     return AdventureTemplate(
         id=new_id,
         owner_id=user.id,
+        origin_id=new_origin_id(),
         title=request.title,
         original_prompt=request.prompt,
         min_scenes=request.min_scenes,

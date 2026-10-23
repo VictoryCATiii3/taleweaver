@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.core.adventure_identity import new_origin_id
 from backend.core.config import settings
 from backend.engine.media_engine import MediaEngine
 from backend.models.adventure_template import AdventureTemplate
@@ -164,7 +165,7 @@ def _create_cloned_template_entity(
         cover_appearance=original.cover_appearance,
         version=original.version or "1.0.0",
         language=original.language,
-        origin_id=None,
+        origin_id=new_origin_id(),
         cover_source_adventure_id=original.cover_source_adventure_id,
         cover_source_adventure_name=original.cover_source_adventure_name,
         cover_similarity_percent=original.cover_similarity_percent,

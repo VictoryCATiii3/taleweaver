@@ -47,7 +47,9 @@ def _entry_exceeds_limits(info: zipfile.ZipInfo) -> bool:
     if info.file_size > MAX_ADZ_ENTRY_BYTES:
         logger.error(
             "Refusing ADZ import: entry '%s' is %d bytes (limit %d).",
-            info.filename, info.file_size, MAX_ADZ_ENTRY_BYTES,
+            info.filename,
+            info.file_size,
+            MAX_ADZ_ENTRY_BYTES,
         )
         return True
     if info.compress_size <= 0:
@@ -56,7 +58,9 @@ def _entry_exceeds_limits(info: zipfile.ZipInfo) -> bool:
     if ratio > MAX_ADZ_COMPRESSION_RATIO:
         logger.error(
             "Refusing ADZ import: entry '%s' compression ratio %.1fx exceeds %dx.",
-            info.filename, ratio, MAX_ADZ_COMPRESSION_RATIO,
+            info.filename,
+            ratio,
+            MAX_ADZ_COMPRESSION_RATIO,
         )
         return True
     return False
@@ -67,7 +71,8 @@ def check_adz_limits(infos: list[zipfile.ZipInfo]) -> bool:
     if len(infos) > MAX_ADZ_TOTAL_ENTRIES:
         logger.error(
             "Refusing ADZ import: %d entries exceeds limit of %d.",
-            len(infos), MAX_ADZ_TOTAL_ENTRIES,
+            len(infos),
+            MAX_ADZ_TOTAL_ENTRIES,
         )
         return False
 
@@ -156,17 +161,24 @@ def fill_start_scene_ids(
 async def find_existing_template(
     db: AsyncSession, owner_id: Optional[str], title: str, origin_id: Optional[str]
 ) -> Optional[AdventureTemplate]:
-    """Find a template of this owner matching the title (or origin_id, if given)."""
+    """Find a template of this owner with the same origin_id, else a legacy one with the same title.
+
+    Templates carrying a different origin_id are distinct adventures and never match by title.
+    """
     owner_clause = (
-        (AdventureTemplate.owner_id == owner_id) if owner_id else AdventureTemplate.owner_id.is_(None)
+        (AdventureTemplate.owner_id == owner_id)
+        if owner_id
+        else AdventureTemplate.owner_id.is_(None)
     )
     query = select(AdventureTemplate).where(owner_clause)
     if origin_id:
-        query = query.where((AdventureTemplate.title == title) | (AdventureTemplate.origin_id == origin_id))
-    else:
-        query = query.where(AdventureTemplate.title == title)
+        by_origin = await db.execute(query.where(AdventureTemplate.origin_id == origin_id))
+        existing = by_origin.scalars().first()
+        if existing:
+            return existing
+        query = query.where(AdventureTemplate.origin_id.is_(None))
 
-    existing_res = await db.execute(query)
+    existing_res = await db.execute(query.where(AdventureTemplate.title == title))
     return existing_res.scalars().first()
 
 

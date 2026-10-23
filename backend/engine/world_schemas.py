@@ -909,9 +909,6 @@ class WorldManifesto(WorldBaseSchema):
     language: str = Field(
         ..., description="The target language for all generated content, e.g. 'English'."
     )
-    origin_id: str = Field(
-        ..., description="Stable ID for the adventure. Use empty string if not provided."
-    )
     plot: str = Field(
         ..., description="The main plotline, goals, and narrative arc of the adventure."
     )

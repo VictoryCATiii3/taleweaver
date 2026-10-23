@@ -9,6 +9,7 @@ from typing import Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.adventure_format import validate_manifest_version
+from backend.core.adventure_identity import manifest_origin_id
 from backend.core.config import settings
 from backend.engine.adventure_import_support import (
     check_adz_limits,
@@ -201,7 +202,7 @@ class AdventureTemplateImporter:
                 adv_data = manifest_data["adventure"]
 
                 # Check if template with this title or origin_id already exists for this owner
-                origin_id = adv_data.get("origin_id") or manifest_data.get("origin_id")
+                origin_id = manifest_origin_id(manifest_data)
                 await AdventureTemplateImporter._resolve_existing_template(
                     db, owner_id, adv_data["title"], origin_id, adv_data.get("version"), overwrite
                 )
@@ -588,11 +589,7 @@ class AdventureTemplateImporter:
                 if is_session
                 else payload.get("title", "Imported AdventureTemplate")
             )
-            origin_id = (
-                payload.get("adventure", {}).get("origin_id")
-                if is_session
-                else payload.get("origin_id")
-            )
+            origin_id = manifest_origin_id(payload)
 
             await AdventureTemplateImporter._resolve_existing_template(
                 db,

@@ -33,7 +33,7 @@ class AdventureTemplate(Base, TimestampMixin):
     language: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     origin_id: Mapped[Optional[str]] = mapped_column(
         String(50), nullable=True
-    )  # Stable ID for default/sample templates
+    )  # Stable adventure identity (UUID) across export/import/update
     cover_source_adventure_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     cover_source_adventure_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     cover_similarity_percent: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
