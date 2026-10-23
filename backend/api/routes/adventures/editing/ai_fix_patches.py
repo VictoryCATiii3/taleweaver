@@ -8,6 +8,12 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from backend.api.routes.adventures.editing.ai_fix_limits import (
+    DECORATIVE_OBJECT_MAX,
+    READABLE_DESCRIPTION_MAX,
+    TEXT_LOG_CONTENT_MAX,
+    length_violations,
+)
 from backend.api.routes.adventures.editing.ai_fix_sequences import patch_sequence
 from backend.api.routes.adventures.editing.ai_fix_targets import (
     _allowed_fields_for,
@@ -107,9 +113,10 @@ def _decorative_objects(values: Any) -> Optional[list[str]]:
     decor: list[str] = []
     for d in values or []:
         s = str(d).strip()
-        if len(s) > 100:
+        if len(s) > DECORATIVE_OBJECT_MAX:
             raise HTTPException(
-                status_code=400, detail="decorative_objects entries must be <= 100 chars"
+                status_code=400,
+                detail=f"decorative_objects entries must be <= {DECORATIVE_OBJECT_MAX} chars",
             )
         if s:
             decor.append(s)
@@ -201,8 +208,11 @@ def _patch_container_lock(
 def _patch_text_log(metadata_json: dict[str, Any], updates: dict[str, Any]) -> None:
     if "text_log_content" in updates:
         text = str(updates["text_log_content"]).strip()
-        if len(text) > 1000:
-            raise HTTPException(status_code=400, detail="text_log_content must be <= 1000 chars")
+        if len(text) > TEXT_LOG_CONTENT_MAX:
+            raise HTTPException(
+                status_code=400,
+                detail=f"text_log_content must be <= {TEXT_LOG_CONTENT_MAX} chars",
+            )
         metadata_json["text_log_content"] = text
     if "text_log_format" in updates:
         fmt = str(updates["text_log_format"]).strip().upper()
@@ -224,8 +234,11 @@ def _patch_object_fields(ent: WorldEntity, updates: dict[str, Any]) -> None:
 def _patch_description(ent: WorldEntity, value: Any) -> None:
     text = str(value).strip()
     is_readable = ent.entity_type == "OBJECT" and str(ent.item_type or "").upper() == "READABLE"
-    if is_readable and len(text) > 200:
-        raise HTTPException(status_code=400, detail="READABLE descriptions must be <= 200 chars")
+    if is_readable and len(text) > READABLE_DESCRIPTION_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=f"READABLE descriptions must be <= {READABLE_DESCRIPTION_MAX} chars",
+        )
     ent.description = text
 
 
@@ -285,6 +298,10 @@ async def _apply_proposal_patch(
     updates = _clean_updates(patch.target_type, patch.field_updates)
     if not updates:
         return None
+    # Item-type specific limits (READABLE descriptions) are checked once the entity is resolved.
+    violations = length_violations(patch.target_type, updates)
+    if violations:
+        raise HTTPException(status_code=400, detail=f"Field too long: {violations[0]}")
 
     target_tag = f"{patch.target_type}:{patch.target_id or ''}"
     if patch.target_type == "adventure":

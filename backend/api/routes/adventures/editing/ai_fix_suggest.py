@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional, get_args
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from backend.api.routes.adventures.editing.ai_fix_context import (
     _signing,
     _summarize_world_for_fix,
 )
+from backend.api.routes.adventures.editing.ai_fix_limits import format_length_limits
 from backend.api.routes.adventures.editing.ai_fix_llm import (
     _AllProvidersFailedError,
     _generate_llm_proposals,
@@ -20,7 +21,7 @@ from backend.api.routes.adventures.editing.ai_fix_llm import (
     _summarize_outcomes,
     _write_cached_suggestions,
 )
-from backend.api.routes.adventures.editing.ai_fix_targets import _allowed_fields_for
+from backend.api.routes.adventures.editing.ai_fix_sanitize import sanitize_proposals
 from backend.api.routes.adventures.editing.common import _get_owned_adventure_or_404
 from backend.api.routes.adventures.editing.payload import _build_adventure_editor_assets
 from backend.api.routes.adventures.schemas import AISuggestFixWrapperResponse
@@ -32,115 +33,15 @@ from backend.models.user import User
 from backend.schemas.validation import (
     AIFixSuggestionsRequest,
     AIFixSuggestionsResponse,
-    FixProposal,
-    FixProposalEntityPatch,
-    FixTargetType,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Editor"])
 
 _MAX_PROPOSALS = 3
-_PATCH_TARGET_TYPES = frozenset(get_args(FixTargetType))
-_MAX_REJECTED_LISTED = 5
-_PROPOSAL_FIELDS = (
-    "title",
-    "summary",
-    "rationale",
-    "patches",
-    "target_type",
-    "target_id",
-    "description",
-    "field_updates",
-    "note",
-)
 _TIMEOUT_MESSAGE = "The AI service did not respond in time. Please retry in a moment."
 _UNAVAILABLE_MESSAGE = "The AI service is currently unavailable. Please retry in a moment."
-_DROPPED_MESSAGE = (
-    "The AI proposed changes the editor cannot apply automatically ({rejected}). "
-    "Try fixing it manually or request new suggestions."
-)
-_DROPPED_FALLBACK = "incomplete proposals without applicable patches"
-
-
-def _as_dict(value: Any) -> Optional[dict[str, Any]]:
-    """Normalize an LLM-returned proposal/patch (dict, pydantic model, or object) to a dict."""
-    if value is None or isinstance(value, dict):
-        return value
-    if hasattr(value, "model_dump"):
-        try:
-            dumped = value.model_dump()
-        except Exception:
-            return None
-        return dumped if isinstance(dumped, dict) else None
-    collected = {f: getattr(value, f) for f in _PROPOSAL_FIELDS if hasattr(value, f)}
-    return collected or None
-
-
-def _clean_patch(raw: Any) -> Optional[FixProposalEntityPatch]:
-    p_dict = _as_dict(raw)
-    if p_dict is None:
-        return None
-    target_type = str(p_dict.get("target_type") or "").strip()
-    field_updates = p_dict.get("field_updates") or {}
-    if target_type not in _PATCH_TARGET_TYPES or not isinstance(field_updates, dict):
-        return None
-    allowed = _allowed_fields_for(target_type)
-    kept_updates = {str(k): v for k, v in field_updates.items() if k in allowed}
-    if not kept_updates:
-        return None
-    target_id = p_dict.get("target_id")
-    return FixProposalEntityPatch(
-        target_type=target_type,  # type: ignore[arg-type]
-        target_id=str(target_id).strip() if target_id is not None else None,
-        description=str(p_dict.get("description") or "").strip()[:280],
-        field_updates=kept_updates,
-    )
-
-
-def _clean_proposal(raw: Any) -> Optional[FixProposal]:
-    raw_dict = _as_dict(raw)
-    if raw_dict is None:
-        return None
-    title = str(raw_dict.get("title") or "").strip()
-    summary_text = str(raw_dict.get("summary") or "").strip()
-    if not title or not summary_text:
-        return None
-    patches = [p for p in (_clean_patch(x) for x in raw_dict.get("patches") or []) if p]
-    if not patches:
-        return None
-    rationale = raw_dict.get("rationale")
-    return FixProposal(
-        title=title[:120],
-        summary=summary_text[:600],
-        rationale=(str(rationale).strip()[:400] if rationale else None),
-        patches=patches,
-    )
-
-
-def _rejected_parts(raw_patch: Any) -> list[str]:
-    """Unsupported target types or ``type.field`` keys of one raw patch."""
-    p_dict = _as_dict(raw_patch) or {}
-    target_type = str(p_dict.get("target_type") or "").strip() or "?"
-    if target_type not in _PATCH_TARGET_TYPES:
-        return [target_type]
-    updates = p_dict.get("field_updates")
-    allowed = _allowed_fields_for(target_type)
-    return [
-        f"{target_type}.{k}"
-        for k in (updates if isinstance(updates, dict) else {})
-        if k not in allowed
-    ]
-
-
-def _dropped_message(raw_proposals: list[Any]) -> str:
-    """Explain why every LLM proposal was discarded by the sanitizer."""
-    rejected: list[str] = []
-    for raw in raw_proposals:
-        for raw_patch in (_as_dict(raw) or {}).get("patches") or []:
-            rejected += [r for r in _rejected_parts(raw_patch) if r not in rejected]
-    listed = ", ".join(rejected[:_MAX_REJECTED_LISTED]) or _DROPPED_FALLBACK
-    return _DROPPED_MESSAGE.format(rejected=listed)
+_SYSTEM_PROMPT = AI_FIX_SUGGESTIONS_SYSTEM_PROMPT + format_length_limits()
 
 
 def _suggestion_prompt(payload: AIFixSuggestionsRequest, summary: dict[str, Any]) -> str:
@@ -173,6 +74,21 @@ def _failure_message(exc: Exception, template_id: str) -> str:
         return _TIMEOUT_MESSAGE
     logger.exception("AI fix suggestion failed for %s: %s", template_id, exc)
     return _UNAVAILABLE_MESSAGE
+
+
+async def _valid_cached_response(
+    db: AsyncSession, template_id: str, user_id: str, signature: str, summary: dict[str, Any]
+) -> Optional[AIFixSuggestionsResponse]:
+    """Cached proposals re-checked against the current limits (None to regenerate)."""
+    cached = await _get_cached_suggestions(
+        db=db, template_id=template_id, user_id=user_id, signature=signature
+    )
+    if not cached:
+        return None
+    response = AIFixSuggestionsResponse(**{**cached, "error": None})
+    raw = [p.model_dump() for p in response.proposals]
+    response.proposals = sanitize_proposals(raw, summary).proposals
+    return response if response.proposals else None
 
 
 async def _cache_response(
@@ -226,21 +142,19 @@ async def generate_fix_proposals(
     # Read before the cache lookup, which may commit/rollback and expire ``current_user``.
     user_id = current_user.id
     signature = _signing(payload)
-    cached = await _get_cached_suggestions(
-        db=db, template_id=template_id, user_id=user_id, signature=signature
-    )
+    summary = _summarize_world_for_fix(await _build_adventure_editor_assets(template_id, db))
+    cached = await _valid_cached_response(db, template_id, user_id, signature, summary)
     if cached:
-        return AIFixSuggestionsResponse(**{"error": None, **cached})
+        return cached
 
-    debug_payload = await _build_adventure_editor_assets(template_id, db)
-    user_prompt = _suggestion_prompt(payload, _summarize_world_for_fix(debug_payload))
+    user_prompt = _suggestion_prompt(payload, summary)
     generated_at = datetime.now(timezone.utc).isoformat()
     try:
         wrapper, _served_provider = await _generate_llm_proposals(
             user_prompt=user_prompt,
             current_user=current_user,
             response_model=AISuggestFixWrapperResponse,
-            gm_kwargs={"system_prompt": AI_FIX_SUGGESTIONS_SYSTEM_PROMPT},
+            gm_kwargs={"system_prompt": _SYSTEM_PROMPT},
             timeout_seconds=settings.AI_FIX_SUGGEST_TIMEOUT_SECONDS,
             allow_fallback=True,
         )
@@ -253,22 +167,25 @@ async def generate_fix_proposals(
         )
 
     raw_proposals = ((wrapper.proposals if wrapper else []) or [])[:_MAX_PROPOSALS]
+    sanitized = sanitize_proposals(raw_proposals, summary)
     response = AIFixSuggestionsResponse(
         finding_signature=signature,
-        proposals=[p for p in (_clean_proposal(raw) for raw in raw_proposals) if p],
+        proposals=sanitized.proposals,
         generated_at=generated_at,
     )
     if not raw_proposals:
         logger.info("AI declined to suggest fixes for %s (%s)", template_id, payload.finding_code)
-    elif not response.proposals:
-        response.error = _dropped_message(raw_proposals)
+    if sanitized.rejected:
         logger.warning(
-            "All %d AI fix proposal(s) for %s (%s) were discarded: %s",
-            len(raw_proposals),
+            "AI fix proposals for %s (%s): kept %d of %d, rejected: %s",
             template_id,
             payload.finding_code,
-            response.error,
+            len(sanitized.proposals),
+            len(raw_proposals),
+            "; ".join(sanitized.rejected),
         )
+    if raw_proposals and not sanitized.proposals:
+        response.error = sanitized.error_message()
     if response.proposals:
         await _cache_response(db, template_id, user_id, response)
     return response
