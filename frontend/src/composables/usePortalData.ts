@@ -3,7 +3,7 @@ import { api } from '@/composables/useApi'
 import { notificationService } from '@/services/notificationService'
 import { usePortalModals, type PortalImportWarningType } from '@/composables/usePortalModals'
 import { usePortalPendingState } from '@/composables/usePortalPendingState'
-import type { AdventureTemplateSummary, GameSession } from '@/types'
+import type { AdventureTemplateSummary, CatalogTile, GameSession } from '@/types'
 
 type ImportKind = 'adv' | 'adz'
 type PendingCard = { adventureId: string; title: string; status: string; hasError: boolean; kind: 'creation' | 'import' }
@@ -18,7 +18,6 @@ export interface UsePortalDataResult {
   sessionToDelete: Ref<{ id: string; title: string } | null>
   isImporting: Ref<boolean>
   errorMsg: Ref<string>
-  showImportConfirm: Ref<boolean>
   isSeeding: Ref<boolean>
   isDeleting: Ref<boolean>
   isDeletingSession: Ref<boolean>
@@ -52,11 +51,7 @@ export interface UsePortalDataResult {
   executeDeleteAllTemplates: () => Promise<void>
   closeTemplateDeleteConfirm: () => void
   closeSessionDeleteConfirm: () => void
-  closeImportExamplesConfirm: () => void
   closeImportWarning: () => void
-  handleImportSamplesClick: () => Promise<void>
-  executeImportExamples: () => Promise<void>
-  performImportExamples: () => Promise<void>
   executeRestoreDefaults: () => Promise<void>
   performRestoreDefaults: () => Promise<void>
   triggerImportPicker: (kindOrAccept?: 'adventure' | 'session' | string) => void
@@ -142,7 +137,6 @@ export function usePortalData(): UsePortalDataResult {
     templateToDelete,
     showDeleteSessionConfirm,
     sessionToDelete,
-    showImportConfirm,
     showImportWarning,
     importWarningType,
     importConflicts,
@@ -150,8 +144,6 @@ export function usePortalData(): UsePortalDataResult {
     closeTemplateDeleteConfirm,
     openSessionDeleteConfirm,
     closeSessionDeleteConfirm,
-    openImportExamplesConfirm,
-    closeImportExamplesConfirm,
     openImportWarning,
     closeImportWarning,
     showConflictModal,
@@ -539,49 +531,6 @@ export function usePortalData(): UsePortalDataResult {
     return true
   }
 
-  /** Handles import examples CTA by checking conflicts first. */
-  async function handleImportSamplesClick() {
-    try {
-      const hasConflicts = await hasImportConflicts('samples', api.checkExamples)
-      if (!hasConflicts) {
-        openImportExamplesConfirm()
-      }
-    } catch (error) {
-      console.error('Error checking for example conflicts:', error)
-      openImportExamplesConfirm()
-    }
-  }
-
-  /** Confirms examples import flow including a second conflict check. */
-  async function executeImportExamples() {
-    closeImportExamplesConfirm()
-
-    try {
-      const hasConflicts = await hasImportConflicts('samples', api.checkExamples)
-      if (hasConflicts) {
-        return
-      }
-    } catch (error) {
-      console.error('Error checking for example conflicts:', error)
-    }
-
-    await performImportExamples()
-  }
-
-  /** Performs examples import and refreshes portal data. */
-  async function performImportExamples() {
-    closeImportWarning()
-    isSeeding.value = true
-    try {
-      await api.importExamples()
-      await fetchPortalData()
-    } catch (error: any) {
-      errorMsg.value = error?.message || 'Import of examples failed.'
-    } finally {
-      isSeeding.value = false
-    }
-  }
-
   /** Starts defaults restore flow with conflict pre-check. */
   async function executeRestoreDefaults() {
     try {
@@ -913,7 +862,6 @@ export function usePortalData(): UsePortalDataResult {
     sessionToDelete,
     isImporting,
     errorMsg,
-    showImportConfirm,
     isSeeding,
     isDeleting,
     isDeletingSession,
@@ -947,11 +895,7 @@ export function usePortalData(): UsePortalDataResult {
     executeDeleteAllTemplates,
     closeTemplateDeleteConfirm,
     closeSessionDeleteConfirm,
-    closeImportExamplesConfirm,
     closeImportWarning,
-    handleImportSamplesClick,
-    executeImportExamples,
-    performImportExamples,
     executeRestoreDefaults,
     performRestoreDefaults,
     triggerImportPicker,

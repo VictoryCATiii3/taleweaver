@@ -24,7 +24,6 @@ import { isMobileSidebarOpen, closeMobileSidebar } from '@/store/layout'
 
 import DeleteAdventureModal from '@/components/portal/DeleteAdventureModal.vue'
 import DeleteAllAdventuresModal from '@/components/portal/DeleteAllAdventuresModal.vue'
-import ImportExamplesModal from '@/components/portal/ImportExamplesModal.vue'
 import ImportWarningModal from '@/components/portal/ImportWarningModal.vue'
 import DeleteSessionModal from '@/components/portal/DeleteSessionModal.vue'
 import DeleteAllSessionsModal from '@/components/portal/DeleteAllSessionsModal.vue'
@@ -36,6 +35,8 @@ import CloneProgressModal from '@/components/portal/CloneProgressModal.vue'
 import ExportProgressModal from '@/components/portal/ExportProgressModal.vue'
 import GenerationProgressModal from '@/components/portal/GenerationProgressModal.vue'
 import MigrateAdventureModal from '@/components/portal/MigrateAdventureModal.vue'
+import AdventureLibraryDialog from '@/components/portal/AdventureLibraryDialog.vue'
+import { useAdventureLibrary } from '@/composables/useAdventureLibrary'
 import type { AdventureTemplateSummary } from '@/types'
 
 
@@ -64,8 +65,9 @@ const {
   templateToDelete,
   showDeleteSessionConfirm,
   sessionToDelete,
-  showImportConfirm,
   isSeeding,
+  isImporting,
+  errorMsg,
   isDeleting,
   isDeletingSession,
   isStartingSession,
@@ -98,11 +100,7 @@ const {
   executeDeleteAllTemplates,
   closeTemplateDeleteConfirm,
   closeSessionDeleteConfirm,
-  closeImportExamplesConfirm,
   closeImportWarning,
-  handleImportSamplesClick,
-  executeImportExamples,
-  performImportExamples,
   executeRestoreDefaults,
   performRestoreDefaults,
   triggerImportPicker,
@@ -131,6 +129,18 @@ const {
   imageStylesCatalog,
   toneCatalog,
 } = usePortalData()
+
+const adventureLibrary = useAdventureLibrary()
+
+function openAdventureLibrary() {
+  void adventureLibrary.openDialog()
+}
+
+/** Closes the library dialog and refreshes the portal so newly imported adventures appear. */
+function closeAdventureLibrary() {
+  adventureLibrary.closeDialog()
+  void fetchPortalData()
+}
 
 const templateFilters = usePortalFilters(visibleTemplates, 'templates', 18)
 const sessionFilters = usePortalFilters(sessions, 'sessions', 18)
@@ -232,7 +242,7 @@ async function createEmptyAdventure() {
 }
 
 async function onDeleteAllAdventures() {
-  if (templates.length === 0 || isDeleting.value) return
+  if (templates.value.length === 0 || isDeleting.value) return
   showDeleteAllAdventuresConfirm.value = true
 }
 
@@ -246,7 +256,7 @@ async function confirmDeleteAllAdventures() {
 }
 
 async function onDeleteAllSessions() {
-  if (sessions.length === 0 || isDeletingSession.value) return
+  if (sessions.value.length === 0 || isDeletingSession.value) return
   showDeleteAllSessionsConfirm.value = true
 }
 
@@ -426,7 +436,7 @@ onUnmounted(() => {
               @load-more="templateFilters.loadMore"
               @create="createEmptyAdventure"
               @generate-world="openCreateModal"
-              @import-samples="handleImportSamplesClick"
+              @open-library="openAdventureLibrary"
               @remove-failed-pending="removeFailedPendingCard"
               @cancel-pending="cancelAdventure"
               @start-session="startSession"
@@ -456,7 +466,7 @@ onUnmounted(() => {
               @load-more="templateFilters.loadMore"
               @create="createEmptyAdventure"
               @generate-world="openCreateModal"
-              @import-samples="handleImportSamplesClick"
+              @open-library="openAdventureLibrary"
               @remove-failed-pending="removeFailedPendingCard"
               @cancel-pending="cancelAdventure"
               @start-session="startSession"
@@ -539,12 +549,6 @@ onUnmounted(() => {
         @confirm="confirmDeleteAllAdventures"
       />
       
-      <ImportExamplesModal
-        v-if="showImportConfirm"
-        @close="closeImportExamplesConfirm"
-        @confirm="executeImportExamples"
-      />
-
       <DeleteSessionModal
         v-if="showDeleteSessionConfirm"
         :session-title="sessionToDelete?.title || ''"
@@ -575,7 +579,7 @@ onUnmounted(() => {
         :conflicts="importConflicts"
         :is-importing="isSeeding"
         @close="closeImportWarning"
-        @confirm="importWarningType === 'defaults' ? performRestoreDefaults() : performImportExamples()"
+        @confirm="performRestoreDefaults"
       />
 
       <AboutModal
@@ -620,6 +624,12 @@ onUnmounted(() => {
         :adventure-id="activeProgressAdventure.id"
         :adventure-title="activeProgressAdventure.title"
         @close="activeProgressAdventure = null"
+      />
+
+      <AdventureLibraryDialog
+        v-if="adventureLibrary.isOpen.value"
+        :library="adventureLibrary"
+        @close="closeAdventureLibrary"
       />
 
       <MigrateAdventureModal

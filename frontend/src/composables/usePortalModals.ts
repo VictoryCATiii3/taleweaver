@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 
-export type PortalImportWarningType = 'defaults' | 'samples'
+export type PortalImportWarningType = 'defaults'
 
 type PortalDeleteTarget = { id: string; title: string }
 type PortalConflictEntry = { title: string; already_exists: boolean }
@@ -19,7 +19,6 @@ export interface UsePortalModalsResult {
   templateToDelete: Ref<PortalDeleteTarget | null>
   showDeleteSessionConfirm: Ref<boolean>
   sessionToDelete: Ref<PortalDeleteTarget | null>
-  showImportConfirm: Ref<boolean>
   showImportWarning: Ref<boolean>
   importWarningType: Ref<PortalImportWarningType>
   importConflicts: Ref<PortalConflictEntry[]>
@@ -27,8 +26,6 @@ export interface UsePortalModalsResult {
   closeTemplateDeleteConfirm: () => void
   openSessionDeleteConfirm: (gameId: string, title: string) => void
   closeSessionDeleteConfirm: () => void
-  openImportExamplesConfirm: () => void
-  closeImportExamplesConfirm: () => void
   openImportWarning: (type: PortalImportWarningType, conflicts: PortalConflictEntry[]) => void
   closeImportWarning: () => void
   showConflictModal: Ref<boolean>
@@ -44,7 +41,6 @@ export function usePortalModals(): UsePortalModalsResult {
   const showDeleteSessionConfirm = ref(false)
   const sessionToDelete = ref<PortalDeleteTarget | null>(null)
 
-  const showImportConfirm = ref(false)
   const showImportWarning = ref(false)
   const importWarningType = ref<PortalImportWarningType>('defaults')
   const importConflicts = ref<PortalConflictEntry[]>([])
@@ -76,16 +72,6 @@ export function usePortalModals(): UsePortalModalsResult {
     sessionToDelete.value = null
   }
 
-  /** Opens the examples import confirmation dialog. */
-  function openImportExamplesConfirm() {
-    showImportConfirm.value = true
-  }
-
-  /** Closes the examples import confirmation dialog. */
-  function closeImportExamplesConfirm() {
-    showImportConfirm.value = false
-  }
-
   function openImportWarning(
     type: PortalImportWarningType,
     conflicts: PortalConflictEntry[],
@@ -105,7 +91,6 @@ export function usePortalModals(): UsePortalModalsResult {
     templateToDelete,
     showDeleteSessionConfirm,
     sessionToDelete,
-    showImportConfirm,
     showImportWarning,
     importWarningType,
     importConflicts,
@@ -113,8 +98,6 @@ export function usePortalModals(): UsePortalModalsResult {
     closeTemplateDeleteConfirm,
     openSessionDeleteConfirm,
     closeSessionDeleteConfirm,
-    openImportExamplesConfirm,
-    closeImportExamplesConfirm,
     openImportWarning,
     closeImportWarning,
     showConflictModal,

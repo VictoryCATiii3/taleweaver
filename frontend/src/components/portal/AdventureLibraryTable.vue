@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import type { AdventureTemplateSummary } from '@/types'
 import {
   Play,
@@ -13,10 +13,8 @@ import {
   BookOpen,
   MessageSquare,
   Sparkles,
-  AlertCircle,
   Plus,
-  Compass,
-  ArrowDownToLine,
+  Library,
   Loader2,
   Copy
 } from 'lucide-vue-next'
@@ -39,7 +37,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'create'): void
   (e: 'generate-world'): void
-  (e: 'import-samples'): void
+  (e: 'open-library'): void
   (e: 'remove-failed-pending', adventureId: string, kind: 'creation' | 'import'): void
   (e: 'cancel-pending', adventureId: string): void
   (e: 'start-session', templateId: string): void
@@ -66,7 +64,7 @@ function toggleMenu(id: string, ev: MouseEvent) {
   activeMenuId.value = activeMenuId.value === id ? null : id
 }
 
-function handleGlobalClick(ev: MouseEvent) {
+function handleGlobalClick() {
   activeMenuId.value = null
 }
 
@@ -154,11 +152,11 @@ function getModeBadge(mode?: string): { label: string; class: string; icon: any 
 
         <button
           v-if="!props.isSeeding"
-          @click="$emit('import-samples')"
+          @click="$emit('open-library')"
           class="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-bold uppercase tracking-wider hover:bg-white/10 hover:text-white transition-all flex items-center gap-2"
         >
-          <Compass class="w-4 h-4" />
-          <span>Import Samples</span>
+          <Library class="w-4 h-4" />
+          <span>Adventure Library</span>
         </button>
       </div>
 
