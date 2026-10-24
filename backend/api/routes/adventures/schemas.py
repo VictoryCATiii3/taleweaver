@@ -406,6 +406,7 @@ class GameSessionResponse(BaseModel):
     award_count: int = 0
     earned_award_count: int = 0
     created_at: Optional[datetime] = None
+    last_played_at: Optional[datetime] = None
     status: str = "active"
     status_note: Optional[str] = None
     copied_from_id: Optional[str] = None
@@ -458,6 +459,7 @@ class AdventureTemplateSummaryResponse(BaseModel):
     completed_quest_count: int = 0
     active_game_id: Optional[str] = None
     has_active_session: bool = False
+    last_played_at: Optional[datetime] = None
     scene_id: Optional[str] = None
     current_scene_name: Optional[str] = None
     origin_id: Optional[str] = None

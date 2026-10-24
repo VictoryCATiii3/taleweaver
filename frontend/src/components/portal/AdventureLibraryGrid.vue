@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { AdventureTemplateSummary } from '@/types'
 import { Loader2, BookOpen } from 'lucide-vue-next'
-import PortalCreateAdventureCard from './PortalCreateAdventureCard.vue'
-import GenerateWorldCard from './GenerateWorldCard.vue'
-import ImportExamplesCard from './ImportExamplesCard.vue'
+import PortalForgeRow from './PortalForgeRow.vue'
+import { setAmbientAccent } from '@/store/portalAmbient'
+import { lastPlayedMs } from '@/utils/relativeTime'
 import PendingAdventureCard from './PendingAdventureCard.vue'
 import AdventureTemplateCard from './AdventureTemplateCard.vue'
 
@@ -27,6 +27,7 @@ const emit = defineEmits<{
   (e: 'remove-failed-pending', adventureId: string, kind: 'creation' | 'import'): void
   (e: 'cancel-pending', adventureId: string): void
   (e: 'start-session', templateId: string): void
+  (e: 'resume-session', gameId: string): void
   (e: 'update-adventure', templateId: string): void
   (e: 'migrate', template: any): void
   (e: 'cover', templateId: string): void
@@ -39,6 +40,14 @@ const emit = defineEmits<{
   (e: 'click-pending', pending: any): void
   (e: 'load-more'): void
 }>()
+
+/** Adventures with a running session get their own shelf above the archive. */
+const inProgressTemplates = computed(() =>
+  props.visibleTemplates
+    .filter((t) => t.has_active_session)
+    .sort((a, b) => lastPlayedMs(b) - lastPlayedMs(a))
+)
+const archiveTemplates = computed(() => props.visibleTemplates.filter((t) => !t.has_active_session))
 
 const sentinelRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -70,6 +79,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  setAmbientAccent(null)
   if (scrollContainer) {
     scrollContainer.removeEventListener('scroll', handleScroll)
   }
@@ -81,52 +91,90 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 xl:gap-4">
-      <PortalCreateAdventureCard @click="$emit('create')" />
+  <div class="space-y-8 sm:space-y-10">
+    <PortalForgeRow
+      :is-seeding="isSeeding"
+      @create="$emit('create')"
+      @generate-world="$emit('generate-world')"
+      @open-library="$emit('open-library')"
+    />
 
-      <GenerateWorldCard @generate="$emit('generate-world')" />
-      
-      <ImportExamplesCard 
-        v-if="!isSeeding" 
-        @open-library="$emit('open-library')" 
-      />
-
-      <!-- Loading indicator for seeding -->
-      <div v-if="isSeeding" class="flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-xl bg-white/5 gap-3 h-full min-h-[220px]">
-        <div class="w-8 h-8 border-2 border-aether-primary/10 border-t-aether-primary rounded-full animate-spin"></div>
-        <span class="text-xxs text-aether-primary uppercase tracking-widest font-bold">Importing Tales...</span>
+    <!-- Shelf: adventures with a running session -->
+    <section v-if="inProgressTemplates.length > 0" class="space-y-3" aria-label="In progress">
+      <h2 class="shelf-heading text-xs sm:text-sm uppercase">In Progress</h2>
+      <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 xl:gap-5 pt-2">
+        <div
+          v-for="(entry, index) in inProgressTemplates"
+          :key="`active-${entry.template_id}`"
+          class="tale-enter"
+          :style="{ '--i': index }"
+        >
+          <AdventureTemplateCard
+            :template="entry"
+            :is-starting-session="isStartingSession"
+            :is-starting-this-template="startingSessionTemplateId === entry.template_id"
+            :is-updating="props.updatingTemplateIds ? props.updatingTemplateIds.has(entry.template_id) : false"
+            @start-session="(id) => $emit('start-session', id)"
+            @resume-session="(id) => $emit('resume-session', id)"
+            @update-adventure="(id) => $emit('update-adventure', id)"
+            @migrate="(tpl) => $emit('migrate', tpl)"
+            @cover="(id) => $emit('cover', id)"
+            @edit="(id) => $emit('edit', id)"
+            @duplicate="(id) => $emit('duplicate', id)"
+            @export-adz="(id, title) => $emit('export-adz', id, title)"
+            @export-adv="(id, title) => $emit('export-adv', id, title)"
+            @delete="(id, title) => $emit('delete', id, title)"
+            @dismiss-warning="(id) => $emit('dismiss-warning', id)"
+          />
+        </div>
       </div>
+    </section>
 
-      <PendingAdventureCard
-        v-for="pending in pendingCards"
-        :key="`pending-${pending.adventureId}`"
-        :pending="pending"
-        :loading-word-index="loadingWordIndex"
-        @remove-failed="(id, kind) => $emit('remove-failed-pending', id, kind)"
-        @cancel="(id) => $emit('cancel-pending', id)"
-        @click="$emit('click-pending', pending)"
-      />
+    <!-- Shelf: everything else -->
+    <section class="space-y-3" aria-label="The archive">
+      <h2 class="shelf-heading text-xs sm:text-sm uppercase">The Archive</h2>
+      <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 xl:gap-5 pt-2">
+        <div v-if="isSeeding" class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-amber-300/20 bg-white/5 gap-3 aspect-[2/3]">
+          <div class="w-8 h-8 border-2 border-aether-primary/10 border-t-aether-primary rounded-full animate-spin"></div>
+          <span class="text-xxs text-aether-primary uppercase tracking-widest font-bold">Importing Tales...</span>
+        </div>
 
-      <AdventureTemplateCard
-        v-for="entry in visibleTemplates"
-        :key="entry.template_id"
-        :template="entry"
-        :is-starting-session="isStartingSession"
-        :is-starting-this-template="startingSessionTemplateId === entry.template_id"
-        :is-updating="props.updatingTemplateIds ? props.updatingTemplateIds.has(entry.template_id) : false"
-        @start-session="(id) => $emit('start-session', id)"
-        @update-adventure="(id) => $emit('update-adventure', id)"
-        @migrate="(tpl) => $emit('migrate', tpl)"
-        @cover="(id) => $emit('cover', id)"
-        @edit="(id) => $emit('edit', id)"
-        @duplicate="(id) => $emit('duplicate', id)"
-        @export-adz="(id, title) => $emit('export-adz', id, title)"
-        @export-adv="(id, title) => $emit('export-adv', id, title)"
-        @delete="(id, title) => $emit('delete', id, title)"
-        @dismiss-warning="(id) => $emit('dismiss-warning', id)"
-      />
-    </div>
+        <PendingAdventureCard
+          v-for="pending in pendingCards"
+          :key="`pending-${pending.adventureId}`"
+          :pending="pending"
+          :loading-word-index="loadingWordIndex"
+          @remove-failed="(id, kind) => $emit('remove-failed-pending', id, kind)"
+          @cancel="(id) => $emit('cancel-pending', id)"
+          @click="$emit('click-pending', pending)"
+        />
+
+        <div
+          v-for="(entry, index) in archiveTemplates"
+          :key="entry.template_id"
+          class="tale-enter"
+          :style="{ '--i': index }"
+        >
+          <AdventureTemplateCard
+            :template="entry"
+            :is-starting-session="isStartingSession"
+            :is-starting-this-template="startingSessionTemplateId === entry.template_id"
+            :is-updating="props.updatingTemplateIds ? props.updatingTemplateIds.has(entry.template_id) : false"
+            @start-session="(id) => $emit('start-session', id)"
+            @resume-session="(id) => $emit('resume-session', id)"
+            @update-adventure="(id) => $emit('update-adventure', id)"
+            @migrate="(tpl) => $emit('migrate', tpl)"
+            @cover="(id) => $emit('cover', id)"
+            @edit="(id) => $emit('edit', id)"
+            @duplicate="(id) => $emit('duplicate', id)"
+            @export-adz="(id, title) => $emit('export-adz', id, title)"
+            @export-adv="(id, title) => $emit('export-adv', id, title)"
+            @delete="(id, title) => $emit('delete', id, title)"
+            @dismiss-warning="(id) => $emit('dismiss-warning', id)"
+          />
+        </div>
+      </div>
+    </section>
 
     <!-- Empty filtered state notice if no templates match filters -->
     <div

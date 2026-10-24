@@ -7,4 +7,6 @@ Files in /assets/fonts and corresponding license text:
 - newsreader-latin-600-normal.woff2 -> licenses/NEWSREADER-LICENSE.txt
 - press-start-2p-latin-400-normal.woff2 -> licenses/PRESS-START-2P-LICENSE.txt
 - Orbitron-VariableFont_wght.ttf -> licenses/ORBITRON-LICENSE.txt
+- cinzel-latin-600-normal.woff2 -> licenses/CINZEL-LICENSE.txt
+- cinzel-latin-700-normal.woff2 -> licenses/CINZEL-LICENSE.txt
 - rpg-awesome.min.css + rpgawesome-webfont.* -> licenses/RPG-AWESOME-LICENSE.md

@@ -41,7 +41,7 @@ onUnmounted(() => {
 
 <template>
   <div 
-    class="adventure-card flex flex-col rounded-xl border bg-aether-surface/30 relative overflow-hidden group cursor-pointer transition-all duration-200 h-full w-full"
+    class="adventure-card flex flex-col rounded-2xl border bg-aether-surface/30 relative overflow-hidden group cursor-pointer transition-all duration-200 h-full w-full min-h-[260px]"
     :class="props.pending.hasError 
       ? 'border-red-500/30 hover:border-red-500/50 hover:shadow-[0_0_20px_rgba(239,68,68,0.1)]' 
       : 'border-white/10 hover:border-aether-primary/40 hover:shadow-[0_0_20px_rgba(56,189,248,0.05)]'"
@@ -50,7 +50,7 @@ onUnmounted(() => {
     <div class="absolute inset-0 animate-shimmer opacity-30 pointer-events-none"></div>
     
     <!-- Placeholder Cover Area -->
-    <div class="aspect-[4/3] sm:aspect-[3/2] w-full bg-white/5 flex flex-col items-center justify-center border-b border-white/5 relative p-3 sm:p-6 text-center">
+    <div class="flex-1 min-h-[140px] w-full bg-white/5 flex flex-col items-center justify-center border-b border-white/5 relative p-3 sm:p-6 text-center">
       <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-aether-primary/10 border border-aether-primary/20 flex items-center justify-center mb-1.5 sm:mb-3">
         <i
           :class="[

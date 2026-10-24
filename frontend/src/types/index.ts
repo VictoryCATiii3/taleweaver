@@ -279,6 +279,8 @@ export interface GameSession {
   award_count?: number
   earned_award_count?: number
   created_at?: string
+  /** When the player last opened this session; falls back to created_at when missing. */
+  last_played_at?: string | null
   status?: 'active' | 'archived' | 'completed' | 'game_over' | null
   status_note?: string | null
   copied_from_id?: string | null
@@ -335,6 +337,8 @@ export interface AdventureTemplateSummary {
   completed_quest_count?: number
   active_game_id?: string | null
   has_active_session?: boolean
+  /** Last time the session behind active_game_id was opened. */
+  last_played_at?: string | null
   is_paused?: boolean
   scene_id?: string | null
   current_scene_name?: string | null

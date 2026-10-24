@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.routes.adventures.adventure_creation import (
@@ -495,8 +495,9 @@ async def list_templates(
             & (WorldScene.id == SessionState.current_scene_id),
         )
         .where((GameSession.user_id == current_user.id) & (GameSession.status == "active"))
-        .order_by(GameSession.created_at.desc())
+        .order_by(func.coalesce(GameSession.last_played_at, GameSession.created_at).desc())
     )
+    # First row per template wins, so active_game_id points at the most recently played session.
     latest_by_template = {}
     for game_session, state, scene_label in session_rows.all():
         if game_session.template_id not in latest_by_template:
@@ -540,6 +541,7 @@ async def list_templates(
                 ),
                 active_game_id=(game_session.id if game_session else None),
                 has_active_session=(game_session is not None),
+                last_played_at=(game_session.last_played_at if game_session else None),
                 scene_id=(state.current_scene_id if state else None),
                 current_scene_name=(scene_label if scene_label else None),
                 origin_id=template.origin_id,

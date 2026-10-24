@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { GameSession } from '@/types'
-import { MoreHorizontal, Clock, FileText, Download } from 'lucide-vue-next'
+import { FileText, Play } from 'lucide-vue-next'
+import ProgressRing from './ProgressRing.vue'
+import TaleCardArtwork from './TaleCardArtwork.vue'
+import SessionCardMenu, { type SessionCardAction } from './SessionCardMenu.vue'
+import { useCardTilt } from '@/composables/useCardTilt'
+import { resolveGenreAccent, toneToLabel } from '@/composables/useGenreAccent'
+import { setAmbientAccent } from '@/store/portalAmbient'
+import { formatRelative } from '@/utils/relativeTime'
 
 const props = defineProps<{
   session: GameSession
@@ -15,286 +22,183 @@ const emit = defineEmits<{
   (e: 'export', gameId: string): void
 }>()
 
+interface StatusView {
+  label: string
+  /** Wax seal for finished journeys; running ones get a small chip instead. */
+  seal: boolean
+  chipClass: string
+  icon: string
+  action: string
+}
+
+const STATUS_VIEWS: Record<string, StatusView> = {
+  active: { label: 'Active', seal: false, chipClass: 'bg-slate-950/80 text-emerald-300 border-emerald-400/40', icon: 'ra-hourglass', action: 'Resume' },
+  paused: { label: 'Paused', seal: false, chipClass: 'bg-slate-950/80 text-amber-300 border-amber-400/40', icon: 'ra-hourglass', action: 'Resume' },
+  archived: { label: 'Archived', seal: false, chipClass: 'bg-slate-950/80 text-slate-300 border-slate-400/40', icon: 'ra-book', action: 'Open' },
+  completed: { label: 'Victory', seal: true, chipClass: 'seal-victory', icon: 'ra-trophy', action: 'Revisit' },
+  game_over: { label: 'Defeated', seal: true, chipClass: 'seal-defeat', icon: 'ra-skull', action: 'Revisit' },
+}
+
 const isMenuOpen = ref(false)
-const isNotePopupOpen = ref(false)
+const isNoteOpen = ref(false)
+const noteRef = ref<HTMLElement | null>(null)
+const { tiltRef, onPointerMove, onPointerLeave } = useCardTilt()
 
-function toggleMenu(): void {
-  isMenuOpen.value = !isMenuOpen.value
+const toneLabel = computed(() => toneToLabel(props.session.selected_tone))
+const accent = computed(() => resolveGenreAccent(toneLabel.value))
+
+const statusKey = computed(() => {
+  const status = props.session.status
+  if (status && status !== 'active') return status
+  return props.session.is_paused ? 'paused' : 'active'
+})
+const statusView = computed(() => STATUS_VIEWS[statusKey.value] || STATUS_VIEWS.active)
+
+const playtime = computed(() => {
+  const extra = props.session as GameSession & { time_system?: string; time_config?: { unit_name?: string } }
+  const unit = extra.time_system === 'units' ? extra.time_config?.unit_name || 'units' : 'min'
+  return `${props.session.in_game_time || 0} ${unit}`
+})
+
+const relativeLastPlayed = computed(() => formatRelative(props.session.last_played_at || props.session.created_at))
+const absoluteStart = computed(() =>
+  props.session.created_at ? new Date(props.session.created_at).toLocaleString() : ''
+)
+
+const actionHandlers: Record<SessionCardAction, () => void> = {
+  copy: () => emit('copy', props.session.game_id),
+  'edit-note': () => emit('edit-note', props.session.game_id, props.session.status_note || ''),
+  export: () => emit('export', props.session.game_id),
+  delete: () => emit('delete', props.session.game_id, props.session.adventure_title),
 }
 
-function closeMenu(): void {
-  isMenuOpen.value = false
-}
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return 'Recently'
-  const d = new Date(dateStr)
-  return d.toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-function runAction(action: 'resume' | 'delete' | 'copy' | 'edit-note' | 'export'): void {
-  if (action === 'resume') {
-    emit('resume', props.session.game_id)
-  } else if (action === 'delete') {
-    emit('delete', props.session.game_id, props.session.adventure_title)
-  } else if (action === 'copy') {
-    emit('copy', props.session.game_id)
-  } else if (action === 'edit-note') {
-    emit('edit-note', props.session.game_id, props.session.status_note || '')
-  } else if (action === 'export') {
-    emit('export', props.session.game_id)
+function handleNoteClickOutside(event: MouseEvent): void {
+  if (noteRef.value && !noteRef.value.contains(event.target as Node)) {
+    isNoteOpen.value = false
   }
-  closeMenu()
 }
+
+onMounted(() => window.addEventListener('mousedown', handleNoteClickOutside))
+onUnmounted(() => window.removeEventListener('mousedown', handleNoteClickOutside))
 </script>
 
 <template>
-  <article class="rounded-xl border border-white/10 bg-aether-surface/20 flex flex-col relative group">
-    <!-- Top Cover Area -->
-    <div class="aspect-[4/3] sm:aspect-[3/2] relative bg-black/30">
-      <div class="absolute inset-0 overflow-hidden rounded-t-xl">
-        <!-- Ribbon for Game Over / Completed -->
-        <div v-if="props.session.status === 'game_over'" class="absolute -right-12 top-6 bg-red-600 text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] py-1 sm:py-1.5 w-48 text-center rotate-45 shadow-lg z-10">
-          Game Over
-        </div>
-        <div v-if="props.session.status === 'completed'" class="absolute -right-12 top-6 bg-emerald-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] py-1 sm:py-1.5 w-48 text-center rotate-45 shadow-lg z-10">
-          Completed
-        </div>
-        <img
-          v-if="props.session.image_url"
-          :src="props.session.image_url"
-          class="w-full h-full object-cover object-top opacity-60 group-hover:opacity-80 transition-opacity"
-          alt="Adventure cover"
-        />
-        <div v-else class="w-full h-full flex items-center justify-center text-slate-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
-          No Cover
-        </div>
-      </div>
+  <article
+    ref="tiltRef"
+    class="tale-card group rounded-2xl aspect-[2/3] flex flex-col"
+    :class="isMenuOpen || isNoteOpen ? 'z-30' : 'z-0'"
+    :style="{ '--accent-rgb': accent.rgb }"
+    @pointerenter="setAmbientAccent(accent.rgb)"
+    @pointermove="onPointerMove"
+    @pointerleave="onPointerLeave"
+  >
+    <TaleCardArtwork :image-url="props.session.image_url" :accent="accent" :muted="statusKey === 'game_over'" />
 
-      <div class="card-image-fray pointer-events-none absolute inset-x-0 bottom-0 h-16 sm:h-24"></div>
-
-      <!-- Status & Format Badges -->
-      <div class="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 flex flex-wrap items-center gap-1.5">
+    <!-- Top row: status + note + options -->
+    <!-- z-20: its menu and popups overlap the bottom block, which must stay underneath -->
+    <div class="relative z-20 flex items-start justify-between gap-2 p-2 sm:p-3">
+      <div class="flex flex-col gap-1.5 items-start min-w-0">
         <span
-          class="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs uppercase tracking-widest font-black"
-          :class="{
-            'bg-amber-500/20 text-amber-300': props.session.is_paused && (!props.session.status || props.session.status === 'active'),
-            'bg-emerald-500/20 text-emerald-300': !props.session.is_paused && (!props.session.status || props.session.status === 'active'),
-            'bg-red-500/20 text-red-300': props.session.status === 'game_over',
-            'bg-emerald-600/40 text-emerald-100': props.session.status === 'completed'
-          }"
+          v-if="!statusView.seal"
+          class="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border text-[9px] sm:text-[11px] font-bold tracking-wide flex items-center gap-1.5 backdrop-blur-md"
+          :class="statusView.chipClass"
         >
-          {{
-            props.session.status === 'game_over' ? 'Defeated' :
-            props.session.status === 'completed' ? 'Victory' :
-            (props.session.is_paused ? 'Paused' : 'Active')
-          }}
+          <span v-if="statusKey === 'active'" class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+          <i v-else :class="['ra', statusView.icon]" class="text-[10px]"></i>
+          {{ statusView.label }}
         </span>
-
-        <!-- Outdated Format Warning Badge -->
-        <div v-if="props.session.is_legacy_format">
-          <div class="group/legacy relative">
-            <div class="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-rose-500/20 text-rose-400 text-[9px] sm:text-xs uppercase tracking-widest font-black border border-rose-500/30 flex items-center gap-1 sm:gap-1.5 backdrop-blur-md shadow-lg shadow-rose-500/10 cursor-help">
-              <i class="ra ra-skull text-[10px] sm:text-xs"></i>
-              <span>Outdated Format</span>
-            </div>
-            <div class="absolute left-0 top-full mt-2 w-64 p-3 rounded-xl bg-slate-900/95 border border-rose-500/30 text-[10px] text-slate-300 font-bold leading-relaxed shadow-2xl opacity-0 group-hover/legacy:opacity-100 transition-opacity pointer-events-none z-40 backdrop-blur-xl">
-              <div class="text-rose-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-2">
-                <i class="ra ra-warning"></i>
-                Format Incompatible
-              </div>
-              This session was created with an outdated adventure format. Unpredictable side effects may occur during gameplay.
-            </div>
-          </div>
-        </div>
+        <span
+          v-if="toneLabel"
+          class="tale-chip hidden sm:flex px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide items-center gap-1.5 max-w-full"
+          :title="toneLabel"
+        >
+          <i :class="['ra', accent.icon]" class="text-xs"></i>
+          <span class="truncate">{{ toneLabel }}</span>
+        </span>
+        <span
+          v-if="props.session.is_legacy_format"
+          class="group/legacy relative px-2 py-0.5 sm:py-1 rounded-full bg-slate-950/80 text-rose-300 text-[9px] sm:text-[11px] font-bold border border-rose-500/40 flex items-center gap-1.5 backdrop-blur-md cursor-help"
+        >
+          <i class="ra ra-help text-[10px]"></i>
+          Outdated format
+          <span class="absolute left-0 top-full mt-2 w-60 p-3 rounded-xl bg-slate-900/95 border border-rose-500/30 text-[11px] font-normal text-slate-300 leading-relaxed shadow-2xl opacity-0 group-hover/legacy:opacity-100 transition-opacity pointer-events-none z-40">
+            This session was created with an outdated adventure format. Unpredictable side effects may occur during gameplay.
+          </span>
+        </span>
       </div>
 
-      <!-- Action Dots & Note Icon -->
-      <div class="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 z-20 flex gap-1.5 sm:gap-2">
-        <button
-          v-if="props.session.status_note"
-          @click.stop="isNotePopupOpen = !isNotePopupOpen"
-          class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-amber-400 hover:bg-black/60 transition-all flex items-center justify-center relative"
-          title="Show note"
-        >
-          <FileText class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          
-          <div v-if="isNotePopupOpen" class="fixed inset-0 z-20" @click.stop="isNotePopupOpen = false"></div>
-          <div
-            v-if="isNotePopupOpen"
-            @click.stop
-            class="absolute right-0 top-10 z-30 w-64 p-4 bg-[#0d1117] border border-white/10 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] text-slate-300 backdrop-blur-xl text-left normal-case font-normal"
-          >
-            <div class="text-xs font-black uppercase tracking-widest text-amber-400 mb-2 flex items-center gap-1.5 border-b border-white/10 pb-1.5">
-              <FileText class="w-3.5 h-3.5" />
-              Session Note
-            </div>
-            <p class="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto pr-1">
-              {{ props.session.status_note }}
-            </p>
-          </div>
-        </button>
-
-        <div class="relative">
+      <div class="flex gap-1.5 sm:gap-2 shrink-0">
+        <div v-if="props.session.status_note" ref="noteRef" class="relative">
           <button
-            @click.stop="toggleMenu"
-            class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60 transition-all flex items-center justify-center"
-            title="Session actions"
+            @click.stop="isNoteOpen = !isNoteOpen"
+            class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/45 backdrop-blur-md border border-amber-300/30 text-amber-300 hover:bg-black/70 transition-all flex items-center justify-center"
+            title="Show note"
+            aria-label="Show note"
           >
-            <MoreHorizontal class="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+            <FileText class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
-
-          <div v-if="isMenuOpen" class="fixed inset-0 z-20" @click="closeMenu"></div>
           <div
-            v-if="isMenuOpen"
-            class="absolute right-0 top-10 z-30 w-44 bg-[#0d1117] border border-white/10 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden backdrop-blur-xl"
+            v-if="isNoteOpen"
+            class="absolute right-0 top-10 z-30 w-60 p-4 bg-[#0d1117]/95 border border-amber-200/15 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl text-left"
           >
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5"
-              @click="runAction('copy')"
-            >
-              Clone Session
-            </button>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-2"
-              @click="runAction('edit-note')"
-            >
-              <FileText class="w-4 h-4 text-amber-400/80" />
-              Edit Note
-            </button>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-2"
-              @click="runAction('export')"
-            >
-              <Download class="w-4 h-4 text-emerald-400/80" />
-              Export ADS
-            </button>
-            <div class="h-[1px] bg-white/5 mx-2 my-1"></div>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-red-400/60 hover:text-red-400 hover:bg-red-500/10 flex items-center gap-2"
-              @click="runAction('delete')"
-            >
-              Delete Session
-            </button>
+            <div class="font-fantasy text-xs font-bold tracking-wider text-amber-300 mb-2 pb-1.5 border-b border-white/10">Journal note</div>
+            <p class="font-narrative text-sm text-slate-300 whitespace-pre-wrap leading-snug max-h-40 overflow-y-auto pr-1">{{ props.session.status_note }}</p>
           </div>
         </div>
+        <SessionCardMenu v-model:open="isMenuOpen" @select="(action) => actionHandlers[action]()" />
       </div>
     </div>
 
-    <!-- Content Area -->
-    <div class="p-2.5 sm:p-5 lg:p-6 lg:pt-5 flex flex-col gap-2 sm:gap-5 lg:gap-6 relative z-10">
-      <div class="min-w-0">
-        <h3 class="text-[11px] sm:text-lg lg:text-xl font-black text-white leading-tight line-clamp-2 sm:line-clamp-1 tracking-tight flex items-center gap-1.5 sm:gap-2 break-words">
-          <span class="break-words min-w-0">{{ props.session.adventure_title }}</span>
-          <span v-if="props.session.copied_from_id" class="px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider shrink-0">
-            Clone
-          </span>
-          <span v-if="props.session.adventure_version" class="hidden sm:inline text-[10px] font-mono font-bold text-slate-500 opacity-60 shrink-0">v{{ props.session.adventure_version }}</span>
-        </h3>
-        <div class="hidden sm:flex flex-col gap-1.5 mt-2 sm:mt-3">
-          <p class="text-xs sm:text-sm text-slate-400 flex items-center gap-2 font-bold uppercase tracking-[0.15em]">
-            <span class="w-2 h-2 rounded-full bg-emerald-500/60"></span>
-            <span class="truncate">{{ props.session.current_scene_name || 'Exploring...' }}</span>
-          </p>
-          <p class="text-[11px] sm:text-xs text-slate-500 flex items-center gap-2 font-black uppercase tracking-widest">
-            <Clock class="w-3 h-3 opacity-50" />
-            {{ props.session.copied_from_id ? 'Copied:' : 'Started:' }} {{ formatDate(props.session.created_at) }}
-          </p>
-        </div>
+    <!-- Wax seal for finished journeys -->
+    <div
+      v-if="statusView.seal"
+      class="session-seal absolute z-10 right-3 sm:right-4 top-[38%] w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full flex flex-col items-center justify-center"
+      :class="statusView.chipClass"
+    >
+      <i :class="['ra', statusView.icon]" class="text-lg sm:text-2xl"></i>
+      <span class="font-fantasy font-bold text-[8px] sm:text-[10px] tracking-widest uppercase">{{ statusView.label }}</span>
+    </div>
 
-        <!-- Outdated Format Alert in Card Content -->
-        <div
-          v-if="props.session.is_legacy_format"
-          class="mt-2.5 p-2 sm:p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-[10px] sm:text-xs flex items-start gap-2"
-        >
-          <i class="ra ra-warning text-xs sm:text-sm text-rose-400 shrink-0 mt-0.5"></i>
-          <div class="leading-relaxed">
-            <span class="font-bold text-rose-300 block">Outdated Adventure Format</span>
-            <span class="text-slate-300 text-[10px] sm:text-[11px]">This session was created with an outdated adventure format. Unpredictable side effects may occur.</span>
-          </div>
-        </div>
+    <!-- Bottom: scene, title, stats, action -->
+    <div class="tale-legible relative z-10 mt-auto p-2.5 sm:p-4 lg:p-5 flex flex-col gap-1.5 sm:gap-2.5">
+      <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold min-w-0 text-slate-200">
+        <i class="ra ra-compass shrink-0 tale-accent-text"></i>
+        <span class="truncate">{{ props.session.current_scene_name || 'Exploring...' }}</span>
       </div>
 
-      <!-- Progress Stats -->
-      <div class="hidden sm:grid grid-cols-3 gap-3 sm:gap-4 pt-1">
-        <!-- Quests -->
-        <div class="min-w-0 flex flex-col gap-2.5">
-          <div class="flex items-center justify-between gap-2 min-w-0">
-            <span class="text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">Quests</span>
-            <span class="text-[10px] font-bold text-slate-300 shrink-0">{{ props.session.completed_quest_count || 0 }}/{{ props.session.quest_count || 0 }}</span>
-          </div>
-          <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div 
-              class="h-full bg-emerald-500 transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-              :style="{ width: `${((props.session.completed_quest_count || 0) / ((props.session.quest_count || 0) || 1)) * 100}%` }"
-            ></div>
-          </div>
-        </div>
+      <h3 class="tale-title text-[13px] sm:text-lg lg:text-xl text-white leading-tight line-clamp-2 break-words">
+        {{ props.session.adventure_title }}
+      </h3>
 
-        <!-- Awards -->
-        <div class="min-w-0 flex flex-col gap-2.5">
-          <div class="flex items-center justify-between gap-2 min-w-0">
-            <span class="text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">Awards</span>
-            <span class="text-[10px] font-bold text-slate-300 shrink-0">{{ props.session.earned_award_count || 0 }}/{{ props.session.award_count || 0 }}</span>
-          </div>
-          <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div 
-              class="h-full bg-amber-400 transition-all duration-500 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
-              :style="{ width: `${((props.session.earned_award_count || 0) / ((props.session.award_count || 0) || 1)) * 100}%` }"
-            ></div>
-          </div>
-        </div>
-
-        <!-- Time Played -->
-        <div class="min-w-0 flex flex-col gap-1.5 items-end text-right">
-          <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">Playtime</span>
-          <span class="text-base font-black text-slate-200 tracking-wide leading-none truncate">
-            {{ props.session.in_game_time || 0 }} {{ (props.session as any).time_system === 'units' ? ((props.session as any).time_config?.unit_name || 'UNITS') : 'MIN' }}
-          </span>
-        </div>
+      <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400 min-w-0">
+        <span :title="`${props.session.copied_from_id ? 'Cloned' : 'Started'} ${absoluteStart}`" class="truncate">Played {{ relativeLastPlayed }}</span>
+        <span v-if="props.session.copied_from_id" class="px-1.5 py-px rounded border border-amber-400/30 bg-amber-500/15 text-amber-300 font-bold shrink-0">Clone</span>
+        <span v-if="props.session.adventure_version" class="ml-auto px-1.5 py-px rounded border border-white/10 bg-black/30 font-mono shrink-0">v{{ props.session.adventure_version }}</span>
       </div>
 
-      <!-- Action Button -->
+      <div class="hidden sm:flex items-center gap-3 py-1 text-[11px] text-slate-300">
+        <ProgressRing :value="props.session.progress || 0" :size="38" />
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <span class="flex items-center gap-1.5" title="Quests completed">
+            <i class="ra ra-scroll-unfurled text-slate-400"></i>{{ props.session.completed_quest_count || 0 }}/{{ props.session.quest_count || 0 }} quests
+          </span>
+          <span class="flex items-center gap-1.5" title="Awards earned">
+            <i class="ra ra-trophy text-amber-300"></i>{{ props.session.earned_award_count || 0 }}/{{ props.session.award_count || 0 }} awards
+          </span>
+        </div>
+        <span class="ml-auto flex items-center gap-1.5 text-slate-400 shrink-0" title="In-game time">
+          <i class="ra ra-hourglass"></i>{{ playtime }}
+        </span>
+      </div>
+
       <button
-        class="w-full py-2 sm:py-3.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1.5 sm:gap-3 mt-1 shadow-lg group/btn"
-        :class="[
-          props.session.status === 'game_over' ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 shadow-red-500/5' :
-          props.session.status === 'completed' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20 shadow-amber-500/5' :
-          'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20 shadow-emerald-500/5'
-        ]"
-        @click="runAction('resume')"
+        class="tale-action w-full py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all"
+        @click="emit('resume', props.session.game_id)"
       >
-        <i :class="[
-          'text-xs sm:text-sm transition-transform group-hover/btn:scale-110',
-          props.session.status === 'game_over' ? 'ra ra-skull' :
-          props.session.status === 'completed' ? 'ra ra-trophy' :
-          'ra ra-play'
-        ]"></i>
-        <span class="truncate">{{
-          props.session.status === 'game_over' ? 'Continue' :
-          props.session.status === 'completed' ? 'Continue' :
-          'Resume'
-        }}</span>
+        <i v-if="statusView.seal" :class="['ra', statusView.icon]"></i>
+        <Play v-else class="w-3.5 h-3.5 fill-current" />
+        <span class="truncate">{{ statusView.action }}</span>
       </button>
     </div>
   </article>
 </template>
-
-<style scoped>
-.card-image-fray {
-  background: linear-gradient(
-    to bottom,
-    rgba(2, 6, 23, 0) 0%,
-    rgba(2, 6, 23, 0.22) 48%,
-    rgba(2, 6, 23, 0.58) 76%,
-    rgba(2, 6, 23, 0.9) 100%
-  );
-}
-</style>
-

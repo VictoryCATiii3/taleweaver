@@ -73,6 +73,7 @@ from backend.models.game_session import GameSession
 from backend.models.session_state import SessionState
 from backend.models.user import User
 from backend.models.world_entity import WorldEntity, WorldExit, WorldScene
+from backend.services.session_activity import mark_session_played
 
 router = APIRouter(tags=["Gameplay"])
 logger = logging.getLogger(__name__)
@@ -175,6 +176,7 @@ async def get_chat_history(
     await apply_pending_sequence_progress(db, state, adventure, avatar)
     history = await load_chat_history(db, state.session_id)
     session_status = state.session.status if state.session else None
+    await mark_session_played(db, state.session_id)
 
     return ChatResponse(
         messages=history,

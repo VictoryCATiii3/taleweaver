@@ -15,6 +15,8 @@ import GameSessionsGrid from '@/components/portal/GameSessionsGrid.vue'
 import GameSessionsTable from '@/components/portal/GameSessionsTable.vue'
 import UserProfileContent from '@/components/portal/UserProfileContent.vue'
 import PortalFooter from '@/components/portal/PortalFooter.vue'
+import PortalHeroBanner from '@/components/portal/PortalHeroBanner.vue'
+import { ambientAccent } from '@/store/portalAmbient'
 import {
   usePortalFilters,
   extractAvailableTones,
@@ -167,6 +169,16 @@ function handleImport(kind?: 'templates' | 'sessions') {
   const targetKind = kind || (activeSection.value === 'sessions' ? 'session' : 'adventure')
   triggerImportPicker(targetKind === 'sessions' ? 'session' : 'adventure')
 }
+
+/** The hero only shows on the unfiltered grid so it never pushes search results down. */
+const showHero = computed(
+  () =>
+    activeSection.value === 'templates' &&
+    templateFilters.viewMode.value === 'grid' &&
+    !templateFilters.isFiltered.value
+)
+
+const atmosphereStyle = computed(() => (ambientAccent.value ? { '--ambient-rgb': ambientAccent.value } : {}))
 
 const isAdmin = computed(() => authState.user?.role === 'admin')
 
@@ -358,7 +370,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 bg-[#050b14] text-slate-200 font-ui overflow-hidden">
+  <div class="portal-atmosphere flex h-full min-h-0 text-slate-200 font-ui overflow-hidden" :style="atmosphereStyle">
     <PortalSidebar
       :is-admin="isAdmin"
       :active-section="activeSection"
@@ -375,6 +387,16 @@ onUnmounted(() => {
       <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10" :class="activeSection === 'profile' ? 'lg:p-10' : ''">
         
         <SetupWarningBanner :active-section="activeSection" />
+
+        <PortalHeroBanner
+          v-if="showHero && !isLoading"
+          class="mb-6 sm:mb-8"
+          :sessions="sessions"
+          :templates="templates"
+          :is-starting-session="isStartingSession"
+          @resume="playSession"
+          @start-session="startSession"
+        />
 
         <PortalLibraryToolbar
           v-if="activeSection !== 'profile'"
@@ -440,6 +462,7 @@ onUnmounted(() => {
               @remove-failed-pending="removeFailedPendingCard"
               @cancel-pending="cancelAdventure"
               @start-session="startSession"
+              @resume-session="playSession"
               @update-adventure="updateAdventure"
               @migrate="openMigrateModal"
               @cover="openCoverCreate"

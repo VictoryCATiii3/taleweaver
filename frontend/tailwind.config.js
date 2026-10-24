@@ -6,6 +6,7 @@ export default {
       fontFamily: {
         display: ['Acme', 'sans-serif'],
         narrative: ['Newsreader', 'serif'],
+        fantasy: ['Cinzel', 'Newsreader', 'serif'],
         ui: ['Acme', 'sans-serif'],
         sans: ['Acme', 'sans-serif'], // Default to UI font
       },

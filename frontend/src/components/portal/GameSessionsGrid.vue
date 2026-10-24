@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { GameSession } from '@/types'
 import { Loader2 } from 'lucide-vue-next'
 import GameSessionCard from './GameSessionCard.vue'
+import { setAmbientAccent } from '@/store/portalAmbient'
+import { lastPlayedMs } from '@/utils/relativeTime'
 
 const props = defineProps<{
   sessions: GameSession[]
@@ -19,6 +21,18 @@ const emit = defineEmits<{
   (e: 'export', gameId: string): void
   (e: 'load-more'): void
 }>()
+
+const FINISHED_STATUSES = new Set(['completed', 'game_over', 'archived'])
+
+/** Running journeys first, finished ones on their own shelf below; each shelf by last played. */
+const shelves = computed(() =>
+  [
+    { key: 'ongoing', title: 'Ongoing Journeys', items: props.sessions.filter((s) => !FINISHED_STATUSES.has(s.status || '')) },
+    { key: 'finished', title: 'Finished Tales', items: props.sessions.filter((s) => FINISHED_STATUSES.has(s.status || '')) },
+  ]
+    .map((shelf) => ({ ...shelf, items: [...shelf.items].sort((a, b) => lastPlayedMs(b) - lastPlayedMs(a)) }))
+    .filter((shelf) => shelf.items.length > 0)
+)
 
 const sentinelRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -50,6 +64,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  setAmbientAccent(null)
   if (scrollContainer) {
     scrollContainer.removeEventListener('scroll', handleScroll)
   }
@@ -62,11 +77,12 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div v-if="sessions.length === 0" class="rounded-xl border border-white/10 bg-aether-surface/20 p-8 sm:p-12 text-center flex flex-col items-center gap-4">
-      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl sm:text-3xl text-slate-500 mb-2">
-        <i class="ra ra-pawn"></i>
+    <div v-if="sessions.length === 0" class="tale-enter rounded-3xl border border-amber-200/10 bg-slate-900/40 p-8 sm:p-12 text-center flex flex-col items-center gap-4">
+      <div class="forge-sigil w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-3xl sm:text-4xl mb-1">
+        <i class="ra ra-campfire"></i>
       </div>
-      <p class="text-sm sm:text-base text-slate-400 max-w-md">
+      <h2 class="font-fantasy font-bold text-lg sm:text-xl text-white tracking-wide">The campfire is quiet</h2>
+      <p class="font-narrative text-sm sm:text-base text-slate-400 max-w-md">
         No active sessions found matching your criteria. Discover new worlds in the Adventure Library and start your journey.
       </p>
       <button
@@ -78,19 +94,22 @@ onUnmounted(() => {
       </button>
     </div>
     
-    <div v-else class="space-y-6">
-      <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3 sm:gap-4 lg:gap-5">
-        <GameSessionCard
-          v-for="entry in sessions"
-          :key="entry.game_id"
-          :session="entry"
-          @resume="(id) => $emit('resume', id)"
-          @delete="(id, title) => $emit('delete', id, title)"
-          @copy="(id) => $emit('copy', id)"
-          @edit-note="(id, note) => $emit('edit-note', id, note)"
-          @export="(id) => $emit('export', id)"
-        />
-      </div>
+    <div v-else class="space-y-8 sm:space-y-10">
+      <section v-for="shelf in shelves" :key="shelf.key" class="space-y-3" :aria-label="shelf.title">
+        <h2 class="shelf-heading text-xs sm:text-sm uppercase">{{ shelf.title }}</h2>
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 xl:gap-5 pt-2">
+          <div v-for="(entry, index) in shelf.items" :key="entry.game_id" class="tale-enter" :style="{ '--i': index }">
+            <GameSessionCard
+              :session="entry"
+              @resume="(id) => $emit('resume', id)"
+              @delete="(id, title) => $emit('delete', id, title)"
+              @copy="(id) => $emit('copy', id)"
+              @edit-note="(id, note) => $emit('edit-note', id, note)"
+              @export="(id) => $emit('export', id)"
+            />
+          </div>
+        </div>
+      </section>
 
       <!-- Infinite Scroll Sentinel & Loader -->
       <div ref="sentinelRef" class="py-6 flex items-center justify-center">

@@ -149,6 +149,7 @@ async def list_sessions(
                 ]
             ),
             created_at=g.created_at,
+            last_played_at=g.last_played_at,
             status=g.status,
             status_note=g.status_note,
             copied_from_id=g.copied_from_id,

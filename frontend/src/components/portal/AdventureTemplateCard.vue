@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import type { AdventureTemplateSummary } from '@/types'
-import { MoreHorizontal, X, ScrollText, Copy } from 'lucide-vue-next'
+import { X, Play } from 'lucide-vue-next'
 import LicenseInfoPopup from '@/components/common/LicenseInfoPopup.vue'
+import AdventureCardMenu, { type AdventureCardAction } from './AdventureCardMenu.vue'
+import TaleCardArtwork from './TaleCardArtwork.vue'
+import { useCardTilt } from '@/composables/useCardTilt'
+import { resolveGenreAccent, toneToLabel } from '@/composables/useGenreAccent'
+import { setAmbientAccent } from '@/store/portalAmbient'
+import { formatRelative } from '@/utils/relativeTime'
 
 const props = defineProps<{
   template: AdventureTemplateSummary
@@ -13,6 +19,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'startSession', templateId: string): void
+  (e: 'resumeSession', gameId: string): void
   (e: 'updateAdventure', templateId: string): void
   (e: 'migrate', template: AdventureTemplateSummary): void
   (e: 'cover', templateId: string): void
@@ -25,318 +32,202 @@ const emit = defineEmits<{
 }>()
 
 const isMenuOpen = ref(false)
-const menuRef = ref<HTMLElement | null>(null)
-
 const isLicenseOpen = ref(false)
 const licenseTriggerRef = ref<HTMLElement | null>(null)
+const bursts = ref<Array<{ id: number; x: string; y: string }>>([])
 
-function toggleMenu() {
-  isMenuOpen.value = !isMenuOpen.value
+const { tiltRef, onPointerMove, onPointerLeave } = useCardTilt()
+
+const toneLabel = computed(() => toneToLabel(props.template.selected_tone))
+const accent = computed(() => resolveGenreAccent(toneLabel.value))
+const needsMigration = computed(() => !!(props.template.is_legacy_format || !props.template.can_start))
+const hasLicenseInfo = computed(() =>
+  !!(props.template.license || props.template.creator || props.template.copyright || props.template.license_url)
+)
+/** Adventures with a running session continue it; starting over is the secondary action. */
+const resumeGameId = computed(() => (props.template.has_active_session ? props.template.active_game_id || null : null))
+const teaser = computed(() => (props.template.teaser || '').replace(/\\n/g, '\n'))
+
+const actionHandlers: Record<AdventureCardAction, () => void> = {
+  cover: () => emit('cover', props.template.template_id),
+  migrate: () => emit('migrate', props.template),
+  edit: () => emit('edit', props.template.template_id),
+  duplicate: () => emit('duplicate', props.template.template_id),
+  adz: () => emit('exportAdz', props.template.template_id, props.template.title),
+  adv: () => emit('exportAdv', props.template.template_id, props.template.title),
+  delete: () => emit('delete', props.template.template_id, props.template.title),
+  update: () => emit('updateAdventure', props.template.template_id),
 }
 
-function handleClickOutside(event: MouseEvent) {
-  if (menuRef.value && !menuRef.value.contains(event.target as Node)) {
-    isMenuOpen.value = false
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('mousedown', handleClickOutside)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('mousedown', handleClickOutside)
-})
-
-function runAction(action: 'cover' | 'edit' | 'duplicate' | 'adz' | 'adv' | 'delete' | 'update' | 'migrate'): void {
-  if (action === 'cover') emit('cover', props.template.template_id)
-  else if (action === 'migrate') emit('migrate', props.template)
-  else if (action === 'edit') emit('edit', props.template.template_id)
-  else if (action === 'duplicate') emit('duplicate', props.template.template_id)
-  else if (action === 'adz') emit('exportAdz', props.template.template_id, props.template.title)
-  else if (action === 'adv') emit('exportAdv', props.template.template_id, props.template.title)
-  else if (action === 'delete') emit('delete', props.template.template_id, props.template.title)
-  else if (action === 'update') emit('updateAdventure', props.template.template_id)
-  isMenuOpen.value = false
-}
-
-function openLicenseInfo() {
-  isMenuOpen.value = false
+function openLicenseInfo(): void {
   nextTick(() => {
     isLicenseOpen.value = true
   })
 }
 
-const toneLabel = computed(() => {
-  const tone = props.template.selected_tone
-  if (!tone) return ''
-  if (typeof tone === 'string') {
-    if (tone.startsWith('{')) {
-      try {
-        const obj = JSON.parse(tone)
-        return obj.name || obj.id || tone
-      } catch (e) {
-        return tone
-      }
-    }
-    return tone
+function onEnter(): void {
+  setAmbientAccent(accent.value.rgb)
+}
+
+// The ambient tint is deliberately kept on leave: resetting it would flicker while moving between cards.
+function onLeave(): void {
+  onPointerLeave()
+}
+
+/** Spawns an ink burst at the click position, then continues or starts the session. */
+function primaryAction(event: MouseEvent): void {
+  const target = event.currentTarget as HTMLElement
+  const rect = target.getBoundingClientRect()
+  const id = Date.now()
+  bursts.value.push({ id, x: `${event.clientX - rect.left}px`, y: `${event.clientY - rect.top}px` })
+  window.setTimeout(() => {
+    bursts.value = bursts.value.filter((b) => b.id !== id)
+  }, 700)
+  if (resumeGameId.value) {
+    emit('resumeSession', resumeGameId.value)
+    return
   }
-  return tone.name || tone.id || ''
-})
-
-function fixNewlines(text: string | null | undefined): string {
-  if (!text) return ''
-  return text.replace(/\\n/g, '\n')
+  emit('startSession', props.template.template_id)
 }
-
-function dismissWarning() {
-  emit('dismissWarning', props.template.template_id)
-}
-
-const hasLicenseInfo = computed(() => {
-  return !!(
-    props.template.license ||
-    props.template.creator ||
-    props.template.copyright ||
-    props.template.license_url
-  )
-})
 </script>
 
 <template>
-  <article class="rounded-xl border border-white/10 bg-aether-surface/20 flex flex-col relative group">
-    <!-- Top Cover Area -->
-    <div class="aspect-[4/3] sm:aspect-[3/2] relative bg-black/30">
-      <div class="absolute inset-0 overflow-hidden rounded-t-xl">
-        <img
-          v-if="props.template.image_url"
-          :src="props.template.image_url"
-          class="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
-          alt="Adventure cover"
-        />
-        <div v-else class="w-full h-full flex items-center justify-center text-slate-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
-          No Cover
-        </div>
-      </div>
+  <article
+    ref="tiltRef"
+    class="tale-card group rounded-2xl aspect-[2/3] flex flex-col"
+    :class="isMenuOpen || isLicenseOpen ? 'z-30' : 'z-0'"
+    :style="{ '--accent-rgb': accent.rgb }"
+    @pointerenter="onEnter"
+    @pointermove="onPointerMove"
+    @pointerleave="onLeave"
+  >
+    <TaleCardArtwork :image-url="props.template.image_url" :accent="accent" />
 
-      <div class="card-image-fray pointer-events-none absolute inset-x-0 bottom-0 h-16 sm:h-24"></div>
-
-      <!-- Badges Stack -->
-      <div class="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 flex flex-col gap-1.5 sm:gap-2 items-start z-20">
-        <!-- Update Tag / Badge -->
-        <div v-if="props.template.has_update">
-          <button
-            @click.stop="emit('updateAdventure', props.template.template_id)"
-            :disabled="props.isUpdating"
-            class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-cyan-500/30 hover:bg-cyan-500/50 text-cyan-300 hover:text-white text-[9px] sm:text-xs uppercase tracking-widest font-black border border-cyan-400/50 flex items-center gap-1 sm:gap-1.5 backdrop-blur-md shadow-lg shadow-cyan-500/20 cursor-pointer transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-            :title="`Update available${props.template.available_version ? ': v' + props.template.available_version : ''}. Click to update this adventure.`"
-          >
-            <i :class="props.isUpdating ? 'ra ra-cycle animate-spin text-[10px] sm:text-xs' : 'ra ra-clockwise text-[10px] sm:text-xs text-cyan-400'"></i>
-            <span>{{ props.isUpdating ? 'Updating...' : (props.template.available_version ? `Update v${props.template.available_version}` : 'Update') }}</span>
-          </button>
-        </div>
-
-        <!-- Outdated Format Warning Badge & Migrate Button -->
-        <div v-if="props.template.is_legacy_format || !props.template.can_start" class="flex items-center gap-1.5">
-          <button
-            @click.stop="emit('migrate', props.template)"
-            class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 hover:text-white text-[9px] sm:text-xs uppercase tracking-widest font-black border border-amber-500/40 flex items-center gap-1 sm:gap-1.5 backdrop-blur-md shadow-lg shadow-amber-500/10 cursor-pointer transition-all hover:scale-105 active:scale-95"
-            title="Click to migrate this legacy adventure to the current format"
-          >
-            <i class="ra ra-wrench text-[10px] sm:text-xs"></i>
-            <span>Migrate</span>
-          </button>
-        </div>
-
-        <!-- Tone Badge -->
-        <div v-if="props.template.selected_tone">
-          <span class="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-aether-primary/20 text-aether-primary text-[9px] sm:text-xs uppercase tracking-widest font-black border border-aether-primary/20 max-w-[7rem] truncate inline-block">
-            {{ toneLabel }}
-          </span>
-        </div>
-
-        <!-- Moderation Warning Badge -->
-        <div v-if="props.template.creation_error">
-          <div class="group/warn relative">
-            <div class="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-amber-500/20 text-amber-500 text-[9px] sm:text-xs uppercase tracking-widest font-black border border-amber-500/20 flex items-center gap-1 sm:gap-2 backdrop-blur-md shadow-lg shadow-amber-500/10 cursor-help">
-              <i class="ra ra-warning text-[10px] sm:text-sm"></i>
-              <span class="hidden sm:inline">Visual Issues</span>
-              <button
-                @click.stop="dismissWarning"
-                class="ml-0.5 sm:ml-1 p-0.5 hover:bg-amber-500/20 rounded-md transition-colors"
-                title="Meldung ausblenden"
-              >
-                <X class="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-              </button>
-            </div>
-            <!-- Tooltip-style detail -->
-            <div class="absolute left-0 top-full mt-2 w-64 p-3 rounded-xl bg-slate-900/95 border border-amber-500/30 text-[10px] text-slate-300 font-bold leading-relaxed shadow-2xl opacity-0 group-hover/warn:opacity-100 transition-opacity pointer-events-none z-40 backdrop-blur-xl">
-              <div class="text-amber-500 uppercase tracking-[0.2em] mb-1.5 flex items-center gap-2">
-                <i class="ra ra-scroll-unfurled"></i>
-                Generation Note
-              </div>
-              {{ props.template.creation_error }}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Action Dots -->
-      <div class="absolute top-1.5 right-1.5 sm:top-3 sm:right-3" ref="menuRef">
+    <!-- Top row: status badges + options -->
+    <!-- z-20: its menu and popups overlap the bottom block, which must stay underneath -->
+    <div class="relative z-20 flex items-start justify-between gap-2 p-2 sm:p-3">
+      <div class="flex flex-col gap-1.5 items-start min-w-0">
+        <span
+          v-if="toneLabel"
+          class="tale-chip px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-bold tracking-wide flex items-center gap-1.5 max-w-full"
+          :title="toneLabel"
+        >
+          <i :class="['ra', accent.icon]" class="text-[10px] sm:text-xs"></i>
+          <span class="truncate">{{ toneLabel }}</span>
+        </span>
         <button
-          @click.stop="toggleMenu"
-          class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60 transition-all flex items-center justify-center"
-          title="Adventure options"
+          v-if="props.template.has_update"
+          @click.stop="emit('updateAdventure', props.template.template_id)"
+          :disabled="props.isUpdating"
+          class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-950/80 hover:bg-cyan-950/90 text-cyan-200 text-[9px] sm:text-[11px] font-bold border border-cyan-400/50 flex items-center gap-1.5 backdrop-blur-md transition-all disabled:opacity-50"
+          :title="`Update available${props.template.available_version ? ': v' + props.template.available_version : ''}. Click to update this adventure.`"
         >
-          <MoreHorizontal class="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+          <i :class="props.isUpdating ? 'ra ra-cycle animate-spin' : 'ra ra-recycle'" class="text-[10px] sm:text-xs"></i>
+          <span>{{ props.isUpdating ? 'Updating...' : (props.template.available_version ? `Update v${props.template.available_version}` : 'Update') }}</span>
         </button>
-
-        <Transition
-          enter-active-class="transition duration-100 ease-out"
-          enter-from-class="transform scale-95 opacity-0"
-          enter-to-class="transform scale-100 opacity-100"
-          leave-active-class="transition duration-75 ease-in"
-          leave-from-class="transform scale-100 opacity-100"
-          leave-to-class="transform scale-95 opacity-0"
+        <div
+          v-if="props.template.creation_error"
+          class="group/warn relative px-2 py-0.5 sm:py-1 rounded-full bg-slate-950/80 text-amber-300 text-[9px] sm:text-[11px] font-bold border border-amber-500/30 flex items-center gap-1.5 backdrop-blur-md cursor-help"
         >
-          <div
-            v-if="isMenuOpen"
-            class="absolute right-0 top-9 sm:top-10 z-30 w-44 bg-[#0d1117] border border-white/10 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden backdrop-blur-xl"
-          >
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5"
-              @click="runAction('cover')"
-            >
-              Cover
-            </button>
-            <button
-              v-if="props.template.is_legacy_format || !props.template.can_start"
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10 flex items-center gap-2"
-              @click="runAction('migrate')"
-            >
-              <i class="ra ra-wrench text-xs"></i>
-              Migrate format
-            </button>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 flex items-center gap-2"
-              @click="runAction('edit')"
-            >
-              <span>Edit blueprint</span>
-            </button>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 flex items-center gap-2"
-              @click="runAction('duplicate')"
-            >
-              <Copy class="w-3.5 h-3.5" />
-              <span>Duplicate</span>
-            </button>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5"
-              @click="runAction('adz')"
-            >
-              Export (.adz)
-            </button>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5"
-              @click="runAction('adv')"
-            >
-              Export (.adv)
-            </button>
-            <button
-              v-if="props.template.has_update"
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-cyan-400/90 hover:text-cyan-300 hover:bg-cyan-500/10 flex items-center gap-2"
-              :disabled="props.isUpdating"
-              @click="runAction('update')"
-            >
-              <i :class="props.isUpdating ? 'ra ra-cycle animate-spin' : 'ra ra-clockwise'" class="text-xs"></i>
-              Update adventure
-            </button>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-emerald-400/80 hover:text-emerald-300 hover:bg-emerald-500/10 flex items-center gap-2"
-              @click="openLicenseInfo"
-            >
-              <ScrollText class="w-3.5 h-3.5" />
-              License Info
-            </button>
-            <div class="h-[1px] bg-white/5 mx-2 my-1"></div>
-            <button
-              class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-widest text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
-              @click="runAction('delete')"
-            >
-              Delete world
-            </button>
+          <i class="ra ra-help text-[10px] sm:text-xs"></i>
+          <span class="hidden sm:inline">Visual issues</span>
+          <button @click.stop="emit('dismissWarning', props.template.template_id)" class="p-0.5 hover:bg-amber-500/20 rounded-md" title="Dismiss notice">
+            <X class="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          </button>
+          <div class="absolute left-0 top-full mt-2 w-64 p-3 rounded-xl bg-slate-900/95 border border-amber-500/30 text-[11px] text-slate-300 leading-relaxed shadow-2xl opacity-0 group-hover/warn:opacity-100 transition-opacity pointer-events-none z-40">
+            <div class="text-amber-400 font-bold mb-1">Generation note</div>
+            {{ props.template.creation_error }}
           </div>
-        </Transition>
+        </div>
       </div>
 
-      <!-- License Trigger (bottom-right of cover, opens shared LicenseInfoPopup) -->
-      <button
-        v-if="hasLicenseInfo"
-        ref="licenseTriggerRef"
-        @click.stop="isLicenseOpen = !isLicenseOpen"
-        class="absolute bottom-1.5 right-1.5 sm:bottom-3 sm:right-3 z-20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-slate-900/60 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 hover:bg-slate-900/80 flex items-center justify-center backdrop-blur-md shadow-lg transition-all"
-        :title="`License: ${props.template.license || 'View details'}`"
-        aria-label="View license & credits"
-      >
-        <i class="ra ra-scroll-unfurled text-[10px] sm:text-xs"></i>
-      </button>
+      <AdventureCardMenu
+        v-model:open="isMenuOpen"
+        :needs-migration="needsMigration"
+        :has-update="!!props.template.has_update"
+        :is-updating="props.isUpdating"
+        @select="(action) => actionHandlers[action]()"
+        @license="openLicenseInfo"
+      />
     </div>
 
-    <!-- Content Area -->
-    <div class="p-2.5 sm:p-5 lg:p-6 lg:pt-5 flex flex-col gap-2 sm:gap-4 flex-1 relative z-10">
-      <div class="space-y-1 sm:space-y-2 flex-1 min-w-0">
-        <h3 class="text-[11px] sm:text-lg lg:text-xl font-black text-white leading-tight line-clamp-2 sm:line-clamp-1 tracking-tight break-words">{{ props.template.title }}</h3>
-        <div v-if="props.template.version" class="hidden sm:flex items-center gap-1.5 opacity-60">
-          <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tighter">v{{ props.template.version }}</span>
-        </div>
-        <p v-if="props.template.teaser" class="hidden sm:block text-[11px] sm:text-xs font-bold text-emerald-500/80 uppercase tracking-widest line-clamp-3 leading-relaxed whitespace-pre-wrap">
-          {{ fixNewlines(props.template.teaser) }}
-        </p>
+    <!-- Bottom: title, meta, teaser, action -->
+    <div class="tale-legible relative z-10 mt-auto p-2.5 sm:p-4 lg:p-5 flex flex-col gap-1.5 sm:gap-2.5">
+      <div
+        v-if="props.template.has_active_session"
+        class="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-200"
+      >
+        <i class="ra ra-hourglass tale-accent-text"></i>
+        <span class="truncate">Played {{ formatRelative(props.template.last_played_at) }}{{ props.template.current_scene_name ? ` · ${props.template.current_scene_name}` : '' }}</span>
       </div>
 
-      <!-- Action Button -->
-      <!-- Case 1: Legacy format with update available -> Update button -->
+      <h3 class="tale-title text-[13px] sm:text-lg lg:text-xl text-white leading-tight line-clamp-2 break-words">
+        {{ props.template.title }}
+      </h3>
+
+      <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400">
+        <span v-if="props.template.version" class="px-1.5 py-px rounded border border-white/10 bg-black/30 font-mono">v{{ props.template.version }}</span>
+        <span v-if="props.template.quest_count" class="flex items-center gap-1"><i class="ra ra-compass"></i>{{ props.template.quest_count }} quests</span>
+        <button
+          v-if="hasLicenseInfo"
+          ref="licenseTriggerRef"
+          @click.stop="isLicenseOpen = !isLicenseOpen"
+          class="ml-auto text-emerald-400/70 hover:text-emerald-300 transition-colors"
+          :title="`License: ${props.template.license || 'View details'}`"
+          aria-label="View license & credits"
+        >
+          <i class="ra ra-scroll-unfurled text-xs"></i>
+        </button>
+      </div>
+
+      <div v-if="teaser" class="tale-reveal hidden sm:grid">
+        <p class="font-narrative text-[13px] leading-snug text-slate-300/90 line-clamp-4 whitespace-pre-wrap">{{ teaser }}</p>
+      </div>
+
       <button
-        v-if="(props.template.is_legacy_format || !props.template.can_start) && props.template.has_update"
-        class="w-full py-2 sm:py-3.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1.5 sm:gap-3 shadow-lg bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border-cyan-500/30 shadow-cyan-500/10 cursor-pointer"
+        v-if="needsMigration && props.template.has_update"
+        class="w-full py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase border flex items-center justify-center gap-2 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border-cyan-500/40 transition-all"
         :disabled="props.isUpdating"
         @click="emit('updateAdventure', props.template.template_id)"
       >
-        <i
-          :class="props.isUpdating ? 'ra ra-cycle animate-spin text-xs sm:text-sm' : 'ra ra-clockwise text-xs sm:text-sm'"
-        ></i>
-        <span class="truncate">{{ props.isUpdating ? 'Updating...' : 'Update to Play' }}</span>
+        <i :class="props.isUpdating ? 'ra ra-cycle animate-spin' : 'ra ra-recycle'"></i>
+        <span class="truncate">{{ props.isUpdating ? 'Updating...' : 'Update to play' }}</span>
       </button>
 
-      <!-- Case 2: Legacy format without update -> Migrate button -->
       <button
-        v-else-if="props.template.is_legacy_format || !props.template.can_start"
-        class="w-full py-2 sm:py-3.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1.5 sm:gap-3 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border-amber-500/35 hover:border-amber-500/50 cursor-pointer shadow-lg shadow-amber-500/10 hover:scale-[1.01] active:scale-[0.99]"
+        v-else-if="needsMigration"
+        class="w-full py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase border flex items-center justify-center gap-2 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border-amber-500/40 transition-all"
         title="Migrate this adventure to the current format"
         @click.stop="emit('migrate', props.template)"
       >
-        <i class="ra ra-wrench text-xs sm:text-sm"></i>
-        <span class="truncate">Migrate Adventure</span>
+        <i class="ra ra-wrench"></i>
+        <span class="truncate">Migrate adventure</span>
       </button>
 
-      <!-- Case 3: Playable adventure -> Normal Start button -->
-      <button
-        v-else
-        class="w-full py-2 sm:py-3.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1.5 sm:gap-3 shadow-lg"
-        :class="props.isStartingSession
-          ? 'bg-slate-800/70 text-slate-400 border-slate-700 cursor-not-allowed shadow-slate-900/30'
-          : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20 shadow-emerald-500/5 group/btn'"
-        :disabled="props.isStartingSession"
-        @click="emit('startSession', props.template.template_id)"
-      >
-        <i
-          :class="props.isStartingSession ? 'ra ra-cycle animate-spin text-xs sm:text-sm' : 'ra ra-play text-xs sm:text-sm transition-transform group-hover/btn:scale-110'"
-        ></i>
-        <span class="truncate">{{ props.isStartingThisTemplate ? 'Starting...' : 'Start' }}</span>
-      </button>
+      <div v-else class="flex gap-2">
+        <button
+          class="tale-action flex-1 min-w-0 py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="props.isStartingSession"
+          @click="primaryAction"
+        >
+          <span v-for="b in bursts" :key="b.id" class="ink-burst" :style="{ '--burst-x': b.x, '--burst-y': b.y }"></span>
+          <i v-if="props.isStartingSession" class="ra ra-cycle animate-spin"></i>
+          <Play v-else class="w-3.5 h-3.5 fill-current" />
+          <span class="truncate">{{ props.isStartingThisTemplate ? 'Starting...' : (resumeGameId ? 'Continue' : 'Begin') }}</span>
+        </button>
+        <button
+          v-if="resumeGameId"
+          class="shrink-0 w-9 sm:w-11 rounded-xl border border-white/15 bg-slate-950/70 text-slate-300 hover:text-white hover:border-white/30 flex items-center justify-center transition-all disabled:opacity-50"
+          :disabled="props.isStartingSession"
+          title="Start a new journey"
+          aria-label="Start a new journey"
+          @click="emit('startSession', props.template.template_id)"
+        >
+          <i class="ra ra-quill-ink text-sm"></i>
+        </button>
+      </div>
     </div>
 
-    <!-- License info popup (teleported to body) -->
     <LicenseInfoPopup
       v-model:open="isLicenseOpen"
       :license="props.template.license"
@@ -348,15 +239,3 @@ const hasLicenseInfo = computed(() => {
     />
   </article>
 </template>
-
-<style scoped>
-.card-image-fray {
-  background: linear-gradient(
-    to bottom,
-    rgba(2, 6, 23, 0) 0%,
-    rgba(2, 6, 23, 0.22) 48%,
-    rgba(2, 6, 23, 0.58) 76%,
-    rgba(2, 6, 23, 0.9) 100%
-  );
-}
-</style>
