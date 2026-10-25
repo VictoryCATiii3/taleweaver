@@ -157,6 +157,37 @@ export function normalizeVoiceTag(tag: string): string {
   return tag.trim().toLowerCase()
 }
 
+// Sentence end (optionally closed by a quote) or a line break inside a captured speaker name.
+const SPEAKER_SENTENCE_BOUNDARY = /[.!?…]["”»]?\s+|\n+/g
+
+/**
+ * The plain speaker pattern allows periods and spaces (for names like "Dr. Holmes"), so it can
+ * swallow the preceding sentence: "She taps the pad. Betty: "…"". Moves such text in front of
+ * the speaker onto its own line. A boundary only counts when the text before it is more than a
+ * single word, so titles like "Dr." or "Mr." stay part of the name.
+ */
+function splitLeadingNarration(match: string, plainSpeaker?: string): string {
+  if (!plainSpeaker) {
+    return match
+  }
+  const speaker = plainSpeaker.trim()
+  let cut = -1
+  for (const boundary of speaker.matchAll(SPEAKER_SENTENCE_BOUNDARY)) {
+    const start = boundary.index ?? 0
+    const before = speaker.slice(cut < 0 ? 0 : cut, start).trim()
+    if (boundary[0].includes('\n') || before.includes(' ')) {
+      cut = start + boundary[0].length
+    }
+  }
+  if (cut < 0) {
+    return match
+  }
+  const speakerStart = match.indexOf(speaker)
+  const narration = match.slice(0, speakerStart + cut).trim()
+  const speech = match.slice(speakerStart + cut).trim()
+  return narration ? `${narration}\n\n${speech}` : speech
+}
+
 export function parseAssistantContent(
   content: string,
   playerSheet?: any,
@@ -170,8 +201,13 @@ export function parseAssistantContent(
 
   // 1) Pre-split embedded/inline dialogues onto separate lines:
   // Detects: (Sentence end, voice tag, or line boundary) -> Speaker: "Dialogue"
-  const inlineSpeechSplitter = /(?:^|\n|(?<=[.!?»”"“]\s+)|(?<=\]\s*))(?:\*\*([^*\n:]{2,60}?):\*\*|\*\*([^*\n:]{2,60}?)\*\*:|([A-Z\p{Lu}][\p{L}\p{N}_\s'’\-,.()]{1,60}?):)\s*(?:(?:\[[^\]\n]+\]|"[^"\n]+")\s*)?(["“„»][\s\S]*?["”«])/gu
-  cleanContent = cleanContent.replace(inlineSpeechSplitter, (m) => '\n\n' + m.trim() + '\n\n')
+  // Follow-up quotes joined only by whitespace, a vocal burst (<short pause>) or a voice tag
+  // belong to the same speaker: Betty: "We're closed." <short pause> "Looking for something?"
+  const inlineSpeechSplitter = /(?:^|\n|(?<=[.!?»”"“]\s+)|(?<=\]\s*))(?:\*\*([^*\n:]{2,60}?):\*\*|\*\*([^*\n:]{2,60}?)\*\*:|([A-Z\p{Lu}][\p{L}\p{N}_\s'’\-,.()]{1,60}?):)\s*(?:(?:\[[^\]\n]+\]|"[^"\n]+")\s*)?(["“„»][\s\S]*?["”«](?:[ \t]*(?:<[^>\n]{1,30}>|\[[^\]\n]{1,40}\])?[ \t]*["“„»][^"“”„«»\n]*["”«])*)/gu
+  cleanContent = cleanContent.replace(
+    inlineSpeechSplitter,
+    (m, _bold1, _bold2, plainSpeaker?: string) => '\n\n' + splitLeadingNarration(m.trim(), plainSpeaker) + '\n\n'
+  )
 
   const lines = cleanContent.split('\n')
   const narrationLines: string[] = []
@@ -206,9 +242,14 @@ export function parseAssistantContent(
       }
 
       const hasQuotes = /^["“„»]/.test(speechText) || /["”«]$/.test(speechText)
-      speechText = speechText.replace(/^["“„»\s]+|["”«\s]+$/g, '').trim()
-      // Clean accidental leftover opening quotes from malformed tags like "[amused] ""
-      speechText = speechText.replace(/^["“„»\s]+/, '').trim()
+      // Several quoted parts ("A." <pause> "B.") keep their own quotes; stripping only the
+      // outer ones would leave the inner ones unbalanced.
+      const quoteCount = (speechText.match(/["“„»”«]/g) || []).length
+      if (quoteCount <= 2) {
+        speechText = speechText.replace(/^["“„»\s]+|["”«\s]+$/g, '').trim()
+        // Clean accidental leftover opening quotes from malformed tags like "[amused] ""
+        speechText = speechText.replace(/^["“„»\s]+/, '').trim()
+      }
 
       // Guard against non-speaker labels (e.g. "Hinweis: ...", "Note: ...") when unquoted and not bold
       if (!hasQuotes && !isBold && NON_SPEAKER_LABELS.has(speakerName.toLowerCase())) {
@@ -265,7 +306,8 @@ export function parseAssistantContent(
 
       const last = dialogues[dialogues.length - 1]
       if (last && last.isNarration) {
-        last.text += '\n\n' + narrationText
+        // A lone voice tag line ("[calm]") leaves an empty narration to continue from.
+        last.text = last.text ? `${last.text}\n\n${narrationText}` : narrationText
         // Use the voice tag from the first paragraph if the new one doesn't have one
         if (voiceTag && !last.voiceTag) {
           last.voiceTag = voiceTag
