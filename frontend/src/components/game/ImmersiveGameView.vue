@@ -11,7 +11,7 @@
  * - Dialog skin (data-skin) resolved from player preference, adventure theme and tone
  * - Bottom action bar and user input with speech-to-text voice recording
  */
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, watch } from 'vue'
 import type { ChatMessage } from '@/types'
 import type { ConnectionStatus } from '@/composables/useGameSocket'
 import { getImageUrl } from '@/utils/game_icons'
@@ -197,6 +197,14 @@ const {
   sceneExits: () => (Array.isArray(props.sceneExits) ? props.sceneExits : []),
   items: () => (Array.isArray(props.items) ? props.items : []),
   systemMessages: computed(() => gameTurns.value.flatMap((turn) => turn.systemMessages)),
+})
+
+// Any action that starts a turn (item click, context menu, take) shows its outcome in the story.
+// A turn in flight is status 'connecting' ('loading' is only the initial session load).
+watch(() => props.status, (status, previous) => {
+  if (status !== 'connecting' || previous === 'connecting') return
+  showStory()
+  goToLatestTurn()
 })
 
 function handleTraverseExit(exit: any) {

@@ -1447,22 +1447,6 @@ class GameTurnManager:
                             role = getattr(sm, "role", "system")
                             yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
 
-                # Entity interactions: scripted and inline on_interact triggers
-                interacted_ids = await interacted_entity_ids(
-                    self.db,
-                    self.state,
-                    user_msg,
-                    [ue.entity_id for ue in game_event.updated_entities or []],
-                )
-                for entity_id in interacted_ids:
-                    sys_msgs, rejected = await fire_interact_triggers(
-                        self, script_runner, entity_id, game_event
-                    )
-                    rule_violations.extend(rejected)
-                    for sm in sys_msgs:
-                        role = getattr(sm, "role", "system")
-                        yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
-
                 if game_event.game_completed:
                     await self._finalize_session("completed", game_event.status_note)
             except GameOverError as goe:
@@ -1684,6 +1668,29 @@ class GameTurnManager:
                     )
             except GameOverError as goe:
                 await self._finalize_session("game_over", str(goe))
+                game_event.game_over = True
+                game_event.status_note = str(goe)
+
+        # Entity interactions: scripted and inline on_interact triggers. Runs in every rule
+        # mode; without the mechanics pass only entities named in the message count.
+        try:
+            interacted_ids = await interacted_entity_ids(
+                self.db,
+                self.state,
+                user_msg,
+                [ue.entity_id for ue in getattr(game_event, "updated_entities", None) or []],
+            )
+            for entity_id in interacted_ids:
+                sys_msgs, rejected = await fire_interact_triggers(
+                    self, script_runner, entity_id, game_event
+                )
+                rule_violations.extend(rejected)
+                for sm in sys_msgs:
+                    role = getattr(sm, "role", "system")
+                    yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
+        except GameOverError as goe:
+            await self._finalize_session("game_over", str(goe))
+            if isinstance(game_event, GameEvent):
                 game_event.game_over = True
                 game_event.status_note = str(goe)
 

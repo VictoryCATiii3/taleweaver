@@ -17,6 +17,8 @@ export interface TriggerLeaf {
   code: string
   /** Extra context shown with the code, e.g. a soft rule's condition or a script's scope. */
   note?: string
+  /** For linked leaves: where the script is defined (opened by "Edit"). */
+  source?: { kind: TriggerOwnerKind; id?: string; label: string }
 }
 
 export interface TriggerTreeNode {
@@ -157,7 +159,17 @@ function globalNode(adventure: any, linked: LinkedScript[]): TriggerTreeNode {
     leaves.push(leaf)
     const targetId = String(script?.target_id || script?.target || '').trim()
     if (targetId) {
-      linked.push({ targetId, leaf: { ...leaf, key: `${leaf.key}:linked`, kind: 'linked', label: `${script.trigger} · global script ${script.id || ''}`.trim() } })
+      linked.push({
+        targetId,
+        leaf: {
+          ...leaf,
+          key: `${leaf.key}:linked`,
+          kind: 'linked',
+          label: `${script.trigger} · global script ${script.id || ''}`.trim(),
+          note: 'Defined in Global scripts',
+          source: { kind: 'global', label: 'Global' },
+        },
+      })
     }
   })
   return { key: 'global', label: 'Global', kind: 'global', children: [], leaves }
@@ -193,7 +205,17 @@ function sequenceNode(sequence: any, linked: LinkedScript[]): TriggerTreeNode {
     leaves.push(leaf)
     const targetId = String(script?.target_id || '').trim()
     if (targetId) {
-      linked.push({ targetId, leaf: { ...leaf, key: `${leaf.key}:linked`, kind: 'linked', label: `${script.trigger} · sequence "${title}"` } })
+      linked.push({
+        targetId,
+        leaf: {
+          ...leaf,
+          key: `${leaf.key}:linked`,
+          kind: 'linked',
+          label: `${script.trigger} · sequence "${title}"`,
+          note: `Defined in sequence "${title}" · only while it is active`,
+          source: { kind: 'sequence', id, label: title },
+        },
+      })
     }
   })
   return { key: `sequence:${id}`, label: title, kind: 'sequence', id, subtitle: `#${sequence?.order ?? '?'}`, children: [], leaves }
@@ -274,9 +296,14 @@ export function buildTriggerTree(input: TriggerTreeInput): TriggerTreeNode[] {
   return tree
 }
 
-/** Number of leaves in the node and all its descendants. */
-export function countLeaves(node: TriggerTreeNode): number {
-  return node.leaves.length + node.children.reduce((sum, child) => sum + countLeaves(child), 0)
+/**
+ * Number of leaves in the node and all its descendants. Linked leaves are references to a
+ * script counted where it is defined, so they are excluded unless ``linked`` is true, which
+ * counts only them.
+ */
+export function countLeaves(node: TriggerTreeNode, linked = false): number {
+  const own = node.leaves.filter((leaf) => (leaf.kind === 'linked') === linked).length
+  return own + node.children.reduce((sum, child) => sum + countLeaves(child, linked), 0)
 }
 
 /**

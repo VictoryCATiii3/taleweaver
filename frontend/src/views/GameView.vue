@@ -353,6 +353,12 @@ onBeforeUnmount(() => {
 const activeActionId = ref<string | null>(null)
 const isPassRunning = computed(() => status.value === 'loading')
 const isDialogOpen = computed(() => !!pendingDialog.value && status.value !== 'game_over')
+
+// The hovered element usually disappears when a turn starts (tab switch, item taken) without a
+// mouseleave event, which would leave its tooltip floating over the story and the choice dialog.
+watch(status, (current, previous) => {
+  if (current === 'connecting' && previous !== 'connecting') hoveredEntity.value = null
+})
 const isActionInputBlocked = computed(() => inputLocked.value || isPassRunning.value || isDialogOpen.value)
 const dialogChoiceBusy = ref(false)
 const dialogChoiceError = ref('')
@@ -404,11 +410,26 @@ const handleEntityClick = async (entity: any) => {
       return
     }
 
-    // Default behavior for click (e.g. pick up if portable item)
+    // Default behavior for click: pick up portable items, look at everything else (this also
+    // fires the entity's on_interact triggers, e.g. a bolted-down bomb's choice dialog).
     if (gameCommandService.shouldAutoTakeOnEntityClick(entity)) {
       await handleTakeDirect(entity)
+      return
+    }
+    const target = entity?.name || entity?.id
+    if (target) {
+      await handlePlayerInput(`/inspect ${target}`)
     }
   }
+}
+
+/** Inventory click on an item without its own action: close the sheet and look at it. */
+const handleInspectInventoryItem = async (item: any): Promise<void> => {
+  const target = item?.name || item?.id
+  if (!target || isActionInputBlocked.value) return
+  showSheet.value = false
+  if (sheetDirty.value) handleSheetChanged()
+  await handlePlayerInput(`/inspect ${target}`)
 }
 
 const CONTAINER_OPEN_PREFIX = '[OPEN_CONTAINER] '
@@ -1766,6 +1787,7 @@ usePlayAgentAutoLoop()
       @item-hover="(item, event) => handleHover({ ...item, entity_type: 'ITEM', description: item.description || 'A mysterious item in your possession.' }, event)"
       @item-leave="hoveredEntity = null"
       @item-contextmenu="(item, event) => openInventoryContextMenu(item, event)"
+      @inspect-item="handleInspectInventoryItem"
     />
     <MapModal :open="showMap" :map-data="mapData" :nodes="nodes" :is-debug="!!sheet?.debug_mode" @close="showMap = false" />
     <QuestsModal 
@@ -2003,7 +2025,7 @@ usePlayAgentAutoLoop()
 
     <!-- HOVER TOOLTIP -->
     <GameHoverTooltip
-      :hovered-entity="hoveredEntity"
+      :hovered-entity="isDialogOpen ? null : hoveredEntity"
       :tooltip-style="tooltipStyle"
       :tooltip-image-failed="tooltipImageFailed"
       :shows-mechanics="showsMechanics"

@@ -22,6 +22,7 @@ const emit = defineEmits<{
   readItem: [item: any]
   changed: []
   itemContextmenu: [item: any, event: MouseEvent]
+  inspectItem: [item: any]
 }>()
 
 type TabType = 'inventory' | 'equipment' | 'ailments' | 'specials'
@@ -134,7 +135,10 @@ const handleInventoryClick = (item: any) => {
   if (isEquippable) {
     stateChanged.value = true
     emit('equip', item.name)
+    return
   }
+  // Everything else is looked at, which also fires the item's on_interact triggers.
+  emit('inspectItem', item)
 }
 
 const handleUnequip = (slot: string) => {

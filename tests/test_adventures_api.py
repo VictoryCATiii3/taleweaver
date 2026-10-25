@@ -4141,3 +4141,22 @@ async def test_editor_scene_decorative_objects_crud(client: AsyncClient):
         },
     )
     assert create_resp_long.status_code == 400
+
+
+async def test_patch_rule_mode_alone_updates_strict_rules(client: AsyncClient):
+    """The editor saves the adventure style on its own; strict_rules must follow it."""
+    # Arrange
+    ids = await _create_adventure(client, "Rule Mode Quest")
+    adv_id = ids["adventure_id"]
+
+    # Act
+    to_chat = await client.patch(
+        f"/api/adventures/{adv_id}", json={"rule_enforcement_mode": "chat"}
+    )
+    to_rpg = await client.patch(f"/api/adventures/{adv_id}", json={"rule_enforcement_mode": "rpg"})
+
+    # Assert
+    assert to_chat.status_code == 200, to_chat.text
+    assert to_chat.json()["strict_rules"] is False
+    assert to_rpg.json()["rule_enforcement_mode"] == "rpg"
+    assert to_rpg.json()["strict_rules"] is True

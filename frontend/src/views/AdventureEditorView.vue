@@ -1420,6 +1420,29 @@ async function saveEntityText(data: any) {
   }
 }
 
+/**
+ * The adventure style (RPG / Story / Chat) has no save button of its own: a click saves only
+ * this field, so other unsaved form edits are not stored by accident.
+ */
+async function handleUpdateRuleMode(mode: 'rpg' | 'story' | 'chat'): Promise<void> {
+  const previous = form.value.rule_enforcement_mode
+  if (mode === previous && mode === adventure.value?.rule_enforcement_mode) return
+  form.value.rule_enforcement_mode = mode
+  isSaving.value = true
+  try {
+    const updated = await adventureService.updateAdventure(props.adventureId, { rule_enforcement_mode: mode })
+    if (adventure.value) {
+      adventure.value.rule_enforcement_mode = updated?.rule_enforcement_mode ?? mode
+    }
+    addNotification(`Adventure style set to ${mode.toUpperCase()}.`, 'success')
+  } catch (error: any) {
+    form.value.rule_enforcement_mode = previous
+    addNotification(error instanceof Error ? error.message : 'Failed to save the adventure style', 'error')
+  } finally {
+    isSaving.value = false
+  }
+}
+
 async function saveChanges() {
   isSaving.value = true
   errorMsg.value = ''
@@ -2660,7 +2683,7 @@ watch(
               @update:calendar-pacing-unit="form.time_config = { ...(form.time_config || {}), calendar_pacing_unit: $event }"
               @update:calendar-max-value="form.time_config = { ...(form.time_config || {}), calendar_max_value: $event }"
               @update:calendar-max-unit="form.time_config = { ...(form.time_config || {}), calendar_max_unit: $event }"
-              @update:mode="form.rule_enforcement_mode = $event as any"
+              @update:mode="handleUpdateRuleMode"
               @save-changes="saveChanges"
               @notify="addNotification"
             />

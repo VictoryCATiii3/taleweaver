@@ -116,3 +116,53 @@ def test_editor_update_model_keeps_sequence_scripts():
     dumped = update.model_dump()["sequences"][0]["scripts"][0]
     assert dumped["trigger"] == "on_interact"
     assert dumped["target_id"] == "TICKING_BOMB"
+
+
+@pytest.mark.asyncio
+async def test_chat_mode_inspect_command_fires_sequence_on_interact(monkeypatch):
+    """Regression: without the mechanics pass (chat mode) on_interact never ran."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from backend.engine.rule_engine import AdventureGeneratorToolIntent
+    from backend.engine.scripting.dialog import pending_dialog
+
+    async with TestSessionLocal() as db:
+        # Arrange
+        dialog_script = {
+            **BOMB_SCRIPT,
+            "code": "tw.dialog.choose('Which wire?', ['Red', 'Blue'], on_choice='on_wire')",
+        }
+        user, adv, _avatar, state = await _seed_game_context(db)
+        adv.strict_rules = False
+        adv.is_adventure_generator = False
+        adv.sequences = [{**SEQUENCES[0], "scripts": [dialog_script]}]
+        state.active_sequence_id = "SEQ_1_BOMB"
+        db.add(
+            WorldEntity(id="TICKING_BOMB", session_id=state.session_id, entity_type="OBJECT",
+                        name="Bomb", description="A bomb.", current_scene_id="START",
+                        item_type="STATIC", is_portable=False)
+        )  # fmt: skip
+        await db.commit()
+
+        llm = MagicMock()
+        llm.aexecute_complex_task = AsyncMock(return_value=AdventureGeneratorToolIntent())
+
+        async def narration(*_args, **_kwargs):
+            yield MagicMock(choices=[MagicMock(delta=MagicMock(content="You study the bomb."))])
+
+        llm.stream_simple_task = AsyncMock(return_value=narration())
+        monkeypatch.setattr(
+            "backend.api.routes.adventures.gameplay_logic.GameMasterLLM",
+            lambda *args, **kwargs: llm,
+        )
+        manager = GameTurnManager(db, state.session_id, user)
+
+        # Act
+        async for _ in manager.process_turn("/inspect Bomb"):
+            pass
+
+        # Assert
+        await db.refresh(state)
+        dialog = pending_dialog(state.entity_states)
+        assert dialog is not None
+        assert dialog["prompt"] == "Which wire?"

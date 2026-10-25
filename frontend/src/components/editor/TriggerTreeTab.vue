@@ -41,7 +41,7 @@ const emit = defineEmits<{
 }>()
 
 type Row =
-  | { type: 'node'; key: string; depth: number; node: TriggerTreeNode; count: number }
+  | { type: 'node'; key: string; depth: number; node: TriggerTreeNode; count: number; linkedCount: number }
   | { type: 'leaf'; key: string; depth: number; leaf: TriggerLeaf; owner: TriggerTreeNode }
 
 const query = ref('')
@@ -67,7 +67,7 @@ const isOpen = (key: string): boolean => Boolean(query.value.trim()) || !collaps
 const rows = computed<Row[]>(() => {
   const out: Row[] = []
   const walk = (node: TriggerTreeNode, depth: number): void => {
-    out.push({ type: 'node', key: node.key, depth, node, count: countLeaves(node) })
+    out.push({ type: 'node', key: node.key, depth, node, count: countLeaves(node), linkedCount: countLeaves(node, true) })
     if (!isOpen(node.key)) return
     node.leaves.forEach((leaf) => out.push({ type: 'leaf', key: leaf.key, depth: depth + 1, leaf, owner: node }))
     node.children.forEach((child) => walk(child, depth + 1))
@@ -128,6 +128,12 @@ const LEAF_STYLES: Record<string, { icon: any; color: string; tag: string }> = {
 }
 
 const canEdit = (node: TriggerTreeNode): boolean => node.kind !== 'group'
+
+/** "Edit" target of a leaf: linked leaves open the place where the script is defined. */
+function editTarget(leaf: TriggerLeaf, owner: TriggerTreeNode): TriggerTreeNode {
+  if (!leaf.source) return owner
+  return { key: `${leaf.source.kind}:${leaf.source.id || ''}`, kind: leaf.source.kind, id: leaf.source.id, label: leaf.source.label, children: [], leaves: [] }
+}
 </script>
 
 <template>
@@ -185,7 +191,14 @@ const canEdit = (node: TriggerTreeNode): boolean => node.kind !== 'group'
               {{ row.node.label }}
             </span>
             <span v-if="row.node.subtitle" class="text-[10px] text-slate-500 shrink-0">{{ row.node.subtitle }}</span>
-            <span class="ml-auto text-[10px] font-mono shrink-0" :class="row.count ? 'text-emerald-300' : 'text-slate-600'">{{ row.count }}</span>
+            <span
+              v-if="row.linkedCount"
+              class="ml-auto flex items-center gap-0.5 text-[10px] font-mono text-slate-400 shrink-0"
+              :title="`${row.linkedCount} script(s) defined elsewhere target this entry`"
+            >
+              +{{ row.linkedCount }} <Link2 class="w-3 h-3" />
+            </span>
+            <span class="text-[10px] font-mono shrink-0" :class="[row.count ? 'text-emerald-300' : 'text-slate-600', row.linkedCount ? '' : 'ml-auto']">{{ row.count }}</span>
             <button
               v-if="canEdit(row.node)"
               type="button"
@@ -224,17 +237,18 @@ const canEdit = (node: TriggerTreeNode): boolean => node.kind !== 'group'
               <p v-if="selected.leaf.note" class="mt-1 text-[11px] text-slate-400">{{ selected.leaf.note }}</p>
             </div>
             <button
-              v-if="canEdit(selected.owner)"
+              v-if="canEdit(editTarget(selected.leaf, selected.owner))"
               type="button"
               class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-black uppercase tracking-wider"
-              @click="emit('edit', selected.owner)"
+              :title="selected.leaf.source ? `Open ${selected.leaf.source.label}` : 'Open editor'"
+              @click="emit('edit', editTarget(selected.leaf, selected.owner))"
             >
-              <PencilLine class="w-3.5 h-3.5" /> Edit
+              <PencilLine class="w-3.5 h-3.5" /> {{ selected.leaf.source ? 'Edit source' : 'Edit' }}
             </button>
           </div>
           <pre class="mt-4 max-h-[55vh] overflow-auto rounded-xl bg-black/50 border border-white/5 p-4 text-[11px] leading-relaxed text-slate-200 font-mono whitespace-pre-wrap">{{ selected.leaf.code }}</pre>
-          <p v-if="selected.leaf.kind === 'linked'" class="mt-2 text-[10px] text-slate-500">
-            Defined elsewhere (global or sequence script) and targeting this entity.
+          <p v-if="selected.leaf.source" class="mt-2 text-[10px] text-slate-500">
+            This is a reference: the script is defined in {{ selected.leaf.source.label }} and targets {{ selected.owner.label }}. It is the same script as the one listed there, not a second one.
           </p>
         </template>
         <p v-else class="text-xs text-slate-500 italic">Select a trigger in the tree to see its code.</p>
