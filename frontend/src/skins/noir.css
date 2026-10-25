@@ -52,10 +52,11 @@
   --tw-tab-radius: 6px 6px 0 0;
   --tw-tab-font: 'Special Elite', 'Courier New', monospace;
 
+  /* Black-and-white but readable: light blinds, a soft vignette, no extra darkening. */
   --tw-scene-tint:
-    repeating-linear-gradient(-24deg, rgba(255, 250, 235, 0.06) 0 22px, transparent 22px 48px),
-    radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.7) 100%);
-  --tw-scene-filter: grayscale(1) contrast(1.15) brightness(0.75);
+    repeating-linear-gradient(-24deg, rgba(255, 250, 235, 0.05) 0 22px, transparent 22px 48px),
+    radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.4) 100%);
+  --tw-scene-filter: grayscale(1) contrast(1.12) brightness(1.08);
 }
 
 [data-skin='noir'] .tw-narration {

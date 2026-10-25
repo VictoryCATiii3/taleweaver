@@ -20,6 +20,7 @@ import {
   VolumeX,
   Sliders,
   LogOut,
+  Image as ImageIcon,
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -34,6 +35,8 @@ const props = defineProps<{
   exp?: number
   mode?: 'rpg' | 'story' | 'chat'
   debugMode?: boolean
+  /** Shows the button that opens the full scene artwork. */
+  hasSceneImage?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -41,6 +44,7 @@ const emit = defineEmits<{
   openQuests: []
   openSettings: [tab?: SettingsTabId]
   openDebug: []
+  viewSceneImage: []
   exitSession: []
 }>()
 
@@ -161,6 +165,16 @@ const sequenceOrder = computed(() => {
           <h2 class="text-sm sm:text-base font-black text-white uppercase tracking-wider truncate drop-shadow-md comic-title min-w-0">
             {{ props.sceneName || 'Unknown Location' }}
           </h2>
+          <button
+            v-if="props.hasSceneImage"
+            type="button"
+            class="flex items-center justify-center w-7 h-7 shrink-0 rounded-lg bg-slate-900/80 border border-slate-700/60 text-slate-300 hover:text-white hover:border-amber-400/60 hover:bg-amber-500/10 transition-all cursor-pointer"
+            title="View the full scene image"
+            aria-label="View the full scene image"
+            @click="emit('viewSceneImage')"
+          >
+            <ImageIcon class="w-3.5 h-3.5" />
+          </button>
         </div>
         <div class="flex items-center gap-2 text-[11px] text-slate-400 truncate opacity-80 font-medium">
           <span v-if="props.adventureTitle" class="truncate">{{ props.adventureTitle }}</span>

@@ -20,6 +20,7 @@ import ImmersiveHeader from './immersive/ImmersiveHeader.vue'
 import ImmersiveCharacterStage from './immersive/ImmersiveCharacterStage.vue'
 import ImmersiveStoryTabs from './immersive/ImmersiveStoryTabs.vue'
 import StoryTabPanel from './immersive/tabs/StoryTabPanel.vue'
+import SceneImageViewer from './immersive/SceneImageViewer.vue'
 import ImmersiveStoryFeed from './immersive/ImmersiveStoryFeed.vue'
 import ImmersiveActionBar from './immersive/ImmersiveActionBar.vue'
 import ImmersiveInputBar from './immersive/ImmersiveInputBar.vue'
@@ -123,6 +124,9 @@ const activeSceneImageUrl = computed(() => {
   }
   return null
 })
+
+// Full-screen view of the scene artwork (opened from the header).
+const showSceneImage = ref(false)
 
 const transitionSceneImageUrl = computed(() => {
   const path = props.sceneTransitionTarget?.targetSceneImage
@@ -277,6 +281,8 @@ defineExpose({
       :exp="props.exp"
       :mode="props.mode"
       :debug-mode="!!props.sheet?.debug_mode"
+      :has-scene-image="!!activeSceneImageUrl"
+      @view-scene-image="showSceneImage = true"
       @open-chronicles="emit('openChronicles')"
       @open-quests="emit('openQuests')"
       @open-memories="emit('openMemories')"
@@ -414,5 +420,12 @@ defineExpose({
         @cancel-turn-error="emit('cancelTurnError')"
       />
     </footer>
+
+    <SceneImageViewer
+      v-if="showSceneImage && activeSceneImageUrl"
+      :image-url="activeSceneImageUrl"
+      :scene-name="props.currentSceneName || props.sheet?.current_scene"
+      @close="showSceneImage = false"
+    />
   </div>
 </template>
