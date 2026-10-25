@@ -504,7 +504,7 @@ async def test_agent_prompt_switches_to_monkey_mode_objective(setup_test_db, mon
     assert "intentionally trying edge cases and bad inputs" in prompt
 
 
-def test_log_issue_does_not_create_unknown_session_folder(tmp_path, monkeypatch):
+async def test_log_issue_does_not_create_unknown_session_folder(tmp_path, monkeypatch):
     """Agent issue logging must not create arbitrary session folders for invalid IDs."""
     from backend.api.routes.adventures.agent_logic import AgentService
 
@@ -973,7 +973,7 @@ async def test_playagent_personalities_prompt_injection(setup_test_db, monkeypat
         assert "Always speak like Sherlock Holmes." in prompt
 
 
-def test_legacy_agent_command_is_not_registered():
+async def test_legacy_agent_command_is_not_registered():
     """The old /agent console command was replaced by /playagent."""
     from backend.api.routes.adventures.agent_commands import PLAYAGENT_COMMANDS
 

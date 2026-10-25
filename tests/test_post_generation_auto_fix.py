@@ -55,7 +55,7 @@ async def _seed() -> tuple[User, str]:
         return user, "autofix-tpl"
 
 
-def test_auto_validate_and_fix_defaults_to_enabled() -> None:
+async def test_auto_validate_and_fix_defaults_to_enabled() -> None:
     assert CreateAdventureTemplatePayload(title="New").auto_validate_and_fix is True
 
 

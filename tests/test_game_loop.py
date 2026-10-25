@@ -4322,7 +4322,7 @@ async def test_off_scene_rule_unlock_flow_unlocks_container_globally(setup_test_
         assert manager_after._is_container_locked(container, None) is False
 
 
-def test_mutual_exclusivity_normalization():
+async def test_mutual_exclusivity_normalization():
     from backend.engine.world_generator import _normalize_unlock_requirements
 
     # Priority 1: code wins over item and rule
@@ -4344,7 +4344,7 @@ def test_mutual_exclusivity_normalization():
     assert rule == "narrative rule"
 
 
-def test_world_generator_ensures_container_has_item_from_existing_objects():
+async def test_world_generator_ensures_container_has_item_from_existing_objects():
     from backend.engine.world_generator import _ensure_containers_have_minimum_inventory
 
     objects = [
@@ -4367,7 +4367,7 @@ def test_world_generator_ensures_container_has_item_from_existing_objects():
     assert container.get("inventory") == ["BETTYS_NOTE"]
 
 
-def test_world_generator_does_not_create_fallback_item_when_no_candidates():
+async def test_world_generator_does_not_create_fallback_item_when_no_candidates():
     from backend.engine.world_generator import _ensure_containers_have_minimum_inventory
 
     objects = [

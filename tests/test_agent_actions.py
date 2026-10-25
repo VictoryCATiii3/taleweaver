@@ -173,7 +173,7 @@ async def test_exit_list_tells_agent_how_to_move_and_unlock(auth_client, setup_t
     assert "4711" not in text
 
 
-def test_agent_history_skips_thoughts_and_truncates():
+async def test_agent_history_skips_thoughts_and_truncates():
     history = [
         {"role": "assistant", "content": "You stand in a dusty hall."},
         {"role": "thought", "content": "secret reasoning"},

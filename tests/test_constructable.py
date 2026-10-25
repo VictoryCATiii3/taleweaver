@@ -42,68 +42,88 @@ def _codes(findings):
     return [(f.severity, f.code) for f in findings]
 
 
-def test_constructable_valid_when_hidden_with_two_ingredients():
-    payload = _payload([
-        {"id": "BATTERY", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Battery", "is_hidden": False},
-        {"id": "TORCH", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Torch", "is_hidden": False},
-        {
-            "id": "LANTERN",
-            "entity_type": "OBJECT",
-            "item_type": "CONSTRUCTABLE",
-            "name": "Lantern",
-            "is_hidden": True,
-            "combination_ingredients": ["BATTERY", "TORCH"],
-        },
-    ])
+async def test_constructable_valid_when_hidden_with_two_ingredients():
+    payload = _payload(
+        [
+            {
+                "id": "BATTERY",
+                "entity_type": "OBJECT",
+                "item_type": "DEFAULT",
+                "name": "Battery",
+                "is_hidden": False,
+            },
+            {
+                "id": "TORCH",
+                "entity_type": "OBJECT",
+                "item_type": "DEFAULT",
+                "name": "Torch",
+                "is_hidden": False,
+            },
+            {
+                "id": "LANTERN",
+                "entity_type": "OBJECT",
+                "item_type": "CONSTRUCTABLE",
+                "name": "Lantern",
+                "is_hidden": True,
+                "combination_ingredients": ["BATTERY", "TORCH"],
+            },
+        ]
+    )
     findings = [f for f in validate_adventure(payload) if f.code.startswith("constructable")]
     assert findings == []
 
 
-def test_constructable_needs_at_least_two_ingredients():
-    payload = _payload([
-        {"id": "BATTERY", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Battery"},
-        {
-            "id": "LANTERN",
-            "entity_type": "OBJECT",
-            "item_type": "CONSTRUCTABLE",
-            "name": "Lantern",
-            "is_hidden": True,
-            "combination_ingredients": ["BATTERY"],
-        },
-    ])
+async def test_constructable_needs_at_least_two_ingredients():
+    payload = _payload(
+        [
+            {"id": "BATTERY", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Battery"},
+            {
+                "id": "LANTERN",
+                "entity_type": "OBJECT",
+                "item_type": "CONSTRUCTABLE",
+                "name": "Lantern",
+                "is_hidden": True,
+                "combination_ingredients": ["BATTERY"],
+            },
+        ]
+    )
     findings = validate_adventure(payload)
     assert ("error", "constructable_needs_ingredients") in _codes(findings)
 
 
-def test_constructable_missing_ingredient_reference():
-    payload = _payload([
-        {"id": "BATTERY", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Battery"},
-        {
-            "id": "LANTERN",
-            "entity_type": "OBJECT",
-            "item_type": "CONSTRUCTABLE",
-            "name": "Lantern",
-            "is_hidden": True,
-            "combination_ingredients": ["BATTERY", "GHOST"],
-        },
-    ])
+async def test_constructable_missing_ingredient_reference():
+    payload = _payload(
+        [
+            {"id": "BATTERY", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Battery"},
+            {
+                "id": "LANTERN",
+                "entity_type": "OBJECT",
+                "item_type": "CONSTRUCTABLE",
+                "name": "Lantern",
+                "is_hidden": True,
+                "combination_ingredients": ["BATTERY", "GHOST"],
+            },
+        ]
+    )
     findings = validate_adventure(payload)
     assert ("error", "constructable_ingredient_missing") in _codes(findings)
 
 
-def test_constructable_should_be_hidden_warns():
-    payload = _payload([
-        {"id": "BATTERY", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Battery"},
-        {"id": "TORCH", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Torch"},
-        {
-            "id": "LANTERN",
-            "entity_type": "OBJECT",
-            "item_type": "CONSTRUCTABLE",
-            "name": "Lantern",
-            "is_hidden": False,
-            "combination_ingredients": ["BATTERY", "TORCH"],
-        },
-    ])
+async def test_constructable_should_be_hidden_warns():
+    payload = _payload(
+        [
+            {"id": "BATTERY", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Battery"},
+            {"id": "TORCH", "entity_type": "OBJECT", "item_type": "DEFAULT", "name": "Torch"},
+            {
+                "id": "LANTERN",
+                "entity_type": "OBJECT",
+                "item_type": "CONSTRUCTABLE",
+                "name": "Lantern",
+                "is_hidden": False,
+                "combination_ingredients": ["BATTERY", "TORCH"],
+            },
+        ]
+    )
     findings = validate_adventure(payload)
     assert ("warn", "constructable_not_hidden") in _codes(findings)
 
@@ -115,7 +135,9 @@ def test_constructable_should_be_hidden_warns():
 
 async def _seed(db):
     user = User(username="player1", hashed_password="pw", role="user")
-    adv = AdventureTemplate(id="adv-1", title="Test", owner_id="admin", time_per_turn=5, strict_rules=True)
+    adv = AdventureTemplate(
+        id="adv-1", title="Test", owner_id="admin", time_per_turn=5, strict_rules=True
+    )
     db.add_all([user, adv])
     await db.flush()
     avatar = Avatar(
@@ -149,16 +171,46 @@ async def test_constructable_materializes_when_all_ingredients_combined(setup_te
         user, _adv, avatar, state = await _seed(db)
 
         # Two ingredients in the player's inventory.
-        db.add(WorldEntity(id="BATTERY", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Battery", description="A battery.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="TORCH", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Torch", description="A torch.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
+        db.add(
+            WorldEntity(
+                id="BATTERY",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Battery",
+                description="A battery.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="TORCH",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Torch",
+                description="A torch.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
         # Hidden constructable result.
-        db.add(WorldEntity(id="LANTERN", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="CONSTRUCTABLE", name="Lantern", description="A lantern.", current_scene_id="START",
-                           is_hidden=True, combination_ingredients=["BATTERY", "TORCH"]))
+        db.add(
+            WorldEntity(
+                id="LANTERN",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="CONSTRUCTABLE",
+                name="Lantern",
+                description="A lantern.",
+                current_scene_id="START",
+                is_hidden=True,
+                combination_ingredients=["BATTERY", "TORCH"],
+            )
+        )
         await db.commit()
 
         avatar.inventory = [
@@ -171,7 +223,9 @@ async def test_constructable_materializes_when_all_ingredients_combined(setup_te
         await manager.initialize()
 
         event = GameEvent(combination_intent=True)
-        messages = await manager._enforce_constructable_combination(event, "combine battery with torch")
+        messages = await manager._enforce_constructable_combination(
+            event, "combine battery with torch"
+        )
 
         assert any("create" in m.lower() for m in messages)
         # Ingredients scheduled for removal from inventory.
@@ -179,7 +233,10 @@ async def test_constructable_materializes_when_all_ingredients_combined(setup_te
         # Constructable revealed in current scene.
         reveal = next(u for u in event.updated_entities if u.entity_id == "LANTERN")
         assert reveal.is_hidden is False
-        assert any(m.entity_id == "LANTERN" and m.to_scene_id == "START" for m in (event.moved_entities or []))
+        assert any(
+            m.entity_id == "LANTERN" and m.to_scene_id == "START"
+            for m in (event.moved_entities or [])
+        )
 
 
 async def test_constructable_noop_when_ingredient_missing(setup_test_db):
@@ -188,15 +245,45 @@ async def test_constructable_noop_when_ingredient_missing(setup_test_db):
     async with TestSessionLocal() as db:
         user, _adv, avatar, state = await _seed(db)
 
-        db.add(WorldEntity(id="BATTERY", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Battery", description="A battery.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="TORCH", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Torch", description="A torch.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="LANTERN", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="CONSTRUCTABLE", name="Lantern", description="A lantern.", current_scene_id="START",
-                           is_hidden=True, combination_ingredients=["BATTERY", "TORCH"]))
+        db.add(
+            WorldEntity(
+                id="BATTERY",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Battery",
+                description="A battery.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="TORCH",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Torch",
+                description="A torch.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="LANTERN",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="CONSTRUCTABLE",
+                name="Lantern",
+                description="A lantern.",
+                current_scene_id="START",
+                is_hidden=True,
+                combination_ingredients=["BATTERY", "TORCH"],
+            )
+        )
         await db.commit()
 
         # Player only carries one of two ingredients.
@@ -207,7 +294,9 @@ async def test_constructable_noop_when_ingredient_missing(setup_test_db):
         await manager.initialize()
 
         event = GameEvent(combination_intent=True)
-        messages = await manager._enforce_constructable_combination(event, "combine battery with torch")
+        messages = await manager._enforce_constructable_combination(
+            event, "combine battery with torch"
+        )
 
         assert messages == []
         assert not event.removed_inventory_item_ids
@@ -220,16 +309,46 @@ async def test_constructable_noop_when_already_revealed(setup_test_db):
     async with TestSessionLocal() as db:
         user, _adv, avatar, state = await _seed(db)
 
-        db.add(WorldEntity(id="BATTERY", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Battery", description="A battery.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="TORCH", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Torch", description="A torch.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
+        db.add(
+            WorldEntity(
+                id="BATTERY",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Battery",
+                description="A battery.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="TORCH",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Torch",
+                description="A torch.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
         # Already visible -> should not re-trigger.
-        db.add(WorldEntity(id="LANTERN", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="CONSTRUCTABLE", name="Lantern", description="A lantern.", current_scene_id="START",
-                           is_hidden=False, combination_ingredients=["BATTERY", "TORCH"]))
+        db.add(
+            WorldEntity(
+                id="LANTERN",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="CONSTRUCTABLE",
+                name="Lantern",
+                description="A lantern.",
+                current_scene_id="START",
+                is_hidden=False,
+                combination_ingredients=["BATTERY", "TORCH"],
+            )
+        )
         await db.commit()
 
         avatar.inventory = [
@@ -242,7 +361,9 @@ async def test_constructable_noop_when_already_revealed(setup_test_db):
         await manager.initialize()
 
         event = GameEvent(combination_intent=True)
-        messages = await manager._enforce_constructable_combination(event, "combine battery with torch")
+        messages = await manager._enforce_constructable_combination(
+            event, "combine battery with torch"
+        )
 
         assert messages == []
         assert not event.removed_inventory_item_ids
@@ -254,15 +375,45 @@ async def test_constructable_noop_without_combine_intent(setup_test_db):
     async with TestSessionLocal() as db:
         user, _adv, avatar, state = await _seed(db)
 
-        db.add(WorldEntity(id="BATTERY", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Battery", description="A battery.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="TORCH", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Torch", description="A torch.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="LANTERN", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="CONSTRUCTABLE", name="Lantern", description="A lantern.", current_scene_id="START",
-                           is_hidden=True, combination_ingredients=["BATTERY", "TORCH"]))
+        db.add(
+            WorldEntity(
+                id="BATTERY",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Battery",
+                description="A battery.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="TORCH",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Torch",
+                description="A torch.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="LANTERN",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="CONSTRUCTABLE",
+                name="Lantern",
+                description="A lantern.",
+                current_scene_id="START",
+                is_hidden=True,
+                combination_ingredients=["BATTERY", "TORCH"],
+            )
+        )
         await db.commit()
 
         avatar.inventory = [
@@ -289,15 +440,45 @@ async def test_constructable_consumes_scene_ingredient(setup_test_db):
         user, _adv, avatar, state = await _seed(db)
 
         # One ingredient in inventory, one visible in the scene.
-        db.add(WorldEntity(id="BATTERY", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Battery", description="A battery.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="TORCH", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Torch", description="A torch.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=False))
-        db.add(WorldEntity(id="LANTERN", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="CONSTRUCTABLE", name="Lantern", description="A lantern.", current_scene_id="START",
-                           is_hidden=True, combination_ingredients=["BATTERY", "TORCH"]))
+        db.add(
+            WorldEntity(
+                id="BATTERY",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Battery",
+                description="A battery.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="TORCH",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Torch",
+                description="A torch.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=False,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="LANTERN",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="CONSTRUCTABLE",
+                name="Lantern",
+                description="A lantern.",
+                current_scene_id="START",
+                is_hidden=True,
+                combination_ingredients=["BATTERY", "TORCH"],
+            )
+        )
         await db.commit()
 
         avatar.inventory = [{"id": "BATTERY", "name": "Battery"}]
@@ -326,15 +507,45 @@ async def test_constructable_reverts_illegal_spawn(setup_test_db):
     async with TestSessionLocal() as db:
         user, _adv, avatar, state = await _seed(db)
 
-        db.add(WorldEntity(id="BATTERY", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Battery", description="A battery.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="TORCH", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Torch", description="A torch.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="LANTERN", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="CONSTRUCTABLE", name="Lantern", description="A lantern.", current_scene_id="START",
-                           is_hidden=True, combination_ingredients=["BATTERY", "TORCH"]))
+        db.add(
+            WorldEntity(
+                id="BATTERY",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Battery",
+                description="A battery.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="TORCH",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Torch",
+                description="A torch.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="LANTERN",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="CONSTRUCTABLE",
+                name="Lantern",
+                description="A lantern.",
+                current_scene_id="START",
+                is_hidden=True,
+                combination_ingredients=["BATTERY", "TORCH"],
+            )
+        )
         await db.commit()
 
         manager = GameTurnManager(db, state.session_id, user)
@@ -342,9 +553,10 @@ async def test_constructable_reverts_illegal_spawn(setup_test_db):
 
         # The LLM outputs schema updates trying to illegally add/unhide the lantern.
         from backend.engine.rule_engine import InventoryItem, WorldEntityUpdate
+
         event = GameEvent(
             new_inventory_items=[InventoryItem(id="LANTERN", name="Lantern")],
-            updated_entities=[WorldEntityUpdate(entity_id="LANTERN", is_hidden=False)]
+            updated_entities=[WorldEntityUpdate(entity_id="LANTERN", is_hidden=False)],
         )
 
         messages = await manager._enforce_constructable_combination(event, "look at lantern")
@@ -362,15 +574,45 @@ async def test_constructable_crafts_in_any_language_when_gm_flags_intent(setup_t
     async with TestSessionLocal() as db:
         # Arrange
         user, _adv, avatar, state = await _seed(db)
-        db.add(WorldEntity(id="PILE", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Pile", description="Une pile.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="TORCHE", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="DEFAULT", name="Torche", description="Une torche.", current_scene_id="START",
-                           is_hidden=False, is_in_inventory=True))
-        db.add(WorldEntity(id="LANTERNE", session_id=state.session_id, entity_type="OBJECT",
-                           item_type="CONSTRUCTABLE", name="Lanterne", description="Une lanterne.",
-                           current_scene_id="START", is_hidden=True, combination_ingredients=["PILE", "TORCHE"]))
+        db.add(
+            WorldEntity(
+                id="PILE",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Pile",
+                description="Une pile.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="TORCHE",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="DEFAULT",
+                name="Torche",
+                description="Une torche.",
+                current_scene_id="START",
+                is_hidden=False,
+                is_in_inventory=True,
+            )
+        )
+        db.add(
+            WorldEntity(
+                id="LANTERNE",
+                session_id=state.session_id,
+                entity_type="OBJECT",
+                item_type="CONSTRUCTABLE",
+                name="Lanterne",
+                description="Une lanterne.",
+                current_scene_id="START",
+                is_hidden=True,
+                combination_ingredients=["PILE", "TORCHE"],
+            )
+        )
         avatar.inventory = [{"id": "PILE", "name": "Pile"}, {"id": "TORCHE", "name": "Torche"}]
         await db.commit()
         manager = GameTurnManager(db, state.session_id, user)
@@ -387,4 +629,3 @@ async def test_constructable_crafts_in_any_language_when_gm_flags_intent(setup_t
         # Assert
         assert any("Lanterne" in m for m in crafted)
         assert not any("Lanterne" in m for m in not_flagged)
-
