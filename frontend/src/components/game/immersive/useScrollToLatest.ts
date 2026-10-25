@@ -1,7 +1,7 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 
 /** Distance (px) from the bottom below which the feed counts as "at the latest message". */
-const AT_BOTTOM_THRESHOLD_PX = 120
+const AT_BOTTOM_THRESHOLD_PX = 32
 
 /**
  * Tracks whether a scroll container has content below the visible area and offers a smooth

@@ -5,7 +5,7 @@
  * A page covers one scene + sequence (chapter) and shows all of its exchanges in order
  * (see comicPages.ts). The page only changes when the scene or the sequence changes.
  */
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import type { ComicTurn } from '@/composables/useComicTurns'
 import LicenseInfoBlock from '@/components/game/LicenseInfoBlock.vue'
 import ImmersiveStoryExchange from '@/components/game/immersive/ImmersiveStoryExchange.vue'
@@ -66,6 +66,8 @@ watch(
   }
 )
 
+const hasPager = computed(() => props.gameTurns.length > 1)
+
 function isLatestExchange(exIdx: number): boolean {
   const isLatestPage = props.activeTurnIndex >= props.gameTurns.length - 1
   return isLatestPage && exIdx === (props.activeTurn?.exchanges.length ?? 0) - 1
@@ -73,11 +75,12 @@ function isLatestExchange(exIdx: number): boolean {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col justify-between min-h-0 relative overflow-hidden">
+  <div class="story-feed flex-1 flex flex-col justify-between min-h-0 relative overflow-hidden">
     <!-- COMIC STORY CONTAINER (Page Display) -->
     <div
       ref="storyContainerRef"
       class="comic-story-container tw-feed flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 flex flex-col min-h-0 relative"
+      :class="{ 'pb-12 sm:pb-12': hasPager }"
     >
       <!-- Empty State -->
       <div v-if="!props.activeTurn && !props.isEvaluating" class="flex-1 flex flex-col items-center justify-center text-slate-500">
@@ -129,23 +132,12 @@ function isLatestExchange(exIdx: number): boolean {
       </template>
     </div>
 
-    <!-- Jump to the latest message (only while content is hidden below) -->
-    <Transition name="scroll-latest">
-      <button
-        v-if="hasContentBelow"
-        type="button"
-        class="tw-scroll-latest absolute right-3 z-20"
-        :class="props.gameTurns.length > 1 ? 'bottom-12' : 'bottom-3'"
-        title="Jump to the latest message"
-        aria-label="Jump to the latest message"
-        @click="scrollToLatest"
-      >
-        <ChevronsDown class="w-5 h-5" />
-      </button>
-    </Transition>
-
-    <!-- COMIC PAGE NAVIGATION & PAGING CONTROLS -->
-    <div v-if="props.gameTurns.length > 1" class="tw-pager flex items-center justify-between px-3 py-1.5 shrink-0 text-xs font-bold">
+    <!-- COMIC PAGE NAVIGATION & PAGING CONTROLS (revealed on hover; pinned while browsing history) -->
+    <div
+      v-if="hasPager"
+      class="tw-pager story-feed-pager absolute inset-x-0 bottom-0 z-20 flex items-center justify-between px-3 py-1.5 text-xs font-bold"
+      :class="{ 'is-pinned': props.viewingTurnIndex !== null }"
+    >
       <div class="flex items-center gap-1">
         <button
           type="button"
@@ -177,6 +169,20 @@ function isLatestExchange(exIdx: number): boolean {
         Jump to Latest
       </button>
     </div>
+
+    <!-- Jump to the latest message (only while content is hidden below; after the pager for the ~ selector) -->
+    <Transition name="scroll-latest">
+      <button
+        v-if="hasContentBelow"
+        type="button"
+        class="tw-scroll-latest story-feed-scroll-latest absolute right-3 z-30"
+        title="Jump to the latest message"
+        aria-label="Jump to the latest message"
+        @click="scrollToLatest"
+      >
+        <ChevronsDown class="w-5 h-5" />
+      </button>
+    </Transition>
   </div>
 </template>
 
@@ -190,6 +196,46 @@ function isLatestExchange(exIdx: number): boolean {
 .scroll-latest-leave-to {
   opacity: 0;
   transform: translateY(8px) scale(0.9);
+}
+
+.story-feed-scroll-latest {
+  bottom: 0.75rem;
+  transition: bottom 0.2s ease;
+}
+
+.story-feed-pager {
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.story-feed:hover .story-feed-pager,
+.story-feed:focus-within .story-feed-pager,
+.story-feed-pager.is-pinned {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* Keep the jump button clear of the pager whenever the pager is shown */
+.story-feed:hover .story-feed-pager ~ .story-feed-scroll-latest,
+.story-feed:focus-within .story-feed-pager ~ .story-feed-scroll-latest,
+.story-feed-pager.is-pinned ~ .story-feed-scroll-latest {
+  bottom: 3rem;
+}
+
+/* Touch devices cannot hover: always show the pager there */
+@media (hover: none) {
+  .story-feed-pager {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .story-feed-pager ~ .story-feed-scroll-latest {
+    bottom: 3rem;
+  }
 }
 
 .comic-story-container > * {
