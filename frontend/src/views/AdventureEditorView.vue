@@ -26,6 +26,8 @@ import MapTab from '@/components/editor/MapTab.vue'
 import QuestTab from '@/components/editor/QuestTab.vue'
 import AwardsTab from '@/components/editor/AwardsTab.vue'
 import ScriptsTab from '@/components/editor/ScriptsTab.vue'
+import TriggerTreeTab from '@/components/editor/TriggerTreeTab.vue'
+import type { TriggerTreeNode } from '@/services/triggerTree'
 import AdvancedTab from '@/components/editor/AdvancedTab.vue'
 import ValidationTab from '@/components/editor/ValidationTab.vue'
 import EntityTooltip from '@/components/editor/EntityTooltip.vue'
@@ -410,9 +412,10 @@ const isSaving = ref(false)
 const errorMsg = ref('')
 const promptError = ref('')
 const showDebug = ref(false)
-const activeTab = ref<'world' | 'sequences' | 'protagonist' | 'items' | 'visuals' | 'inhabitants' | 'scenes' | 'map' | 'quest' | 'awards' | 'scripts' | 'tone' | 'advanced' | 'validation'>('world')
-const sceneEditorReturnTab = ref<'world' | 'sequences' | 'protagonist' | 'items' | 'visuals' | 'inhabitants' | 'scenes' | 'map' | 'quest' | 'awards' | 'scripts' | 'tone' | 'advanced' | 'validation'>('scenes')
-const exitEditorReturnTab = ref<'world' | 'sequences' | 'protagonist' | 'items' | 'visuals' | 'inhabitants' | 'scenes' | 'map' | 'quest' | 'awards' | 'scripts' | 'tone' | 'advanced' | 'validation'>('map')
+type EditorTabKey = 'world' | 'sequences' | 'protagonist' | 'items' | 'visuals' | 'inhabitants' | 'scenes' | 'map' | 'quest' | 'awards' | 'scripts' | 'triggers' | 'tone' | 'advanced' | 'validation'
+const activeTab = ref<EditorTabKey>('world')
+const sceneEditorReturnTab = ref<EditorTabKey>('scenes')
+const exitEditorReturnTab = ref<EditorTabKey>('map')
 
 const selectedVisual = ref<{ kind: VisualKind; id: string; label: string; description: string; hint: string } | null>(null)
 const selectedUploadTarget = ref<{ kind: VisualKind; id: string; label: string } | null>(null)
@@ -488,6 +491,7 @@ const editorTabs = [
   { key: 'quest', label: 'Side Quests' },
   { key: 'awards', label: 'Awards' },
   { key: 'scripts', label: 'Scripts' },
+  { key: 'triggers', label: 'Trigger Overview' },
   { key: 'visuals', label: 'Visual Style' },
   { key: 'tone', label: 'Tone' },
   { key: 'advanced', label: 'Advanced' },
@@ -1836,6 +1840,43 @@ async function handleUpdateAwards(newAwards: any[]) {
   }
 }
 
+// Trigger overview "Edit": entity editors open as modal, the rest switch to their tab.
+const TRIGGER_OWNER_TABS = { global: 'scripts', protagonist: 'protagonist', sequence: 'sequences', exit: 'map' } as const
+
+function handleTriggerTreeEdit(node: TriggerTreeNode): void {
+  const tab = TRIGGER_OWNER_TABS[node.kind as keyof typeof TRIGGER_OWNER_TABS]
+  if (tab) {
+    activeTab.value = tab
+    return
+  }
+  const id = String(node.id || '')
+  if (node.kind === 'scene') {
+    const scene = editorScenes.value.find((s: any) => String(s.id) === id)
+    openTextEdit('scene', id, scene?.label || scene?.name || id, scene?.description || '')
+    return
+  }
+  if (node.kind === 'npc') {
+    const npc = editorNpcs.value.find((n: any) => String(n.id) === id)
+    openTextEdit('npc', id, npc?.name || id, npc?.description || '', '', npc?.hp, npc?.stamina, npc?.mana, npc?.goal, npc?.character, npc?.is_killable)
+    return
+  }
+  const item = editorAllItems.value.find((o: any) => String(o.id) === id)
+  openTextEdit('object', id, item?.name || id, item?.description || '')
+}
+
+async function handleUpdateInitScript(initScript: string): Promise<void> {
+  isSaving.value = true
+  try {
+    await adventureService.updateAdventure(props.adventureId, { init_script: initScript })
+    await fetchAdventure()
+    addNotification('Init script updated.', 'success')
+  } catch (error: any) {
+    addNotification(error instanceof Error ? error.message : 'Failed to update init script', 'error')
+  } finally {
+    isSaving.value = false
+  }
+}
+
 async function handleUpdateScripts(newScripts: any[]) {
   isSaving.value = true
   try {
@@ -2841,8 +2882,21 @@ watch(
               v-if="activeTab === 'scripts'"
               :adventure="adventure"
               :reference-options="referenceOptions"
+              :is-saving="isSaving"
               @update-scripts="handleUpdateScripts"
+              @update-init-script="handleUpdateInitScript"
               @notify="addNotification"
+            />
+
+            <TriggerTreeTab
+              v-if="activeTab === 'triggers'"
+              :adventure="{ ...(debugData?.adventure || {}), ...(adventure || {}) }"
+              :protagonist="debugData?.protagonist"
+              :scenes="editorScenes"
+              :exits="debugData?.exits || []"
+              :npcs="editorNpcs"
+              :objects="editorAllItems"
+              @edit="handleTriggerTreeEdit"
             />
 
             <VisualsTab

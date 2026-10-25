@@ -342,6 +342,7 @@ class AdventureTemplateResponse(BaseModel):
     container_generation_enabled: bool = True
     scripts_generation_enabled: bool = True
     scripts: list[dict[str, Any]] = Field(default_factory=list)
+    init_script: Optional[str] = None
     min_containers: Optional[int] = None
     max_containers: Optional[int] = None
     text_log_generation_enabled: bool = True

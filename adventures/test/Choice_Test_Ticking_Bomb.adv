@@ -5,7 +5,7 @@
     "title": "Choice Test: The Ticking Bomb",
     "teaser": "One minute, two wires, one choice.",
     "cover_appearance": "subway maintenance room, ticking bomb, red and blue wires, harsh lamp",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "creator": "TaleWeaver Test",
     "language": "English",
     "original_prompt": "Minimal test adventure for script-driven choice dialogs (tw.dialog.choose).",
@@ -18,7 +18,7 @@
     "generate_npc_images": false,
     "generate_item_images": false,
     "scripts_generation_enabled": true,
-    "plot": "A bomb ticks in an abandoned subway maintenance room. The protagonist must disarm it. Examining or tampering with the bomb opens a choice dialog. The maintenance note tells which wire is safe; the wire options only appear once the protagonist carries the wire cutters.",
+    "plot": "A bomb ticks in an abandoned subway maintenance room. The protagonist must disarm it. Inspecting or tampering with the bomb opens a choice dialog. The maintenance note tells which wire is safe; the wire options only appear once the protagonist carries the wire cutters.",
     "rules": "The bomb is resolved exclusively through the choice dialog opened by scripts. The GM must never decide the bomb's outcome on its own; it only narrates.",
     "intro_text": "A steady ticking echoes through the dark maintenance room. Somewhere in here is a bomb.",
     "completed_condition": "The bomb has been disarmed.",
@@ -61,25 +61,23 @@
     {
       "id": "MAINTENANCE_ROOM",
       "label": "Subway Maintenance Room",
-      "description": "A cramped concrete room under the subway line. A single caged lamp buzzes overhead. On a workbench sits a crude bomb with a digital timer; a red and a blue wire run into its detonator. A toolbox lies open on the floor, and a laminated note is taped to the wall.",
+      "description": "A cramped concrete room under the subway line. A single caged lamp buzzes overhead. A crude bomb with a digital timer is bolted to the workbench; a red and a blue wire run into its detonator. A toolbox lies open on the floor, and a laminated note is taped to the wall.",
       "decorative_objects": [
         "buzzing caged lamp",
         "rusty pipes",
         "puddle of oily water"
-      ],
-      "on_enter_scene_script": "",
-      "on_enter_scene_text": ""
+      ]
     }
   ],
   "exits": [],
   "npcs": [],
   "objects": [
     {
-      "id": "TICKING_BOMB",
+      "id": "BOMB",
       "entity_type": "OBJECT",
-      "name": "Ticking Bomb",
-      "description": "A pipe bomb strapped to a cheap digital timer. A red and a blue wire run into the detonator.",
-      "appearance": "A pipe bomb strapped to a cheap digital timer. A red and a blue wire run into the detonator.",
+      "name": "Bomb",
+      "description": "A ticking pipe bomb strapped to a cheap digital timer, bolted to the workbench. A red and a blue wire run into the detonator.",
+      "appearance": "A ticking pipe bomb strapped to a cheap digital timer, bolted to the workbench. A red and a blue wir",
       "current_scene_id": "MAINTENANCE_ROOM",
       "spatial_position": "bolted to the workbench",
       "item_type": "STATIC",
@@ -127,7 +125,7 @@
       "order": 1,
       "title": "Sixty Seconds",
       "description": "The protagonist must disarm the bomb. Its outcome is decided only by the choice dialog.",
-      "walkthrough": "1. Read the MAINTENANCE_NOTE: cut the red wire. 2. Take the WIRE_CUTTERS from the toolbox (without them the wire options stay hidden). 3. Examine, use or tamper with the TICKING_BOMB (it is bolted down) to open the choice dialog. 4. 'Cut the red wire' -> bomb_disarmed = True -> victory. 'Cut the blue wire' -> game over. 'Scream like a baby' -> -5 HP and the dialog reopens. 'Step back and think' closes the dialog; examining the bomb reopens it.",
+      "walkthrough": "1. Read the laminated note (MAINTENANCE_NOTE): cut the red wire. 2. Take the WIRE_CUTTERS from the toolbox; without them the wire options stay hidden. 3. Inspect, use or tamper with the BOMB (it is bolted down) to open the choice dialog. 4. 'Cut the red wire' -> bomb_disarmed -> victory. 'Cut the blue wire' -> game over. 'Scream like a baby' -> -5 HP. 'Step back and think' closes the dialog. Inspecting the bomb again reopens the dialog.",
       "end_condition": "",
       "required_item_id": "",
       "required_scene_id": "",
@@ -135,27 +133,23 @@
       "guard_expression": "",
       "completion_guard_expression": "tw.vars.get('bomb_disarmed') == True",
       "exp_reward": 100,
-      "soft_rules": [
-        {
-          "id": "TAMPER_WITH_BOMB",
-          "condition": "The player tries to defuse, disarm, cut a wire of or otherwise tamper with the bomb",
-          "script": "open_bomb_dialog()",
-          "text": "",
-          "guard_expression": "tw.vars.get('bomb_disarmed') != True"
-        }
-      ],
+      "on_start_sequence_script": "",
+      "on_start_sequence_text": "",
+      "on_end_sequence_script": "",
+      "on_end_sequence_text": "",
+      "soft_rules": [],
       "scripts": [
         {
-          "id": "SEQ_BOMB_EXAMINE",
-          "name": "Examine Bomb Opens Dialog",
+          "id": "SEQ_BOMB_DIALOG",
+          "name": "Bomb opens wire choice",
           "trigger": "on_interact",
-          "target_id": "TICKING_BOMB",
-          "code": "open_bomb_dialog()",
-          "description": "Opens the wire choice whenever the player examines or manipulates the bomb, only during this chapter."
+          "target_id": "BOMB",
+          "code": "if not tw.vars.get('bomb_disarmed', False):\n    tw.dialog.choose(\n        'The timer reads 00:59 and keeps falling. A red and a blue wire run into the detonator. What do you do?',\n        [\n            {'label': 'Cut the red wire', 'visible_if': \"tw.player.has_item('WIRE_CUTTERS')\"},\n            {'label': 'Cut the blue wire', 'visible_if': \"tw.player.has_item('WIRE_CUTTERS')\"},\n            'Scream like a baby',\n            'Step back and think',\n        ],\n        on_choice='on_bomb_wire',\n    )\n",
+          "description": "Opens the wire choice whenever the player inspects, uses or tampers with the bomb during this chapter."
         }
       ]
     }
   ],
   "scripts": [],
-  "init_script": "def open_bomb_dialog():\n    if tw.vars.get('bomb_disarmed', False) or tw.vars.get('bomb_exploded', False):\n        return\n    tw.dialog.choose(\n        'The timer reads 00:59 and keeps falling. Two wires run into the detonator: one red, one blue. What do you do?',\n        [\n            {'label': 'Cut the red wire', 'visible_if': \"tw.player.has_item('WIRE_CUTTERS')\"},\n            {'label': 'Cut the blue wire', 'visible_if': \"tw.player.has_item('WIRE_CUTTERS')\"},\n            'Scream like a baby',\n            'Step back and think',\n        ],\n        on_choice=on_bomb_wire,\n    )\n\n\ndef on_bomb_wire(answ):\n    if answ == 0:\n        tw.vars.set('bomb_disarmed', True)\n        tw.narrate('Snip. The red wire parts, the display flickers and dies. You disarmed the trap.')\n        return\n    if answ == 1:\n        tw.vars.set('bomb_exploded', True)\n        tw.game.game_over('You cut the blue wire. The bomb exploded.')\n        return\n    if answ == 2:\n        tw.player.damage(5)\n        tw.narrate('You scream. The bomb does not care. Panic costs you precious seconds. (-5 HP)')\n        open_bomb_dialog()\n        return\n    tw.narrate('You step back from the bomb. The ticking follows you through the room.')\n"
+  "init_script": "def on_bomb_wire(answ):\n    if answ == 0:\n        tw.vars.set('bomb_disarmed', True)\n        tw.narrate('Snip. The red wire parts, the display flickers and dies. You disarmed the trap.')\n        return\n    if answ == 1:\n        tw.vars.set('bomb_exploded', True)\n        tw.game.game_over('You cut the blue wire. The bomb exploded.')\n        return\n    if answ == 2:\n        tw.player.damage(5)\n        tw.narrate('You scream. The bomb does not care. Panic costs you precious seconds. (-5 HP)')\n        return\n    tw.narrate('You step back from the bomb. The ticking follows you through the room.')\n"
 }

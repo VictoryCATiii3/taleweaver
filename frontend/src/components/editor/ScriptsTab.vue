@@ -15,14 +15,17 @@ import {
 } from 'lucide-vue-next'
 import { adventureService } from '@/services/adventureService'
 import ScriptEditor from '@/components/editor/ScriptEditor.vue'
+import InitScriptPanel from '@/components/editor/InitScriptPanel.vue'
 
 const props = defineProps<{
   adventure: any
   referenceOptions?: Array<{ id: string; name?: string; imageUrl?: string | null }>
+  isSaving?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update-scripts', scripts: any[]): void
+  (e: 'update-init-script', initScript: string): void
   (e: 'notify', message: string, type?: 'error' | 'success' | 'info'): void
 }>()
 
@@ -404,6 +407,12 @@ function handleTabKey(e: KeyboardEvent) {
         </button>
       </div>
     </div>
+
+    <InitScriptPanel
+      :init-script="adventure?.init_script"
+      :is-saving="isSaving"
+      @save="emit('update-init-script', $event)"
+    />
 
     <!-- Filters & Search Bar -->
     <div class="flex flex-col sm:flex-row items-center gap-3">

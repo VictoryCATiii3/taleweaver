@@ -732,3 +732,21 @@ async def test_init_script_survives_adv_export_import(auth_client, setup_test_db
         assert await AdventureTemplateImporter.import_adv_manifest(db, manifest, owner_id=user.id)
         imported = (await db.execute(select(AdventureTemplate))).scalars().first()
         assert imported.init_script == init_script.strip()
+
+
+async def test_editor_response_includes_init_script(auth_client, setup_test_db):
+    """The editor loads init_script through AdventureTemplateResponse to make it editable."""
+    from backend.api.routes.adventures.schemas import AdventureTemplateResponse
+    from tests.conftest import TestSessionLocal
+
+    async with TestSessionLocal() as db:
+        user = (await db.execute(select(User).limit(1))).scalars().first()
+        adventure_id = await _seed_adventure(db, user.id)
+        adv = await db.get(AdventureTemplate, adventure_id)
+        adv.init_script = "def helper():\n    return 1"
+        await db.commit()
+        await db.refresh(adv)
+
+        response = AdventureTemplateResponse.model_validate(adv).model_dump()
+
+    assert response["init_script"] == "def helper():\n    return 1"

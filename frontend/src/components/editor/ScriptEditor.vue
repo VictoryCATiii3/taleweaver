@@ -116,6 +116,20 @@ const availableSnippets = computed(() => {
     },
   ]
 
+  if (props.context === 'init_script') {
+    return [
+      {
+        label: 'Choice dialog handler',
+        code: '# Called with the index of the chosen option (its position in the options list).\ndef on_wire_choice(answ):\n    if answ == 0:\n        tw.vars.set("bomb_disarmed", True)\n        tw.narrate("The ticking stops.")\n        return\n    tw.game.game_over("The bomb exploded.")\n',
+      },
+      {
+        label: 'Shared helper function',
+        code: 'def has_all(*item_ids):\n    return all(tw.player.has_item(i) for i in item_ids)\n',
+      },
+      ...common,
+    ]
+  }
+
   if (props.context === 'on_pickup' || props.context === 'on_drop') {
     return [
       {
