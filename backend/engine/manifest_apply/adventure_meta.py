@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from sqlalchemy import select
 
+from backend.core.ui_theme import normalize_ui_theme
 from backend.engine.image_prompt_context import clean_appearance
 from backend.engine.manifest_apply.assets import is_usable_image_url, resolve_source_asset_image
 from backend.engine.manifest_apply.context import ApplyContext, generator_module
@@ -133,6 +134,10 @@ def _apply_runtime_settings(ctx: ApplyContext, adventure: AdventureTemplate) -> 
         if (truthy_only and not value) or value is None:
             continue
         setattr(adventure, key, convert(value) if convert else value)
+
+    ui_theme = adventure_field(ctx.manifest, "ui_theme")
+    if ui_theme is not None:
+        adventure.ui_theme = normalize_ui_theme(ui_theme)  # type: ignore[assignment]
 
     start_time = ctx.manifest.get("start_time")
     if not start_time:

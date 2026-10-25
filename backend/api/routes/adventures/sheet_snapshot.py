@@ -14,6 +14,7 @@ from backend.api.routes.adventures.asset_url_healing import (
 )
 from backend.api.routes.adventures.session_start_settings import resolve_start_datetime
 from backend.core.config import settings
+from backend.core.ui_theme import normalize_ui_theme
 from backend.engine.item_logic import get_item_slot, normalize_equipment_keys
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
@@ -255,6 +256,7 @@ def _adventure_fields(state: SessionState, ctx: _SheetContext) -> dict[str, Any]
         "template_id": state.template_id,
         "rule_enforcement_mode": ctx.get("rule_enforcement_mode", "rpg"),
         "adventure_tone": ctx.get("selected_tone"),
+        "ui_theme": normalize_ui_theme(ctx.get("ui_theme")),
         "clock_enabled": bool(ctx.get("clock_enabled", False)),
         "time_system": state.time_system or ctx.get("time_system", "relative"),
         "time_config": state.time_config or ctx.get("time_config"),

@@ -18,7 +18,6 @@ import {
   Scroll,
   AudioLines,
   VolumeX,
-  Map as MapIcon,
   Sliders,
   LogOut,
 } from 'lucide-vue-next'
@@ -42,7 +41,6 @@ const emit = defineEmits<{
   openQuests: []
   openSettings: [tab?: SettingsTabId]
   openDebug: []
-  toggleMobileInteract: []
   exitSession: []
 }>()
 
@@ -265,16 +263,6 @@ const sequenceOrder = computed(() => {
         aria-label="Exit session"
       >
         <LogOut class="w-4 h-4" />
-      </button>
-
-      <!-- Mobile Interact Toggle (Only on mobile) -->
-      <button
-        type="button"
-        @click="emit('toggleMobileInteract')"
-        class="md:hidden flex items-center justify-center px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-300 hover:bg-amber-500/30 transition-all text-xs font-black uppercase tracking-wider shadow-lg active:scale-95 cursor-pointer"
-        title="Toggle Interact Menu"
-      >
-        <MapIcon class="w-4 h-4" />
       </button>
     </div>
   </header>

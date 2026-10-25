@@ -121,6 +121,7 @@ class AdventureLogic:
             "time_config": deepcopy(adventure.time_config or {}),
             "selected_image_styles": deepcopy(adventure.selected_image_styles or []),
             "selected_tone": deepcopy(adventure.selected_tone or {}),
+            "ui_theme": deepcopy(adventure.ui_theme),
             "quests": deepcopy(adventure.quests or []),
             "awards": deepcopy(adventure.awards or []),
             "plot": adventure.plot,

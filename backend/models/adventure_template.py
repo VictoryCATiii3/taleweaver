@@ -59,6 +59,8 @@ class AdventureTemplate(Base, TimestampMixin):
         JSON, nullable=True
     )
     selected_tone: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    # Dialog skin chosen by the author: {"skin": <id>, "accent": "#rrggbb"} (see core/ui_theme.py)
+    ui_theme: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     game_over_rules: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     quests: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)

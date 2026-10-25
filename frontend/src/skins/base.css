@@ -1,0 +1,355 @@
+/*
+ * Dialog skin system — base component classes + the "classic" token set.
+ *
+ * Components use only the semantic tw-* classes for colors, fonts, borders and shapes;
+ * Tailwind utilities in the markup handle layout. Each skin file overrides the tokens
+ * below (and, where needed, a few structural rules) under [data-skin='<id>'].
+ */
+
+.tw-skin {
+  --tw-accent: #f59e0b;
+  --tw-accent-soft: #fbbf24;
+  --tw-player: #34d399;
+  --tw-target: #22d3ee;
+
+  --tw-font-body: 'Acme', sans-serif;
+  --tw-font-dialogue: 'Acme', sans-serif;
+  --tw-font-label: ui-sans-serif, system-ui, sans-serif;
+
+  --tw-narration-bg: rgba(15, 23, 42, 0.95);
+  --tw-narration-ink: #f1f5f9;
+  --tw-narration-border: 2px solid color-mix(in srgb, var(--tw-accent) 70%, transparent);
+  --tw-narration-radius: 1rem;
+  --tw-narration-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+  --tw-label-bg: var(--tw-accent);
+  --tw-label-ink: #020617;
+
+  --tw-bubble-bg: rgba(15, 23, 42, 0.95);
+  --tw-bubble-tail-fill: #0f172a;
+  --tw-bubble-ink: #ffffff;
+  --tw-bubble-color: var(--tw-accent-soft);
+  --tw-bubble-border-width: 2px;
+  --tw-bubble-radius: 1rem;
+  --tw-bubble-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+
+  --tw-strong-ink: #fde68a;
+
+  --tw-panel-bg: rgba(2, 6, 23, 0.9);
+  --tw-panel-border: rgba(51, 65, 85, 0.8);
+  --tw-panel-ink: #e2e8f0;
+  --tw-panel-muted: #94a3b8;
+  --tw-panel-radius: 1rem;
+  --tw-card-bg: rgba(15, 23, 42, 0.85);
+  --tw-card-border: rgba(51, 65, 85, 0.9);
+  --tw-card-radius: 0.875rem;
+  --tw-card-ink: var(--tw-panel-ink);
+  --tw-card-muted: var(--tw-panel-muted);
+
+  --tw-tab-bg: rgba(15, 23, 42, 0.85);
+  --tw-tab-ink: #e2e8f0;
+  --tw-tab-border: rgba(51, 65, 85, 0.8);
+  --tw-tab-active-bg: color-mix(in srgb, var(--tw-accent) 20%, transparent);
+  --tw-tab-active-ink: #fde68a;
+  --tw-tab-active-border: var(--tw-accent-soft);
+  --tw-tab-radius: 0.75rem;
+  --tw-tab-font: ui-sans-serif, system-ui, sans-serif;
+
+  --tw-scene-tint: transparent;
+  --tw-scene-filter: brightness(0.9) saturate(1.1) contrast(1.05);
+}
+
+/* ---------- Scene ---------- */
+.tw-scene-image {
+  filter: var(--tw-scene-filter);
+}
+
+.tw-scene-tint {
+  position: absolute;
+  inset: 0;
+  background: var(--tw-scene-tint);
+  pointer-events: none;
+}
+
+/* ---------- GM narration ---------- */
+.tw-narration {
+  position: relative;
+  background: var(--tw-narration-bg);
+  color: var(--tw-narration-ink);
+  border: var(--tw-narration-border);
+  border-radius: var(--tw-narration-radius);
+  box-shadow: var(--tw-narration-shadow);
+  backdrop-filter: blur(24px);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.tw-narration.is-speaking {
+  box-shadow: 0 0 0 2px var(--tw-accent-soft), 0 0 30px color-mix(in srgb, var(--tw-accent-soft) 50%, transparent);
+  transform: scale(1.01);
+}
+
+.tw-narration-text {
+  font-family: var(--tw-font-body);
+  letter-spacing: 0.02em;
+}
+
+.tw-narration-label {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-right: 0.625rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--tw-label-bg);
+  color: var(--tw-label-ink);
+  font-family: var(--tw-font-label);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  user-select: none;
+}
+
+/* ---------- Dialogue bubbles ---------- */
+.tw-bubble {
+  position: relative;
+  background: var(--tw-bubble-bg);
+  color: var(--tw-bubble-ink);
+  border: var(--tw-bubble-border-width) solid var(--tw-bubble-color);
+  border-radius: var(--tw-bubble-radius);
+  box-shadow: var(--tw-bubble-shadow), 0 0 20px color-mix(in srgb, var(--tw-bubble-color) 22%, transparent);
+  backdrop-filter: blur(24px);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.tw-bubble--player {
+  --tw-bubble-color: var(--tw-player);
+}
+
+.tw-bubble.is-speaking {
+  box-shadow: 0 0 0 2px var(--tw-bubble-color), 0 0 30px color-mix(in srgb, var(--tw-bubble-color) 50%, transparent);
+  transform: scale(1.01);
+}
+
+.tw-bubble-text {
+  font-family: var(--tw-font-dialogue);
+  letter-spacing: 0.02em;
+}
+
+.tw-bubble-tail {
+  position: absolute;
+  left: -0.875rem;
+  top: 1rem;
+  width: 1rem;
+  height: 1.5rem;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.tw-bubble-tail polygon {
+  fill: var(--tw-bubble-tail-fill);
+  stroke: var(--tw-bubble-color);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.tw-bubble-tail rect {
+  fill: var(--tw-bubble-tail-fill);
+}
+
+/* ---------- Speaker / addressee tags ---------- */
+.tw-speaker {
+  --tw-speaker-color: var(--tw-bubble-color);
+  display: inline-flex;
+  align-items: center;
+  vertical-align: baseline;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--tw-speaker-color) 50%, transparent);
+  background: color-mix(in srgb, var(--tw-speaker-color) 20%, transparent);
+  color: color-mix(in srgb, var(--tw-speaker-color) 65%, #ffffff);
+  font-style: normal;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.tw-speaker:hover {
+  background: color-mix(in srgb, var(--tw-speaker-color) 30%, transparent);
+  border-color: var(--tw-speaker-color);
+}
+
+.tw-speaker--player {
+  --tw-speaker-color: var(--tw-player);
+}
+
+.tw-speaker--target {
+  --tw-speaker-color: var(--tw-target);
+}
+
+.tw-arrow {
+  color: color-mix(in srgb, currentColor 55%, transparent);
+  font-style: normal;
+  user-select: none;
+}
+
+/* Inline tags produced by renderFormattedHtml (v-html) */
+.tw-skin .comic-voice-tag,
+.tw-voice-tag {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  padding: 0.125rem 0.4rem;
+  margin: 0 0.3rem 0 0;
+  border-radius: 0.375rem;
+  font-family: var(--tw-font-label);
+  font-size: 0.6875rem;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: color-mix(in srgb, var(--tw-accent-soft) 15%, transparent);
+  color: color-mix(in srgb, var(--tw-accent-soft) 70%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--tw-accent-soft) 30%, transparent);
+}
+
+.tw-skin .comic-object-tag {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  padding: 0.125rem 0.35rem;
+  margin: 0 0.2rem;
+  border-radius: 0.375rem;
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  background: color-mix(in srgb, var(--tw-target) 15%, transparent);
+  color: var(--tw-target);
+  border: 1px solid color-mix(in srgb, var(--tw-target) 30%, transparent);
+}
+
+.tw-skin .tw-narration strong,
+.tw-skin .tw-bubble strong {
+  color: var(--tw-strong-ink);
+}
+
+/* ---------- Tabs ---------- */
+.tw-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--tw-tab-radius);
+  border: 1px solid var(--tw-tab-border);
+  background: var(--tw-tab-bg);
+  color: var(--tw-tab-ink);
+  font-family: var(--tw-tab-font);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.tw-tab:hover {
+  border-color: var(--tw-tab-active-border);
+}
+
+.tw-tab--active {
+  background: var(--tw-tab-active-bg);
+  color: var(--tw-tab-active-ink);
+  border-color: var(--tw-tab-active-border);
+}
+
+.tw-tab-count {
+  min-width: 1.25rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.125rem;
+  text-align: center;
+}
+
+.tw-tab-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--tw-accent);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 10px var(--tw-accent);
+  animation: tw-dot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes tw-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.75; }
+}
+
+/* ---------- Tab panels & cards ---------- */
+.tw-panel {
+  background: var(--tw-panel-bg);
+  border: 1px solid var(--tw-panel-border);
+  border-radius: var(--tw-panel-radius);
+  color: var(--tw-panel-ink);
+  backdrop-filter: blur(20px);
+}
+
+.tw-panel-title {
+  font-family: var(--tw-tab-font);
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.tw-muted {
+  color: var(--tw-panel-muted);
+}
+
+.tw-card {
+  background: var(--tw-card-bg);
+  border: 1px solid var(--tw-card-border);
+  border-radius: var(--tw-card-radius);
+  color: var(--tw-card-ink);
+  transition: border-color 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+
+.tw-card .tw-muted {
+  color: var(--tw-card-muted);
+}
+
+.tw-card--interactive {
+  cursor: pointer;
+}
+
+.tw-card--interactive:hover {
+  border-color: var(--tw-accent-soft);
+}
+
+.tw-card--interactive:active {
+  transform: scale(0.98);
+}
+
+/* ---------- Page navigation ---------- */
+.tw-pager {
+  background: color-mix(in srgb, var(--tw-panel-bg) 85%, transparent);
+  border-top: 1px solid var(--tw-panel-border);
+  color: var(--tw-panel-muted);
+}
+
+.tw-pager-button {
+  border: 1px solid var(--tw-panel-border);
+  background: var(--tw-card-bg);
+  color: var(--tw-panel-ink);
+}

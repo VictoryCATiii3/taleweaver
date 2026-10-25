@@ -31,6 +31,10 @@ This document provides transparency regarding the creation, licensing, and origi
 - **Press Start 2P:** [CodeMan38](http://www.zone38.net/font/) via Google Fonts (SIL Open Font License 1.1).
 - **Acme:** [Huertatipografica](http://www.huertatipografica.com.ar) via Google Fonts (SIL Open Font License 1.1).
 - **Orbitron:** [Matt McInerney](http://thesimplist.com) via Google Fonts (SIL Open Font License 1.1).
+- **IM Fell English / IM Fell English SC:** [Igino Marini](http://iginomarini.com) via Fontsource (SIL Open Font License 1.1) — Chronicle and Grimoire dialog skins.
+- **Courier Prime:** [Alan Dague-Greene](http://quoteunquoteapps.com/courierprime) via Fontsource (SIL Open Font License 1.1) — Noir dialog skin.
+- **Special Elite:** [Astigmatic](http://www.astigmatic.com) via Fontsource (Apache License 2.0) — Noir dialog skin.
+- **Share Tech Mono:** [Carrois Apostrophe](http://www.carrois.com) via Fontsource (SIL Open Font License 1.1) — Terminal dialog skin.
 
 ---
 

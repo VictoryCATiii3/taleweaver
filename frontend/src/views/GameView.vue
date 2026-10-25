@@ -33,6 +33,8 @@ import SetupWarningBanner from '@/components/portal/SetupWarningBanner.vue'
 import SessionNoteModal from '@/components/portal/SessionNoteModal.vue'
 import SessionSettingsModal from '@/components/game/SessionSettingsModal.vue'
 import type { SessionSettingsPayload, SettingsTabId } from '@/components/game/settings/types'
+import { useUiSkin } from '@/skins/useUiSkin'
+import { describeAutoSkin, resolveSkin } from '@/skins/skinRegistry'
 import WorldMemoriesModal from '@/components/game/WorldMemoriesModal.vue'
 import DebugModal from '@/components/game/DebugModal.vue'
 import { api } from '@/composables/useApi'
@@ -149,6 +151,10 @@ const isSavingSettings = ref(false)
 const autoSpeakNarration = ref(localStorage.getItem('tw_autoSpeakNarration') !== 'false')
 const autoSpeakDialogues = ref(localStorage.getItem('tw_autoSpeakDialogues') !== 'false')
 
+const { skinPreference } = useUiSkin()
+const autoSkin = computed(() => resolveSkin('auto', sheet.value?.ui_theme, sheet.value?.adventure_tone))
+const autoSkinReason = computed(() => describeAutoSkin(sheet.value?.ui_theme, sheet.value?.adventure_tone))
+
 const openSettingsModal = (tab: SettingsTabId = 'memory') => {
   settingsInitialTab.value = tab
   showSettingsModal.value = true
@@ -161,6 +167,7 @@ const saveSessionSettings = async (payload: SessionSettingsPayload) => {
   autoSpeakNarration.value = payload.autoSpeakNarration
   autoSpeakDialogues.value = payload.autoSpeakDialogues
   language.value = payload.language
+  skinPreference.value = payload.skin
   // The save click is a user gesture, so this is the moment to unlock audio playback.
   if (payload.autoSpeech !== audioService.autoSpeechEnabled.value) {
     audioService.toggleAutoSpeech()
@@ -1771,6 +1778,9 @@ usePlayAgentAutoLoop()
       :initial-auto-speak-dialogues="autoSpeakDialogues"
       :initial-language="language"
       :initial-tab="settingsInitialTab"
+      :initial-skin="skinPreference"
+      :auto-skin="autoSkin"
+      :auto-skin-reason="autoSkinReason"
       :tts-available="configState.isTtsEnabled"
       :is-saving="isSavingSettings"
       @close="showSettingsModal = false"

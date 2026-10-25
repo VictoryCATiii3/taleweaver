@@ -1,3 +1,5 @@
+import type { SkinPreference } from '@/skins/skinRegistry'
+
 export type SessionSettingsPayload = {
   turns: number
   enableCompression: boolean
@@ -5,6 +7,7 @@ export type SessionSettingsPayload = {
   autoSpeakNarration: boolean
   autoSpeakDialogues: boolean
   language: string
+  skin: SkinPreference
 }
 
-export type SettingsTabId = 'memory' | 'voice' | 'translation'
+export type SettingsTabId = 'memory' | 'voice' | 'translation' | 'display'

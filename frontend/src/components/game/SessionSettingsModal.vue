@@ -1,15 +1,17 @@
 <script setup lang="ts">
 /**
- * SessionSettingsModal — Tabbed in-game settings (memory, voice, translation).
+ * SessionSettingsModal — Tabbed in-game settings (memory, voice, translation, display).
  *
  * Renders as a bottom sheet on mobile and as a centered dialog on larger screens.
  * All values are edited locally and only applied when the player saves.
  */
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Sliders, X, BrainCircuit, Volume2 } from 'lucide-vue-next'
+import { Sliders, X, BrainCircuit, Volume2, Palette } from 'lucide-vue-next'
 import SettingsMemoryTab from './settings/SettingsMemoryTab.vue'
 import SettingsVoiceTab from './settings/SettingsVoiceTab.vue'
 import SettingsTranslationTab from './settings/SettingsTranslationTab.vue'
+import SettingsDisplayTab from './settings/SettingsDisplayTab.vue'
+import type { SkinId, SkinPreference } from '@/skins/skinRegistry'
 import type { SessionSettingsPayload, SettingsTabId } from './settings/types'
 
 const props = defineProps<{
@@ -20,6 +22,9 @@ const props = defineProps<{
   initialAutoSpeakDialogues?: boolean
   initialLanguage?: string
   initialTab?: SettingsTabId
+  initialSkin?: SkinPreference
+  autoSkin?: SkinId
+  autoSkinReason?: string
   ttsAvailable?: boolean
   isSaving?: boolean
 }>()
@@ -33,6 +38,7 @@ const TABS: { id: SettingsTabId; label: string }[] = [
   { id: 'memory', label: 'Memory' },
   { id: 'voice', label: 'Voice' },
   { id: 'translation', label: 'Translation' },
+  { id: 'display', label: 'Display' },
 ]
 
 const activeTab = ref<SettingsTabId>(props.initialTab ?? 'memory')
@@ -42,6 +48,7 @@ const autoSpeech = ref(props.initialAutoSpeech ?? false)
 const autoSpeakNarration = ref(props.initialAutoSpeakNarration ?? true)
 const autoSpeakDialogues = ref(props.initialAutoSpeakDialogues ?? true)
 const language = ref(props.initialLanguage ?? '')
+const skin = ref<SkinPreference>(props.initialSkin ?? 'auto')
 
 if (typeof props.initialTurns === 'number' && props.initialTurns >= 1) {
   turns.value = Math.min(100, Math.max(1, props.initialTurns))
@@ -54,6 +61,9 @@ function isTabActive(id: SettingsTabId): boolean {
   if (id === 'translation') {
     return !!language.value
   }
+  if (id === 'display') {
+    return skin.value !== 'auto'
+  }
   return false
 }
 
@@ -65,6 +75,7 @@ function save() {
     autoSpeakNarration: autoSpeakNarration.value,
     autoSpeakDialogues: autoSpeakDialogues.value,
     language: language.value,
+    skin: skin.value,
   })
 }
 
@@ -121,14 +132,14 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 
       <!-- Tabs -->
       <div class="px-5 sm:px-6">
-        <div role="tablist" aria-label="Settings sections" class="grid grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-slate-950/60 p-1">
+        <div role="tablist" aria-label="Settings sections" class="grid grid-cols-4 gap-1 rounded-2xl border border-white/10 bg-slate-950/60 p-1">
           <button
             v-for="tab in TABS"
             :key="tab.id"
             type="button"
             role="tab"
             :aria-selected="activeTab === tab.id"
-            class="relative flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer"
+            class="relative flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer sm:flex-row sm:gap-2 sm:px-2 sm:py-2.5 sm:text-[11px]"
             :class="
               activeTab === tab.id
                 ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
@@ -138,8 +149,9 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
           >
             <BrainCircuit v-if="tab.id === 'memory'" class="h-4 w-4 shrink-0" />
             <Volume2 v-else-if="tab.id === 'voice'" class="h-4 w-4 shrink-0" />
+            <Palette v-else-if="tab.id === 'display'" class="h-4 w-4 shrink-0" />
             <i v-else class="ra ra-fish shrink-0 text-sm"></i>
-            <span class="truncate">{{ tab.label }}</span>
+            <span class="max-w-full truncate">{{ tab.label }}</span>
             <span
               v-if="isTabActive(tab.id)"
               class="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full"
@@ -163,7 +175,13 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
           v-model:auto-speak-dialogues="autoSpeakDialogues"
           :tts-available="!!props.ttsAvailable"
         />
-        <SettingsTranslationTab v-else v-model:language="language" />
+        <SettingsTranslationTab v-else-if="activeTab === 'translation'" v-model:language="language" />
+        <SettingsDisplayTab
+          v-else
+          v-model:skin="skin"
+          :auto-skin="props.autoSkin ?? 'classic'"
+          :auto-reason="props.autoSkinReason ?? 'no tone set, using the default look'"
+        />
       </div>
 
       <!-- Footer -->

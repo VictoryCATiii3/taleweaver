@@ -128,23 +128,23 @@ function isLatestExchange(exIdx: number): boolean {
     </div>
 
     <!-- COMIC PAGE NAVIGATION & PAGING CONTROLS -->
-    <div v-if="props.gameTurns.length > 1" class="flex items-center justify-between px-3 py-1.5 bg-slate-950/80 border-t border-slate-800/80 shrink-0 text-xs font-bold text-slate-400">
+    <div v-if="props.gameTurns.length > 1" class="tw-pager flex items-center justify-between px-3 py-1.5 shrink-0 text-xs font-bold">
       <div class="flex items-center gap-1">
         <button
           type="button"
           :disabled="props.activeTurnIndex <= 0"
           @click="emit('goToTurn', props.activeTurnIndex - 1)"
-          class="p-1 rounded bg-slate-900 border border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:text-white cursor-pointer"
+          class="tw-pager-button p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           title="Previous Turn"
         >
           <ChevronLeft class="w-3.5 h-3.5" />
         </button>
-        <span class="px-2 font-mono">Turn {{ props.activeTurnIndex + 1 }} / {{ props.gameTurns.length }}</span>
+        <span class="px-2 tabular-nums">Turn {{ props.activeTurnIndex + 1 }} / {{ props.gameTurns.length }}</span>
         <button
           type="button"
           :disabled="props.activeTurnIndex >= props.gameTurns.length - 1"
           @click="emit('goToTurn', props.activeTurnIndex + 1)"
-          class="p-1 rounded bg-slate-900 border border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:text-white cursor-pointer"
+          class="tw-pager-button p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           title="Next Turn"
         >
           <ChevronRight class="w-3.5 h-3.5" />

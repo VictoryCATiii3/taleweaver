@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.adventure_format import validate_manifest_version
 from backend.core.adventure_identity import manifest_origin_id
 from backend.core.config import settings
+from backend.core.ui_theme import normalize_ui_theme
 from backend.engine.adventure_import_support import (
     check_adz_limits,
     collect_existing_image_urls,
@@ -244,6 +245,9 @@ class AdventureTemplateImporter:
                     or manifest_data.get("max_memory_turns")
                     or 10,
                     clock_enabled=adv_data.get("clock_enabled", False),
+                    ui_theme=normalize_ui_theme(
+                        adv_data.get("ui_theme") or manifest_data.get("ui_theme")
+                    ),
                     generate_scene_images=adv_data.get("generate_scene_images", False),
                     generate_npc_images=adv_data.get("generate_npc_images", False),
                     generate_item_images=adv_data.get("generate_item_images", False),
@@ -645,6 +649,7 @@ class AdventureTemplateImporter:
             max_time_per_turn=old_adv.get("max_time_per_turn"),
             max_memory_turns=old_adv.get("max_memory_turns") or 10,
             clock_enabled=old_adv.get("clock_enabled", False),
+            ui_theme=normalize_ui_theme(old_adv.get("ui_theme")),
             game_over_rules=old_adv.get("game_over_rules"),
             quests=old_adv.get("quests", []),
             awards=old_adv.get("awards", []),
@@ -798,6 +803,7 @@ class AdventureTemplateImporter:
                         "time_system": new_template.time_system,
                         "time_config": deepcopy(new_template.time_config or {}),
                         "selected_tone": deepcopy(new_template.selected_tone or {}),
+                        "ui_theme": deepcopy(new_template.ui_theme),
                         "selected_image_styles": deepcopy(new_template.selected_image_styles or []),
                         "quests": deepcopy(new_template.quests or []),
                         "awards": deepcopy(new_template.awards or []),
@@ -892,6 +898,7 @@ class AdventureTemplateImporter:
             or manifest.get("max_memory_turns")
             or 10,
             clock_enabled=adv_meta.get("clock_enabled", False),
+            ui_theme=normalize_ui_theme(adv_meta.get("ui_theme") or manifest.get("ui_theme")),
             selected_image_styles=adv_meta.get("selected_image_styles")
             or manifest.get("selected_image_styles", []),
             selected_tone=adv_meta.get("selected_tone") or manifest.get("selected_tone"),

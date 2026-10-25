@@ -48,7 +48,9 @@ export interface CharacterSheet {
   current_scene?: string | null
   scene_id?: string | null
   rule_enforcement_mode?: 'rpg' | 'story' | 'chat'
-  adventure_tone?: string | null
+  adventure_tone?: string | { id?: string; name?: string } | null
+  /** Author-defined dialog skin (validated server-side). */
+  ui_theme?: { skin?: string | null; accent?: string | null } | null
   is_debug_enabled?: boolean
   debug_mode?: boolean
   special_actions?: SpecialAttack[]

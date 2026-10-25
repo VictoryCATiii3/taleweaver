@@ -1,0 +1,137 @@
+/* Noir — typewritten case files for mystery, detective and crime adventures. */
+
+[data-skin='noir'] {
+  --tw-accent: #c8102e;
+  --tw-accent-soft: #c8102e;
+  --tw-player: #d4a017;
+  --tw-target: #9fb7c9;
+
+  --tw-font-body: 'Courier Prime', 'Courier New', monospace;
+  --tw-font-dialogue: 'Newsreader', Georgia, serif;
+  --tw-font-label: 'Special Elite', 'Courier New', monospace;
+
+  --tw-narration-bg: #ebe4d1;
+  --tw-narration-ink: #1d1b17;
+  --tw-narration-border: 0 solid transparent;
+  --tw-narration-radius: 2px;
+  --tw-narration-shadow: 0 0 0 8px #d8c79f, 0 22px 50px rgba(0, 0, 0, 0.75);
+
+  --tw-bubble-bg: #0f0f10;
+  --tw-bubble-tail-fill: #0f0f10;
+  --tw-bubble-ink: #efe8d6;
+  --tw-bubble-color: #3a3a3a;
+  --tw-bubble-border-width: 1px;
+  --tw-bubble-radius: 2px;
+  --tw-bubble-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+
+  --tw-strong-ink: #8f0b21;
+
+  --tw-panel-bg: rgba(14, 14, 15, 0.94);
+  --tw-panel-border: #333333;
+  --tw-panel-ink: #e6e2d7;
+  --tw-panel-muted: #a8a294;
+  --tw-panel-radius: 2px;
+  --tw-card-bg: #ebe4d1;
+  --tw-card-border: #c9bfa5;
+  --tw-card-radius: 2px;
+  --tw-card-ink: #1d1b17;
+  --tw-card-muted: #5b5547;
+
+  --tw-tab-bg: #8c7a58;
+  --tw-tab-ink: #141414;
+  --tw-tab-border: transparent;
+  --tw-tab-active-bg: #d8c79f;
+  --tw-tab-active-ink: #141414;
+  --tw-tab-active-border: transparent;
+  --tw-tab-radius: 6px 6px 0 0;
+  --tw-tab-font: 'Special Elite', 'Courier New', monospace;
+
+  --tw-scene-tint:
+    repeating-linear-gradient(-24deg, rgba(255, 250, 235, 0.06) 0 22px, transparent 22px 48px),
+    radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.7) 100%);
+  --tw-scene-filter: grayscale(1) contrast(1.15) brightness(0.75);
+}
+
+[data-skin='noir'] .tw-narration {
+  backdrop-filter: none;
+}
+
+[data-skin='noir'] .tw-narration-label {
+  display: block;
+  margin: 0 0 0.75rem;
+  padding: 0 0 0.5rem;
+  border-radius: 0;
+  border-bottom: 1px dashed #9b927c;
+  background: none;
+  color: #4a4538;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+}
+
+[data-skin='noir'] .tw-narration-text {
+  display: block;
+  line-height: 1.7;
+  letter-spacing: 0;
+}
+
+[data-skin='noir'] .tw-bubble {
+  box-shadow: var(--tw-bubble-shadow);
+}
+
+[data-skin='noir'] .tw-bubble--player {
+  --tw-bubble-color: #5a4a1a;
+}
+
+[data-skin='noir'] .tw-bubble-text {
+  font-size: 1.06em;
+  letter-spacing: 0;
+}
+
+[data-skin='noir'] .tw-speaker {
+  border: 0;
+  border-radius: 0;
+  background: var(--tw-accent);
+  color: #ffffff;
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+}
+
+[data-skin='noir'] .tw-speaker--player {
+  background: #e6e2d7;
+  color: #141414;
+}
+
+[data-skin='noir'] .tw-speaker--target {
+  background: transparent;
+  color: var(--tw-target);
+  border-bottom: 1px solid currentColor;
+}
+
+[data-skin='noir'] .comic-voice-tag {
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  color: #e9d27a;
+  font-family: 'Caveat', cursive;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0;
+  transform: rotate(-4deg);
+}
+
+[data-skin='noir'] .tw-tab {
+  padding: 0.5rem 1.25rem 0.4rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  backdrop-filter: none;
+}
+
+[data-skin='noir'] .tw-panel-title,
+[data-skin='noir'] .tw-pager {
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-weight: 400;
+}

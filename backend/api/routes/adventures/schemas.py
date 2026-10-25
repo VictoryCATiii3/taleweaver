@@ -3,6 +3,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from backend.core.ui_theme import normalize_ui_theme
 from backend.schemas.adventure import AdventureTemplateDebugResponse
 
 
@@ -319,6 +320,7 @@ class AdventureTemplateResponse(BaseModel):
     game_over_rules: Optional[dict[str, Any]]
     selected_image_styles: Optional[list[dict[str, Any]]] = None
     selected_tone: Optional[dict[str, Any]] = None
+    ui_theme: Optional[dict[str, Any]] = None
     original_prompt: Optional[str] = None
     sequences: Optional[list[dict[str, Any]]] = None
     quests: Optional[list[dict[str, Any]]] = None
@@ -347,6 +349,11 @@ class AdventureTemplateResponse(BaseModel):
     max_text_logs: Optional[int] = None
     can_damage_npcs: bool = True
     npcs_can_damage_protagonist: bool = True
+
+    @field_validator("ui_theme", mode="before")
+    @classmethod
+    def normalize_theme(cls, v):
+        return normalize_ui_theme(v)
 
     @field_validator("selected_tone", mode="before")
     @classmethod
@@ -624,6 +631,7 @@ class AdventureTemplateUpdate(BaseModel):
     generate_item_images: Optional[bool] = None
     selected_image_styles: Optional[list[dict[str, Any]]] = None
     selected_tone: Optional[dict[str, Any]] = None
+    ui_theme: Optional[dict[str, Any]] = None
     min_scenes: Optional[int] = None
     max_scenes: Optional[int] = None
     container_generation_enabled: Optional[bool] = None
@@ -749,6 +757,11 @@ class AdventureTemplateUpdate(BaseModel):
         if len(value) > 2000:
             raise ValueError("length must be at most 2000 characters")
         return value
+
+    @field_validator("ui_theme", mode="before")
+    @classmethod
+    def normalize_theme(cls, v):
+        return normalize_ui_theme(v)
 
     @field_validator("selected_tone", mode="before")
     @classmethod

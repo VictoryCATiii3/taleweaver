@@ -1,16 +1,20 @@
 <script setup lang="ts">
 /**
  * ImmersiveStoryExchange — One exchange of a story page: protagonist speech/action bubble,
- * engine events, GM narration caption boxes, NPC dialogue bubbles, and item discovery cards.
+ * GM narration caption boxes, NPC dialogue bubbles, and item discovery cards.
+ *
+ * Colors, fonts and shapes come from the active dialog skin (tw-* classes, see src/skins).
+ * Engine events are listed in the System tab; only failed-turn notices stay inline.
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { configState } from '@/store/config'
 import { audioService } from '@/services/audioService'
 import { getItemIcon, getTypeColor, getImageUrl, getOriginalImageUrl } from '@/utils/game_icons'
-import type { ComicExchange } from '@/composables/useComicTurns'
+import type { ComicExchange, DialogueSegment } from '@/composables/useComicTurns'
 import { renderFormattedHtml, resolveNpc } from '@/composables/useComicTurns'
 import { useStoryBubbleAudio } from '@/composables/useStoryBubbleAudio'
 import ImmersiveSystemMessage from '@/components/game/immersive/ImmersiveSystemMessage.vue'
+import { isTurnErrorMessage } from './systemMessages'
 import { Volume2, VolumeX, Brain } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -42,6 +46,28 @@ const emit = defineEmits<{
 const { isSpeakingBubble, speakBubble } = useStoryBubbleAudio(() => props)
 const brokenImages = ref<Record<string, boolean>>({})
 
+const playerName = computed(() => props.sheet?.name || 'You')
+const userSpeech = computed(
+  () => props.exchange.userSpeechText || props.exchange.userMessage?.content || ''
+)
+
+const leadingErrors = computed(() =>
+  props.exchange.systemMessages.filter((msg) => isTurnErrorMessage(msg, props.turnError))
+)
+const trailingErrors = computed(() =>
+  props.exchange.trailingSystemMessages.filter((msg) => isTurnErrorMessage(msg, props.turnError))
+)
+
+const revealedItems = computed(() =>
+  props.exchange.revealedItemIds
+    .map((itemId) => props.entities.find((e) => e.id === itemId))
+    .filter((item): item is any => Boolean(item))
+)
+
+function dialogueSpeech(dlg: DialogueSegment): string {
+  return dlg.voiceTag ? `[${dlg.voiceTag}] ${dlg.text}` : dlg.text
+}
+
 function onImageLoadError(e: Event, path?: string | null) {
   if (!path) return
   const target = e.target as HTMLImageElement
@@ -54,10 +80,6 @@ function onImageLoadError(e: Event, path?: string | null) {
 
 function showImage(path?: string | null) {
   return !!path && !brokenImages.value[path]
-}
-
-function findEntity(itemId: string) {
-  return props.entities.find((e) => e.id === itemId)
 }
 
 function getEntityForHover(nameOrEntity: any) {
@@ -104,55 +126,40 @@ function getEntityForHover(nameOrEntity: any) {
         <button
           v-if="configState.isTtsEnabled"
           type="button"
-          @click.stop="speakBubble(props.exchange.userSpeechText || props.exchange.userMessage.content, props.sheet?.name || 'You')"
+          @click.stop="speakBubble(userSpeech, playerName)"
           class="absolute -top-2.5 right-3 z-30 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-400/60 text-emerald-300 text-[10px] font-black uppercase tracking-wider shadow-lg cursor-pointer backdrop-blur-md"
-          :title="isSpeakingBubble(props.exchange.userSpeechText || props.exchange.userMessage.content, props.sheet?.name || 'You') ? 'Stop Audio' : 'Play Audio'"
+          :title="isSpeakingBubble(userSpeech, playerName) ? 'Stop Audio' : 'Play Audio'"
         >
-          <VolumeX v-if="isSpeakingBubble(props.exchange.userSpeechText || props.exchange.userMessage.content, props.sheet?.name || 'You')" class="w-3 h-3 text-red-400" />
+          <VolumeX v-if="isSpeakingBubble(userSpeech, playerName)" class="w-3 h-3 text-red-400" />
           <Volume2 v-else class="w-3 h-3" />
-          <span>{{ isSpeakingBubble(props.exchange.userSpeechText || props.exchange.userMessage.content, props.sheet?.name || 'You') ? 'Stop' : 'Audio' }}</span>
+          <span>{{ isSpeakingBubble(userSpeech, playerName) ? 'Stop' : 'Audio' }}</span>
         </button>
 
-        <!-- SVG Speech Tail pointing to Speaker on Left -->
-        <svg
-          class="absolute -left-3.5 top-4 w-4 h-6 text-slate-900 pointer-events-none z-20 overflow-visible"
-          viewBox="0 0 16 24"
-        >
-          <polygon
-            points="16,0 0,12 16,24"
-            class="fill-slate-900 stroke-emerald-400"
-            stroke-width="2"
-            stroke-linejoin="round"
-          />
-          <rect x="14" y="1" width="4" height="22" class="fill-slate-900" />
-        </svg>
+        <div class="tw-bubble tw-bubble--player p-3.5 sm:p-4.5">
+          <!-- Speech tail pointing to the speaker on the left -->
+          <svg class="tw-bubble-tail" viewBox="0 0 16 24" aria-hidden="true">
+            <polygon points="16,0 0,12 16,24" />
+            <rect x="14" y="1" width="4" height="22" />
+          </svg>
 
-        <div
-          class="relative p-3.5 sm:p-4.5 rounded-2xl border-2 shadow-[0_8px_25px_rgba(0,0,0,0.6)] backdrop-blur-xl bg-slate-900/95 border-emerald-400 text-slate-100"
-        >
-          <!-- Content: Name Tag, Target Addressee & Speech -->
           <p
-            class="comic-bubble-text text-sm sm:text-base leading-relaxed font-semibold"
-            :class="props.exchange.userIsDialogue ? 'italic text-white' : 'text-emerald-100'"
+            class="tw-bubble-text text-sm sm:text-base leading-relaxed font-semibold"
+            :class="{ italic: props.exchange.userIsDialogue }"
           >
-            <!-- Speaker Tag -->
             <span
-              class="inline-flex items-center align-baseline mr-1.5 not-italic select-none px-2 py-0.5 rounded-lg border font-black text-xs sm:text-sm uppercase tracking-wider bg-emerald-500/20 border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/30 hover:border-emerald-400 cursor-pointer transition-all shadow-sm"
-              @mouseenter="emit('npcHover', getEntityForHover(props.sheet?.name || 'You'), $event)"
-              @mousemove="emit('npcHover', getEntityForHover(props.sheet?.name || 'You'), $event)"
+              class="tw-speaker tw-speaker--player tw-speaker--primary mr-1.5 font-black text-xs sm:text-sm uppercase tracking-wider"
+              @mouseenter="emit('npcHover', getEntityForHover(playerName), $event)"
+              @mousemove="emit('npcHover', getEntityForHover(playerName), $event)"
               @mouseleave="emit('npcLeave')"
               @click="emit('openSheet')"
             >
-              {{ props.sheet?.name || 'You' }}
+              {{ playerName }}
             </span>
 
-            <!-- Target Addressee Tag with Arrow -->
             <template v-if="props.exchange.userTargetName">
-              <span class="inline-flex items-center align-baseline text-slate-400 mx-1 not-italic font-black text-xs select-none">
-                ➔
-              </span>
+              <span class="tw-arrow mx-1 font-black text-xs">➔</span>
               <span
-                class="inline-flex items-center align-baseline mr-2.5 not-italic select-none px-2 py-0.5 rounded-lg border font-black text-xs sm:text-sm uppercase tracking-wider bg-cyan-500/20 border-cyan-400/50 text-cyan-300 hover:bg-cyan-500/30 hover:border-cyan-400 cursor-pointer transition-all shadow-sm"
+                class="tw-speaker tw-speaker--target mr-2.5 font-black text-xs sm:text-sm uppercase tracking-wider"
                 @mouseenter="emit('npcHover', getEntityForHover(props.exchange.userTargetEntity || props.exchange.userTargetName), $event)"
                 @mousemove="emit('npcHover', getEntityForHover(props.exchange.userTargetEntity || props.exchange.userTargetName), $event)"
                 @mouseleave="emit('npcLeave')"
@@ -197,9 +204,9 @@ function getEntityForHover(nameOrEntity: any) {
       </span>
     </div>
 
-    <!-- 2) ENGINE EVENTS BEFORE THE NARRATION (rolls, rule checks, triggers) -->
+    <!-- 2) FAILED-TURN NOTICES BEFORE THE NARRATION -->
     <ImmersiveSystemMessage
-      v-for="(sysMsg, sysIdx) in props.exchange.systemMessages"
+      v-for="(sysMsg, sysIdx) in leadingErrors"
       :key="sysMsg.id || `pre-${sysIdx}`"
       :msg="sysMsg"
       :turn-error="props.turnError"
@@ -219,10 +226,7 @@ function getEntityForHover(nameOrEntity: any) {
     >
       <!-- GM NARRATION BOX -->
       <div v-if="dlg.isNarration" class="relative group shrink-0 w-full max-w-2xl">
-        <div
-          class="relative bg-slate-900/95 border-2 border-amber-500/70 rounded-2xl p-4 sm:p-5 shadow-[0_12px_35px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-all duration-300"
-          :class="{'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.5)] scale-[1.01]': isSpeakingBubble(dlg.text)}"
-        >
+        <div class="tw-narration p-4 sm:p-5" :class="{ 'is-speaking': isSpeakingBubble(dlg.text) }">
           <!-- Overlay TTS Button -->
           <button
             v-if="configState.isTtsEnabled && !audioService.autoSpeechEnabled.value"
@@ -236,65 +240,46 @@ function getEntityForHover(nameOrEntity: any) {
             <span>{{ isSpeakingBubble(dlg.text) ? 'Stop' : 'Audio' }}</span>
           </button>
 
-          <!-- Narrative Text with Inline "GAME MASTER" Badge -->
-          <div class="comic-narration-text text-sm sm:text-base leading-relaxed text-slate-100">
-            <span
-              class="inline-flex items-center align-middle mr-2.5 not-italic select-none px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-sans font-black text-[10px] uppercase tracking-[0.2em] shadow-sm"
-            >
-              Game Master
-            </span>
-            <span v-html="renderFormattedHtml(dlg.text)"></span>
+          <div class="text-sm sm:text-base leading-relaxed">
+            <span class="tw-narration-label">Game Master</span>
+            <span class="tw-narration-text" v-html="renderFormattedHtml(dlg.text)"></span>
           </div>
         </div>
       </div>
 
-      <!-- NPC DIALOGUE COMIC SPEECH BUBBLE -->
+      <!-- NPC DIALOGUE SPEECH BUBBLE -->
       <div v-else class="relative max-w-2xl">
         <!-- Overlay TTS Button -->
         <button
           v-if="configState.isTtsEnabled && !audioService.autoSpeechEnabled.value"
           type="button"
-          @click.stop="speakBubble(dlg.voiceTag ? `[${dlg.voiceTag}] ${dlg.text}` : dlg.text, dlg.speaker)"
+          @click.stop="speakBubble(dialogueSpeech(dlg), dlg.speaker)"
           class="absolute -top-2.5 right-3 z-30 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg cursor-pointer backdrop-blur-md border"
           :class="dlg.isPlayer ? 'bg-emerald-950/90 hover:bg-emerald-900 border-emerald-400/60 text-emerald-300' : 'bg-amber-950/90 hover:bg-amber-900 border-amber-400/60 text-amber-300'"
-          :title="isSpeakingBubble(dlg.voiceTag ? `[${dlg.voiceTag}] ${dlg.text}` : dlg.text, dlg.speaker) ? 'Stop Audio' : 'Play Audio'"
+          :title="isSpeakingBubble(dialogueSpeech(dlg), dlg.speaker) ? 'Stop Audio' : 'Play Audio'"
         >
-          <VolumeX v-if="isSpeakingBubble(dlg.voiceTag ? `[${dlg.voiceTag}] ${dlg.text}` : dlg.text, dlg.speaker)" class="w-3 h-3 text-red-400" />
+          <VolumeX v-if="isSpeakingBubble(dialogueSpeech(dlg), dlg.speaker)" class="w-3 h-3 text-red-400" />
           <Volume2 v-else class="w-3 h-3" />
-          <span>{{ isSpeakingBubble(dlg.voiceTag ? `[${dlg.voiceTag}] ${dlg.text}` : dlg.text, dlg.speaker) ? 'Stop' : 'Audio' }}</span>
+          <span>{{ isSpeakingBubble(dialogueSpeech(dlg), dlg.speaker) ? 'Stop' : 'Audio' }}</span>
         </button>
 
-        <!-- Comic Angled Speech Tail pointing Left directly towards the NPC portrait card -->
-        <svg
-          class="absolute -left-3.5 top-4 w-4 h-6 text-slate-900 pointer-events-none z-20 overflow-visible"
-          viewBox="0 0 16 24"
-        >
-          <polygon
-            points="16,0 0,12 16,24"
-            class="fill-slate-900"
-            :class="dlg.isPlayer ? 'stroke-emerald-400' : 'stroke-amber-400'"
-            stroke-width="2"
-            stroke-linejoin="round"
-          />
-          <rect x="14" y="1" width="4" height="22" class="fill-slate-900" />
-        </svg>
-
         <div
-          class="relative p-3.5 sm:p-4.5 rounded-2xl border-2 shadow-[0_10px_30px_rgba(0,0,0,0.65)] backdrop-blur-xl bg-slate-900/95 transition-all duration-300"
-          :class="[
-            dlg.isPlayer ? 'border-emerald-400 text-slate-100' : 'border-amber-400 text-slate-100 shadow-[0_0_20px_rgba(251,191,36,0.25)]',
-            isSpeakingBubble(dlg.voiceTag ? `[${dlg.voiceTag}] ${dlg.text}` : dlg.text, dlg.speaker) ? (dlg.isPlayer ? 'ring-2 ring-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.5)] scale-[1.01]' : 'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.5)] scale-[1.01]') : ''
-          ]"
+          class="tw-bubble p-3.5 sm:p-4.5"
+          :class="{
+            'tw-bubble--player': dlg.isPlayer,
+            'is-speaking': isSpeakingBubble(dialogueSpeech(dlg), dlg.speaker),
+          }"
         >
-          <p class="comic-bubble-text text-sm sm:text-base leading-relaxed font-medium italic text-white">
-            <!-- Speaker Tag -->
+          <!-- Speech tail pointing left towards the NPC portrait card -->
+          <svg class="tw-bubble-tail" viewBox="0 0 16 24" aria-hidden="true">
+            <polygon points="16,0 0,12 16,24" />
+            <rect x="14" y="1" width="4" height="22" />
+          </svg>
+
+          <p class="tw-bubble-text text-sm sm:text-base leading-relaxed font-medium italic">
             <span
-              class="inline-flex items-center align-baseline mr-1.5 not-italic select-none px-2 py-0.5 rounded-lg border font-black text-xs sm:text-sm uppercase tracking-wider cursor-pointer transition-all shadow-sm"
-              :class="[
-                dlg.isPlayer
-                  ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/30 hover:border-emerald-400'
-                  : 'bg-amber-500/20 border-amber-400/50 text-amber-300 hover:bg-amber-500/30 hover:border-amber-400'
-              ]"
+              class="tw-speaker tw-speaker--primary mr-1.5 font-black text-xs sm:text-sm uppercase tracking-wider"
+              :class="{ 'tw-speaker--player': dlg.isPlayer }"
               @mouseenter="emit('npcHover', getEntityForHover(dlg.speakerEntity || dlg.speaker), $event)"
               @mousemove="emit('npcHover', getEntityForHover(dlg.speakerEntity || dlg.speaker), $event)"
               @mouseleave="emit('npcLeave')"
@@ -305,20 +290,14 @@ function getEntityForHover(nameOrEntity: any) {
             </span>
 
             <!-- Emotion / Voice Tag Badge -->
-            <span
-              v-if="dlg.voiceTag"
-              class="comic-voice-tag not-italic select-none align-baseline mr-1.5"
-            >
+            <span v-if="dlg.voiceTag" class="comic-voice-tag select-none align-baseline mr-1.5">
               [{{ dlg.voiceTag }}]
             </span>
 
-            <!-- Target Addressee Badge (if targeted) -->
             <template v-if="dlg.target">
-              <span class="inline-flex items-center align-baseline text-slate-400 mx-1 not-italic font-black text-xs select-none">
-                ➔
-              </span>
+              <span class="tw-arrow mx-1 font-black text-xs">➔</span>
               <span
-                class="inline-flex items-center align-baseline mr-2.5 not-italic select-none px-2 py-0.5 rounded-lg border font-black text-xs sm:text-sm uppercase tracking-wider bg-cyan-500/20 border-cyan-400/50 text-cyan-300 hover:bg-cyan-500/30 hover:border-cyan-400 cursor-pointer transition-all shadow-sm"
+                class="tw-speaker tw-speaker--target mr-2.5 font-black text-xs sm:text-sm uppercase tracking-wider"
                 @mouseenter="emit('npcHover', getEntityForHover(dlg.targetEntity || dlg.target), $event)"
                 @mousemove="emit('npcHover', getEntityForHover(dlg.targetEntity || dlg.target), $event)"
                 @mouseleave="emit('npcLeave')"
@@ -334,9 +313,9 @@ function getEntityForHover(nameOrEntity: any) {
       </div>
     </div>
 
-    <!-- 4) ENGINE EVENTS AFTER THE NARRATION (items added, stat changes) -->
+    <!-- 4) FAILED-TURN NOTICES AFTER THE NARRATION -->
     <ImmersiveSystemMessage
-      v-for="(sysMsg, sysIdx) in props.exchange.trailingSystemMessages"
+      v-for="(sysMsg, sysIdx) in trailingErrors"
       :key="sysMsg.id || `post-${sysIdx}`"
       :msg="sysMsg"
       :turn-error="props.turnError"
@@ -349,31 +328,31 @@ function getEntityForHover(nameOrEntity: any) {
     />
 
     <!-- 5) REVEALED ITEMS DISCOVERY CARDS -->
-    <div v-if="props.exchange.revealedItemIds.length" class="flex flex-wrap gap-3 my-2 shrink-0">
+    <div v-if="revealedItems.length" class="flex flex-wrap gap-3 my-2 shrink-0">
       <div
-        v-for="itemId in props.exchange.revealedItemIds"
-        :key="itemId"
-        v-show="findEntity(itemId)"
-        class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/90 border border-emerald-500/50 shadow-lg cursor-pointer hover:border-emerald-400"
-        @click="emit('itemClick', findEntity(itemId))"
+        v-for="item in revealedItems"
+        :key="item.id"
+        class="tw-card tw-card--interactive flex items-center gap-3 p-2.5 shadow-lg"
+        @click="emit('itemClick', item)"
       >
         <div class="w-8 h-8 rounded-lg overflow-hidden bg-slate-950 border border-slate-700 flex items-center justify-center shrink-0">
           <img
-            v-if="findEntity(itemId)?.image_url && showImage(findEntity(itemId).image_url)"
-            :src="getImageUrl(findEntity(itemId).image_url, { thumbnail: true })"
+            v-if="item.image_url && showImage(item.image_url)"
+            :src="getImageUrl(item.image_url, { thumbnail: true })"
+            :alt="item.name"
             class="w-full h-full object-cover"
-            @error="onImageLoadError($event, findEntity(itemId).image_url)"
+            @error="onImageLoadError($event, item.image_url)"
           />
-          <i v-else :class="['ra text-base', getItemIcon(findEntity(itemId)?.item_type), getTypeColor(findEntity(itemId)?.item_type)]"></i>
+          <i v-else :class="['ra text-base', getItemIcon(item.item_type), getTypeColor(item.item_type)]"></i>
         </div>
         <div>
-          <span class="text-xs font-bold text-white block">{{ findEntity(itemId)?.name }}</span>
-          <span class="text-[10px] text-emerald-400 uppercase font-black tracking-wider">New Discovery!</span>
+          <span class="text-xs font-bold block">{{ item.name }}</span>
+          <span class="tw-muted text-[10px] uppercase font-black tracking-wider">New Discovery!</span>
         </div>
         <button
           type="button"
           class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-black uppercase tracking-wider ml-2 cursor-pointer"
-          @click.stop="emit('takeDirect', findEntity(itemId))"
+          @click.stop="emit('takeDirect', item)"
         >
           Take
         </button>
@@ -383,45 +362,6 @@ function getEntityForHover(nameOrEntity: any) {
 </template>
 
 <style scoped>
-.comic-narration-text,
-.comic-bubble-text {
-  font-family: 'Acme', sans-serif;
-  letter-spacing: 0.02em;
-}
-
-:deep(.comic-voice-tag) {
-  display: inline-flex;
-  align-items: center;
-  vertical-align: middle;
-  padding: 0.125rem 0.4rem;
-  margin: 0 0.3rem 0 0;
-  border-radius: 0.375rem;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  line-height: 1.25;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: rgba(251, 191, 36, 0.15);
-  color: rgb(252, 211, 77);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-}
-
-:deep(.comic-object-tag) {
-  display: inline-flex;
-  align-items: center;
-  vertical-align: middle;
-  padding: 0.125rem 0.35rem;
-  margin: 0 0.2rem;
-  border-radius: 0.375rem;
-  font-family: monospace;
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.25;
-  background: rgba(56, 189, 248, 0.15);
-  color: rgb(56, 189, 248);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-}
-
 .animate-fade-in {
   animation: comicPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }

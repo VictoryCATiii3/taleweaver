@@ -6,8 +6,9 @@
  * - Full-screen scene background with atmospheric overlays
  * - Top header with scene details, tracked quest, clock, and speech controls
  * - Left character stage with portrait cards and active speaker auras
- * - Center story area with interactive scene hotspots (exits, switches, items)
- *   and comic story feed (dialogue bubbles, narration boxes, turn history)
+ * - Center story area with tabs (Story, Passages, Discoveries, System) and scene switches;
+ *   the Story tab holds the comic feed (dialogue bubbles, narration boxes, turn history)
+ * - Dialog skin (data-skin) resolved from player preference, adventure theme and tone
  * - Bottom action bar and user input with speech-to-text voice recording
  */
 import { ref, computed, toRef } from 'vue'
@@ -17,7 +18,8 @@ import { getImageUrl } from '@/utils/game_icons'
 import { useComicTurns } from '@/composables/useComicTurns'
 import ImmersiveHeader from './immersive/ImmersiveHeader.vue'
 import ImmersiveCharacterStage from './immersive/ImmersiveCharacterStage.vue'
-import ImmersiveSceneHotspots from './immersive/ImmersiveSceneHotspots.vue'
+import ImmersiveStoryTabs from './immersive/ImmersiveStoryTabs.vue'
+import StoryTabPanel from './immersive/tabs/StoryTabPanel.vue'
 import ImmersiveStoryFeed from './immersive/ImmersiveStoryFeed.vue'
 import ImmersiveActionBar from './immersive/ImmersiveActionBar.vue'
 import ImmersiveInputBar from './immersive/ImmersiveInputBar.vue'
@@ -25,6 +27,9 @@ import SceneTransitionOverlay from './immersive/SceneTransitionOverlay.vue'
 import CinematicSequenceOverlay from './immersive/CinematicSequenceOverlay.vue'
 import PlayAgentPanel from './immersive/PlayAgentPanel.vue'
 import type { SettingsTabId } from './settings/types'
+import { useStoryTabs } from './immersive/tabs/useStoryTabs'
+import { useUiSkin } from '@/skins/useUiSkin'
+import { resolveAccent, resolveSkin } from '@/skins/skinRegistry'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -160,13 +165,43 @@ const {
   sheet: toRef(props, 'sheet'),
 })
 
-// Mobile Hotspot Drawer
-const showMobileInteract = ref(false)
+// --- Dialog skin ---
+const { skinPreference } = useUiSkin()
+const activeSkin = computed(() =>
+  resolveSkin(skinPreference.value, props.sheet?.ui_theme, props.sheet?.adventure_tone)
+)
+const skinStyle = computed(() => {
+  const accent = resolveAccent(skinPreference.value, props.sheet?.ui_theme)
+  return accent ? { '--tw-accent': accent, '--tw-accent-soft': accent } : {}
+})
+
+// --- Story tabs ---
+const {
+  activeStoryTab,
+  sceneExits,
+  sceneItems,
+  systemLog,
+  hasLockedExits,
+  unseenSystem,
+  unseenItems,
+  systemSeenAtOpen,
+  showStory,
+} = useStoryTabs({
+  sceneExits: () => (Array.isArray(props.sceneExits) ? props.sceneExits : []),
+  items: () => (Array.isArray(props.items) ? props.items : []),
+  systemMessages: computed(() => gameTurns.value.flatMap((turn) => turn.systemMessages)),
+})
+
+function handleTraverseExit(exit: any) {
+  showStory()
+  emit('traverseExit', exit)
+}
 
 // Input Bar Template Ref
 const inputBarRef = ref<InstanceType<typeof ImmersiveInputBar> | null>(null)
 
 function handleSend(content: string) {
+  showStory()
   emit('send', content)
   goToLatestTurn()
 }
@@ -203,13 +238,17 @@ defineExpose({
 </script>
 
 <template>
-  <div class="relative w-full h-full flex flex-col justify-between overflow-hidden select-none bg-slate-950 font-sans">
+  <div
+    class="tw-skin relative w-full h-full flex flex-col justify-between overflow-hidden select-none bg-slate-950 font-sans"
+    :data-skin="activeSkin"
+    :style="skinStyle"
+  >
     <!-- 1. FULL VIEW SCENE BACKGROUND -->
     <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
       <img
         v-if="activeSceneImageUrl"
         :src="activeSceneImageUrl"
-        class="w-full h-full object-cover object-center filter brightness-[0.9] saturate-[1.1] contrast-[1.05] scale-[1.01] transition-all duration-1000"
+        class="tw-scene-image w-full h-full object-cover object-center scale-[1.01] transition-all duration-1000"
         alt="Scene background"
         @error="handleImageError(props.currentSceneImage || props.adventureImage)"
       />
@@ -219,6 +258,7 @@ defineExpose({
       <div class="absolute inset-0 bg-black/20"></div>
       <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-slate-950/40"></div>
       <div class="absolute inset-0 bg-gradient-to-r from-slate-950/60 via-transparent to-slate-950/40"></div>
+      <div class="tw-scene-tint"></div>
     </div>
 
     <!-- 2. TOP ATMOSPHERIC HEADER BAR -->
@@ -239,7 +279,6 @@ defineExpose({
       @open-memories="emit('openMemories')"
       @open-settings="(tab?: SettingsTabId) => emit('openSettings', tab)"
       @open-debug="emit('openDebug')"
-      @toggle-mobile-interact="showMobileInteract = !showMobileInteract"
       @exit-session="emit('exitSession')"
     />
 
@@ -258,17 +297,30 @@ defineExpose({
 
       <!-- 3B. CENTER / STORY AREA WITH SCENE HOTSPOTS & COMIC FEED -->
       <main class="flex-1 flex flex-col justify-between min-h-0 relative overflow-hidden">
-        <ImmersiveSceneHotspots
-          :scene-exits="props.sceneExits"
-          :scene-switches="props.sceneSwitches"
-          :items="props.items"
-          :system-messages="activeTurn?.systemMessages || []"
+        <ImmersiveStoryTabs
+          v-model="activeStoryTab"
+          :exit-count="sceneExits.length"
+          :has-locked-exits="hasLockedExits"
+          :item-count="sceneItems.length"
+          :unseen-items="unseenItems"
+          :system-count="systemLog.length"
+          :unseen-system="unseenSystem"
+          :scene-switches="props.sceneSwitches || []"
           :is-evaluating="isEvaluating"
-          :show-mobile-interact="showMobileInteract"
-          :current-scene-name="props.currentSceneName || props.sheet?.current_scene"
-          :active-sequence-id="props.activeSequence?.id"
-          @traverse-exit="(exit) => emit('traverseExit', exit)"
           @switch-flip="(sw) => emit('switchFlip', sw)"
+        />
+
+        <StoryTabPanel
+          v-if="activeStoryTab !== 'story'"
+          :tab="activeStoryTab"
+          :scene-exits="sceneExits"
+          :items="sceneItems"
+          :system-messages="systemLog"
+          :system-seen-count="systemSeenAtOpen"
+          :current-scene-name="props.currentSceneName || props.sheet?.current_scene"
+          :is-evaluating="isEvaluating"
+          :turn-error="props.turnError"
+          @traverse-exit="handleTraverseExit"
           @item-click="(item) => emit('itemClick', item)"
           @item-hover="(item, event) => emit('itemHover', item, event)"
           @item-leave="emit('itemLeave')"
@@ -277,6 +329,7 @@ defineExpose({
         />
 
         <ImmersiveStoryFeed
+          v-show="activeStoryTab === 'story'"
           :game-turns="gameTurns"
           :active-turn="activeTurn"
           :active-turn-index="activeTurnIndex"

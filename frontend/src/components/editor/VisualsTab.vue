@@ -1,18 +1,36 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import UiSkinPicker from './UiSkinPicker.vue'
+
 const props = defineProps<{
   form: any
   adventure: any
+  adventureId: string
   imageStylesCatalog: any[]
+  toneCatalog: any[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:style', val: string): void
+  (e: 'update:uiTheme', val: any): void
   (e: 'save-changes'): void
 }>()
+
+/** Tone selected in the form; drives the "Auto" game UI theme. */
+const selectedTone = computed(
+  () => props.toneCatalog.find((tone) => tone.id === props.form.selected_tone_id) || props.form.selected_tone_id
+)
 </script>
 
 <template>
   <div class="space-y-8 animate-page-in">
+    <UiSkinPicker
+      :adventure-id="props.adventureId"
+      :ui-theme="props.adventure?.ui_theme"
+      :tone="selectedTone"
+      @update:ui-theme="emit('update:uiTheme', $event)"
+    />
+
     <section v-if="imageStylesCatalog.length" class="space-y-6 bg-slate-900/40 p-8 rounded-[2rem] border border-white/5 backdrop-blur-md shadow-xl">
      <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
@@ -30,9 +48,9 @@ const emit = defineEmits<{
         </div>
      </div>
      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-        <button 
-          v-for="style in imageStylesCatalog" 
-          :key="style.id" 
+        <button
+          v-for="style in imageStylesCatalog"
+          :key="style.id"
           @click="$emit('update:style', style.id)"
           class="relative aspect-4-5 rounded-2xl overflow-hidden border-2 transition-all duration-500 group"
           :class="form.selected_style_id === style.id ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-transparent hover:border-white/10'"

@@ -2841,8 +2841,11 @@ watch(
               v-if="activeTab === 'visuals'"
               :form="form"
               :adventure="adventure"
+              :adventure-id="props.adventureId"
               :image-styles-catalog="imageStylesCatalog"
+              :tone-catalog="toneCatalog"
               @update:style="form.selected_style_id = $event"
+              @update:ui-theme="adventure && (adventure.ui_theme = $event)"
               @save-changes="saveChanges"
             />
 

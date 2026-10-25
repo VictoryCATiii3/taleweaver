@@ -287,7 +287,9 @@ export function parseAssistantContent(
 
 export function renderFormattedHtml(text: string): string {
   if (!text) return ''
-  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  // TTS pause markers (e.g. "<short pause>") are meant for speech output only.
+  const displayText = text.replace(/\s*<\s*(?:short|medium|long)?\s*pause\s*>\s*/gi, ' ')
+  const escaped = displayText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   const withVoiceTags = escaped.replace(/(\[[^\]\n]+\])/g, (match, tag) => {
     const raw = tag.slice(1, -1).trim()
     if (/^DEBUG/i.test(raw)) return match

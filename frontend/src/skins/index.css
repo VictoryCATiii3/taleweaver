@@ -1,0 +1,15 @@
+/* Self-hosted skin fonts (CSP: font-src 'self'). Acme, Newsreader, Cinzel, Orbitron and
+   Caveat are already loaded globally. */
+@import '@fontsource/im-fell-english/latin-400.css';
+@import '@fontsource/im-fell-english/latin-400-italic.css';
+@import '@fontsource/im-fell-english-sc/latin-400.css';
+@import '@fontsource/courier-prime/latin-400.css';
+@import '@fontsource/courier-prime/latin-700.css';
+@import '@fontsource/special-elite/latin-400.css';
+@import '@fontsource/share-tech-mono/latin-400.css';
+
+@import './base.css';
+@import './chronicle.css';
+@import './noir.css';
+@import './terminal.css';
+@import './grimoire.css';

@@ -47,6 +47,8 @@ export interface Adventure {
   tts_director_notes?: string
   selected_image_styles?: any[]
   selected_tone?: any
+  /** Author-defined dialog skin: built-in skin id and optional accent color. */
+  ui_theme?: { skin?: string | null; accent?: string | null } | null
   is_adventure_generator?: boolean
   creation_error?: string
   image_url?: string
@@ -106,6 +108,7 @@ export interface AdventureFormData {
   cover_source_adventure_name?: string
   cover_similarity_percent?: number
   allow_reuse_source_assets?: boolean
+  ui_theme?: { skin?: string | null; accent?: string | null } | null
 }
 
 export interface CatalogData {

@@ -8,6 +8,7 @@ import { configState } from '@/store/config'
 import { renderFormattedHtml } from '@/composables/useComicTurns'
 import { useStoryBubbleAudio } from '@/composables/useStoryBubbleAudio'
 import { Volume2, VolumeX, RotateCcw } from 'lucide-vue-next'
+import { cleanSystemContent, isDebugMessage, isTurnErrorMessage } from './systemMessages'
 
 const props = defineProps<{
   msg: any
@@ -25,24 +26,9 @@ const emit = defineEmits<{
 
 const { isSpeakingBubble, speakBubble } = useStoryBubbleAudio(() => props)
 
-const isDebug = computed(() => {
-  if (props.msg?.is_debug) return true
-  const c = String(props.msg?.content || '').trim()
-  return c.startsWith('[DEBUG') || c.startsWith('DEBUG:') || c.startsWith('--- DEBUG')
-})
-
-const isError = computed(() =>
-  Boolean(props.turnError?.message && String(props.msg?.content || '').includes(props.turnError.message))
-)
-
-const cleanContent = computed(() => {
-  const content = String(props.msg?.content || '')
-  if (isDebug.value) return content
-  return content
-    .replace(/\s*\[DEBUG:\s*Trigger fired\][^\n]*/gi, '')
-    .replace(/\s*\[DEBUG\][^\n]*/gi, '')
-    .trim()
-})
+const isDebug = computed(() => isDebugMessage(props.msg))
+const isError = computed(() => isTurnErrorMessage(props.msg, props.turnError))
+const cleanContent = computed(() => cleanSystemContent(props.msg))
 </script>
 
 <template>

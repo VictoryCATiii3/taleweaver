@@ -1,0 +1,107 @@
+/* Terminal — holographic readouts for sci-fi and cyberpunk adventures. */
+
+[data-skin='terminal'] {
+  --tw-accent: #22d3ee;
+  --tw-accent-soft: #67e8f9;
+  --tw-player: #a3e635;
+  --tw-target: #f472b6;
+
+  --tw-font-body: 'Share Tech Mono', ui-monospace, monospace;
+  --tw-font-dialogue: 'Share Tech Mono', ui-monospace, monospace;
+  --tw-font-label: 'Orbitron', ui-sans-serif, sans-serif;
+
+  --tw-narration-bg:
+    repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.05) 0 1px, transparent 1px 3px),
+    rgba(4, 19, 26, 0.86);
+  --tw-narration-ink: #c7f9ff;
+  --tw-narration-border: 1px solid color-mix(in srgb, var(--tw-accent) 50%, transparent);
+  --tw-narration-radius: 4px;
+  --tw-narration-shadow:
+    inset 0 0 30px color-mix(in srgb, var(--tw-accent) 8%, transparent),
+    0 0 24px color-mix(in srgb, var(--tw-accent) 20%, transparent);
+  --tw-label-bg: transparent;
+  --tw-label-ink: var(--tw-accent);
+
+  --tw-bubble-bg:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 3px),
+    rgba(4, 19, 26, 0.86);
+  --tw-bubble-tail-fill: #04131a;
+  --tw-bubble-ink: #e6fbff;
+  --tw-bubble-color: var(--tw-accent);
+  --tw-bubble-border-width: 1px;
+  --tw-bubble-radius: 4px;
+  --tw-bubble-shadow: 0 0 18px rgba(0, 0, 0, 0.6);
+
+  --tw-strong-ink: #67e8f9;
+
+  --tw-panel-bg: rgba(3, 14, 20, 0.92);
+  --tw-panel-border: color-mix(in srgb, var(--tw-accent) 35%, transparent);
+  --tw-panel-ink: #c7f9ff;
+  --tw-panel-muted: #6fb7c4;
+  --tw-panel-radius: 4px;
+  --tw-card-bg: rgba(4, 25, 34, 0.9);
+  --tw-card-border: color-mix(in srgb, var(--tw-accent) 30%, transparent);
+  --tw-card-radius: 3px;
+
+  --tw-tab-bg: rgba(4, 19, 26, 0.8);
+  --tw-tab-ink: #9be7f3;
+  --tw-tab-border: color-mix(in srgb, var(--tw-accent) 30%, transparent);
+  --tw-tab-active-bg: color-mix(in srgb, var(--tw-accent) 16%, transparent);
+  --tw-tab-active-ink: #e6fbff;
+  --tw-tab-active-border: var(--tw-accent);
+  --tw-tab-radius: 2px;
+  --tw-tab-font: 'Orbitron', ui-sans-serif, sans-serif;
+
+  --tw-scene-tint:
+    repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.035) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, rgba(8, 47, 73, 0.25), rgba(2, 6, 23, 0.45));
+  --tw-scene-filter: brightness(0.75) saturate(1.2) contrast(1.1);
+}
+
+[data-skin='terminal'] .tw-narration-label {
+  border: 1px solid var(--tw-accent);
+  border-radius: 2px;
+  font-size: 9px;
+  letter-spacing: 0.3em;
+}
+
+[data-skin='terminal'] .tw-narration-text,
+[data-skin='terminal'] .tw-bubble-text {
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--tw-accent) 35%, transparent);
+}
+
+[data-skin='terminal'] .tw-speaker {
+  border-radius: 2px;
+  background: transparent;
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+}
+
+[data-skin='terminal'] .tw-speaker::before {
+  content: '>';
+  margin-right: 0.35rem;
+  opacity: 0.7;
+}
+
+[data-skin='terminal'] .comic-voice-tag {
+  border-radius: 2px;
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  background: transparent;
+}
+
+[data-skin='terminal'] .tw-tab {
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+}
+
+[data-skin='terminal'] .tw-tab--active {
+  box-shadow: 0 0 14px color-mix(in srgb, var(--tw-accent) 35%, transparent);
+}
+
+[data-skin='terminal'] .tw-panel-title,
+[data-skin='terminal'] .tw-pager {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  letter-spacing: 0.18em;
+}

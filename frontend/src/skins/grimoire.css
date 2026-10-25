@@ -1,0 +1,117 @@
+/* Grimoire — dark vellum and blood-red ink for horror and grimdark adventures. */
+
+[data-skin='grimoire'] {
+  --tw-accent: #b91c1c;
+  --tw-accent-soft: #dc2626;
+  --tw-player: #d6c7a1;
+  --tw-target: #a8a29e;
+
+  --tw-font-body: 'Newsreader', Georgia, serif;
+  --tw-font-dialogue: 'IM Fell English', Georgia, serif;
+  --tw-font-label: 'Cinzel', Georgia, serif;
+
+  --tw-narration-bg: radial-gradient(ellipse at 30% 20%, #241915 0%, #16100e 70%);
+  --tw-narration-ink: #e8dccb;
+  --tw-narration-border: 1px solid color-mix(in srgb, var(--tw-accent) 45%, transparent);
+  --tw-narration-radius: 2px;
+  --tw-narration-shadow: inset 0 0 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(0, 0, 0, 0.8);
+
+  --tw-bubble-bg: #1d1412;
+  --tw-bubble-tail-fill: #1d1412;
+  --tw-bubble-ink: #f0e6d8;
+  --tw-bubble-color: color-mix(in srgb, var(--tw-accent) 60%, transparent);
+  --tw-bubble-border-width: 1px;
+  --tw-bubble-radius: 2px;
+  --tw-bubble-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6), 0 12px 36px rgba(0, 0, 0, 0.75);
+
+  --tw-strong-ink: #f87171;
+
+  --tw-panel-bg: rgba(18, 12, 10, 0.94);
+  --tw-panel-border: color-mix(in srgb, var(--tw-accent) 35%, transparent);
+  --tw-panel-ink: #e8dccb;
+  --tw-panel-muted: #a8998a;
+  --tw-panel-radius: 2px;
+  --tw-card-bg: #1d1412;
+  --tw-card-border: rgba(120, 90, 70, 0.4);
+  --tw-card-radius: 2px;
+
+  --tw-tab-bg: rgba(22, 16, 14, 0.9);
+  --tw-tab-ink: #d6c7b4;
+  --tw-tab-border: rgba(120, 90, 70, 0.45);
+  --tw-tab-active-bg: color-mix(in srgb, var(--tw-accent) 22%, #16100e);
+  --tw-tab-active-ink: #f5ebe0;
+  --tw-tab-active-border: var(--tw-accent);
+  --tw-tab-radius: 2px;
+  --tw-tab-font: 'Cinzel', Georgia, serif;
+
+  --tw-scene-tint: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.75) 100%);
+  --tw-scene-filter: saturate(0.6) brightness(0.7) contrast(1.1);
+}
+
+[data-skin='grimoire'] .tw-narration-label {
+  display: block;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  background: none;
+  color: var(--tw-accent-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+}
+
+[data-skin='grimoire'] .tw-narration-text {
+  display: block;
+  line-height: 1.7;
+  letter-spacing: 0;
+}
+
+[data-skin='grimoire'] .tw-narration-text::first-letter {
+  float: left;
+  margin: 0.3rem 0.45rem 0 0;
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 3.2em;
+  font-weight: 700;
+  line-height: 0.8;
+  color: var(--tw-accent-soft);
+}
+
+[data-skin='grimoire'] .tw-bubble-text {
+  font-size: 1.08em;
+  letter-spacing: 0;
+}
+
+[data-skin='grimoire'] .tw-speaker {
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tw-accent-soft);
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+[data-skin='grimoire'] .tw-speaker--player {
+  color: var(--tw-player);
+}
+
+[data-skin='grimoire'] .tw-speaker--target {
+  color: var(--tw-target);
+}
+
+[data-skin='grimoire'] .comic-voice-tag {
+  border: 0;
+  background: none;
+  color: #f87171;
+  font-family: 'IM Fell English', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+[data-skin='grimoire'] .tw-panel-title,
+[data-skin='grimoire'] .tw-pager {
+  font-family: 'Cinzel', Georgia, serif;
+  letter-spacing: 0.2em;
+}
