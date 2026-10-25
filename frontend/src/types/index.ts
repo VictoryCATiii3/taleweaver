@@ -237,6 +237,20 @@ export interface CombatState {
   log?: CombatLogEntry[]
 }
 
+/** One answer of a script-opened choice dialog; `index` is the author-defined option position. */
+export interface DialogOption {
+  index: number
+  label: string
+}
+
+/** Choice dialog opened by a script (`tw.dialog.choose`) that awaits the player's answer. */
+export interface PendingDialog {
+  id: string
+  prompt: string
+  speaker?: string | null
+  options: DialogOption[]
+}
+
 export interface MapNode {
   id: string
   label: string

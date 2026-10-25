@@ -993,7 +993,7 @@ class WorldManifesto(WorldBaseSchema):
     )
     init_script: Optional[str] = Field(
         default=None,
-        description="Optional initialization Python script executed at session creation and loaded into scope before event triggers.",
+        description="Optional initialization Python script executed at session creation and loaded into scope before event triggers. Define shared helper functions and every tw.dialog on_choice handler here.",
     )
     cover_source_adventure_id: Optional[str] = None
     cover_source_adventure_name: Optional[str] = None

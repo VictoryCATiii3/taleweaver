@@ -59,6 +59,12 @@ class PostTurnHooks:
             messages.append(attack_msg)
         return messages
 
+    async def run_checks(self) -> list[str]:
+        """Runs the hooks outside a streamed turn (e.g. after a dialog choice)."""
+        if not self._ready():
+            return []
+        return await self._collect_messages()
+
     async def process_final(self, chunk: str) -> AsyncGenerator[str, None]:
         """Yields hook messages followed by the (possibly refreshed) final event."""
         data = _parse_final(chunk)

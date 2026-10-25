@@ -1,0 +1,166 @@
+"""Resolves the player's answer to a script-opened choice dialog (``tw.dialog.choose``).
+
+The pending dialog lives in ``entity_states``. Resolving it records the choice in the chat
+(so the GM keeps continuity), runs the ``on_choice`` handler from the global init script with
+the chosen option index, applies the resulting changeset and, when the dialog asked for it,
+lets the small model narrate the outcome. The handler may open a follow-up dialog.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any, Optional
+
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
+
+from backend.api.routes.adventures.gameplay_logic import GameTurnManager
+from backend.api.routes.adventures.post_turn_hooks import PostTurnHooks
+from backend.core.llm_router import GameMasterLLM
+from backend.engine.rule_engine import GameOverError
+from backend.engine.scripting.dialog import (
+    clear_pending_dialog,
+    find_option,
+    pending_dialog,
+)
+from backend.models.chat import ChatMessage
+
+logger = logging.getLogger(__name__)
+
+CHOICE_MESSAGE_PREFIX = "[Choice]"
+_NARRATION_HISTORY_LIMIT = 6
+_NARRATION_SYSTEM_PROMPT = (
+    "You are the Game Master of a text adventure. The player just answered a choice dialog. "
+    "Narrate the immediate outcome in 2-4 vivid sentences, in second person. The listed outcome "
+    "facts were decided by the game engine and are binding: stay consistent with them and never "
+    "invent additional state changes, items, damage or rewards. Output prose only."
+)
+
+
+class DialogChoiceResolver:
+    """Applies one dialog choice for a session."""
+
+    def __init__(self, manager: GameTurnManager):
+        self.manager = manager
+
+    @classmethod
+    async def create(cls, db: Any, game_id: str, user: Any) -> DialogChoiceResolver:
+        manager = GameTurnManager(db, game_id, user)
+        if not await manager.initialize():
+            raise HTTPException(status_code=404, detail="Session not found.")
+        return cls(manager)
+
+    async def resolve(self, dialog_id: str, index: int, language: Optional[str]) -> dict[str, Any]:
+        state = self.manager.state
+        if state.session and state.session.status in {"completed", "game_over"}:
+            raise HTTPException(status_code=409, detail="The adventure has already ended.")
+        dialog = pending_dialog(state.entity_states)
+        if dialog is None or dialog.get("id") != dialog_id:
+            raise HTTPException(status_code=409, detail="This choice is no longer available.")
+        option = find_option(dialog, index)
+        if option is None:
+            raise HTTPException(status_code=400, detail="Unknown choice.")
+
+        self._clear_dialog()
+        await self.manager._save_chat_message("user", f"{CHOICE_MESSAGE_PREFIX} {option['label']}")
+        messages, ended = await self._run_handler(dialog, option)
+        if not ended:
+            messages.extend(await PostTurnHooks(self.manager).run_checks())
+        if dialog.get("narrate") and not ended:
+            narration = await self._narrate(dialog, option, messages, language)
+            if narration:
+                await self.manager._save_chat_message("assistant", narration)
+                messages.append(narration)
+        await self.manager.db.commit()
+        return {"status": "ok", "messages": [str(m) for m in messages]}
+
+    def _clear_dialog(self) -> None:
+        state = self.manager.state
+        entity_states = dict(state.entity_states or {})
+        clear_pending_dialog(entity_states)
+        state.entity_states = entity_states
+        flag_modified(state, "entity_states")
+
+    async def _run_handler(
+        self, dialog: dict[str, Any], option: dict[str, Any]
+    ) -> tuple[list[Any], bool]:
+        """Runs the on_choice handler; returns (messages, adventure_ended)."""
+        handler = str(dialog.get("handler") or "")
+        runner = self.manager._get_script_runner()
+        definitions: dict[str, Any] = {}
+        runner.load_init_definitions(definitions)
+        if not callable(definitions.get(handler)):
+            logger.warning("[Dialog] Handler '%s' is not defined in the init script.", handler)
+            await self._debug(f"[DEBUG: Dialog] Handler '{handler}' is not defined in init_script.")
+            return [], False
+
+        context = await self.manager._build_script_context()
+        choice = {"index": option["index"], "label": option["label"], "dialog_id": dialog["id"]}
+        scope = {"tw": context, "game": context, "dialog_choice": choice}
+        runner.execute_code(
+            f"{handler}(dialog_choice['index'])", scope, script_id=f"dialog_{handler}"
+        )
+        try:
+            return await self.manager._apply_script_changeset(context.changeset), False
+        except GameOverError as goe:
+            await self.manager._finalize_session("game_over", str(goe))
+            return [], True
+
+    async def _debug(self, message: str) -> None:
+        context = await self.manager._build_script_context()
+        if context.is_debug_enabled:
+            await self.manager._save_chat_message("system", message)
+
+    async def _narrate(
+        self,
+        dialog: dict[str, Any],
+        option: dict[str, Any],
+        outcome: list[Any],
+        language: Optional[str],
+    ) -> str:
+        user = self.manager.user
+        settings = user.llm_settings or {}
+        provider = (
+            settings.get("small_model_provider")
+            or settings.get("complex_model_provider")
+            or settings.get("preferred_provider")
+            or "openai"
+        )
+        model = settings.get("small_model") or "gpt-4o-mini"
+        system_prompt = _NARRATION_SYSTEM_PROMPT
+        if language:
+            system_prompt += f" Respond only in {language}."
+        payload = {
+            "recent_story": await self._recent_history(),
+            "speaker": dialog.get("speaker"),
+            "question": dialog.get("prompt"),
+            "player_choice": option["label"],
+            "outcome_facts": [str(m) for m in outcome if not str(m).startswith("[DEBUG")],
+        }
+        try:
+            llm = GameMasterLLM(user, provider=provider, model_category="small")
+            text = await llm.aexecute_simple_task(
+                system_prompt,
+                json.dumps(payload, ensure_ascii=False),
+                model,
+                adventure_id=self.manager.state.template_id,
+                game_id=self.manager.state.session_id,
+                operation="dialog_choice_narration",
+                phase="narration",
+            )
+        except Exception:
+            logger.exception("[Dialog] Narration failed for session %s", self.manager.game_id)
+            return ""
+        return str(text or "").strip()
+
+    async def _recent_history(self) -> list[dict[str, str]]:
+        res = await self.manager.db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == self.manager.state.session_id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(_NARRATION_HISTORY_LIMIT)
+        )
+        rows = list(reversed(res.scalars().all()))
+        return [{"role": r.role, "content": r.content} for r in rows if r.role != "system"]

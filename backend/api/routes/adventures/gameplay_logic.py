@@ -60,6 +60,7 @@ from backend.engine.rule_engine import (
     WorldEntityUpdate,
 )
 from backend.engine.scripting import GameContext, ScriptChangeset, ScriptRunner, ScriptMessage
+from backend.engine.scripting.dialog import store_pending_dialog
 from backend.engine.skill_check import roll_attack, roll_skill_check
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
@@ -2974,6 +2975,7 @@ class GameTurnManager:
             story_flags.update(changeset.story_flag_updates)
             entity_states["__switch_story_flags__"] = story_flags
 
+        store_pending_dialog(entity_states, changeset.pending_dialog)
         self.state.entity_states = entity_states
         flag_modified(self.state, "entity_states")
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from backend.core.dialog_validator import check_dialog_handlers
 from backend.engine.scripting.sandbox import SafeAstInterpreter
 from backend.schemas.validation import ValidationFinding
 
@@ -96,6 +97,16 @@ def _validate_guard_expression(
     ]
 
 
+def _init_script(adventure: dict[str, Any], payload: dict[str, Any]) -> Any:
+    manifest = adventure.get("original_manifest")
+    manifest_dict = manifest if isinstance(manifest, dict) else {}
+    return (
+        adventure.get("init_script")
+        or manifest_dict.get("init_script")
+        or payload.get("init_script")
+    )
+
+
 def _check_adventure_level(
     adventure: dict[str, Any],
     payload: dict[str, Any],
@@ -104,11 +115,7 @@ def _check_adventure_level(
 
     manifest = adventure.get("original_manifest")
     manifest_dict = manifest if isinstance(manifest, dict) else {}
-    init_script = (
-        adventure.get("init_script")
-        or manifest_dict.get("init_script")
-        or payload.get("init_script")
-    )
+    init_script = _init_script(adventure, payload)
     findings.extend(
         _validate_script_code(
             init_script,
@@ -487,6 +494,11 @@ def check_scripts_and_guards(
     findings.extend(_check_sequences(sequences))
     findings.extend(_check_quests(quests))
     findings.extend(_check_awards(awards))
+    findings.extend(
+        check_dialog_handlers(
+            [adv, payload, scs, exs, ents, protagonist], _init_script(adv, payload)
+        )
+    )
     return findings
 
 

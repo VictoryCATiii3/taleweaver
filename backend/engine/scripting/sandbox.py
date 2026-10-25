@@ -525,6 +525,8 @@ class SafeAstInterpreter:
                         old_env[k] = self.env[k]
                 self.env = old_env
 
+        # Lets APIs that store a callback by name (e.g. tw.dialog on_choice) accept the function.
+        sandbox_function.__name__ = func_name
         self.env[func_name] = sandbox_function
 
     # -------------------------------------------------------------------------

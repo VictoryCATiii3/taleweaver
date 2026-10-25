@@ -569,6 +569,8 @@ class ChatResponse(BaseModel):
     world_rumors: Optional[list[dict[str, Any]]] = Field(default_factory=list)
     is_legacy_format: bool = False
     full_world: Optional[AdventureTemplateDebugResponse] = None
+    # Choice dialog opened by a script (tw.dialog.choose) that awaits the player's answer.
+    pending_dialog: Optional[dict[str, Any]] = None
 
 
 class AdventureTemplateImportPayload(BaseModel):

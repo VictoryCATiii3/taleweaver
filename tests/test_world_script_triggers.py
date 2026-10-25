@@ -65,8 +65,14 @@ def test_build_scripts_requirement_prompt_content():
     assert "tw.player" in prompt
     assert "tw.player.give_item" in prompt
 
+    assert "SEQUENCE SOFT RULES" in prompt
+    assert "max_triggers" in prompt
+    assert "tw.dialog.choose" in prompt
+    assert "init_script" in prompt
+
     disabled_prompt = build_scripts_requirement(False)
     assert "Do NOT generate any custom scripts" in disabled_prompt
+    assert "soft_rules: []" in disabled_prompt
 
 
 def test_world_schemas_trigger_validation():

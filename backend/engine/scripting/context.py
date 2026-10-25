@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from backend.engine.scripting.dialog import DialogProxy
 from backend.engine.scripting.item_transfer import inventory_entry, take_from_inventory
 from backend.engine.scripting.switch_proxy import SwitchesProxy, SwitchProxy
 
@@ -68,6 +69,7 @@ class ScriptChangeset:
     gameover_condition_override: Optional[str] = None
     completed_guard_expression_override: Optional[str] = None
     gameover_guard_expression_override: Optional[str] = None
+    pending_dialog: Optional[dict[str, Any]] = None
 
     @property
     def has_changes(self) -> bool:
@@ -102,6 +104,7 @@ class ScriptChangeset:
             or self.gameover_condition_override
             or self.completed_guard_expression_override
             or self.gameover_guard_expression_override
+            or self.pending_dialog
         )
 
 
@@ -1203,6 +1206,7 @@ class GameContext:
         self.awards = AwardsProxy(self.changeset)
         self.sequences = SequencesProxy(self.changeset)
         self.dice = DiceProxy()
+        self.dialog = DialogProxy(self.changeset, self)
 
     def switch(self, switch_id_or_name: str) -> SwitchProxy:
         """Shortcut for tw.switches.get(switch_id_or_name)."""

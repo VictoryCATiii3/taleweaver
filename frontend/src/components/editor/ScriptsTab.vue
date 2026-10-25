@@ -325,6 +325,10 @@ const SNIPPET_TEMPLATES = [
     code: '# Trigger victory or defeat\ntw.game.set_victory("You have retrieved the lost relic and saved the realm!")\n# tw.game.set_game_over("The ancient darkness completely consumed your spirit.")\n',
   },
   {
+    label: 'Choice Dialog',
+    code: '# Opens a choice dialog. The handler must be defined in the global init script:\n#   def on_wire_choice(answ):\n#       if answ == 0:\n#           tw.vars.set("bomb_disarmed", True)\ntw.dialog.choose("The bomb starts ticking. What do you do?", ["Cut the red wire", "Cut the blue wire", "Run"], on_choice="on_wire_choice")\n',
+  },
+  {
     label: 'Complete Quest',
     code: '# Mark quest completed\ntw.quests.complete("MAIN_QUEST_ID")\n',
   },
@@ -797,6 +801,13 @@ function handleTabKey(e: KeyboardEvent) {
                   <span class="font-bold text-emerald-400">tw.story & tw.game</span>
                   <p class="text-[11px] text-slate-400 font-sans mt-0.5">
                     <code>tw.story.show_message(text)</code>, <code>tw.game.set_victory(msg)</code>, <code>tw.game.set_game_over(msg)</code>
+                  </p>
+                </div>
+
+                <div class="bg-slate-900/60 p-2.5 rounded-lg border border-white/5">
+                  <span class="font-bold text-emerald-400">tw.dialog</span>
+                  <p class="text-[11px] text-slate-400 font-sans mt-0.5">
+                    <code>tw.dialog.choose(prompt, options, on_choice, speaker=None, narrate=False)</code> &mdash; handler lives in the init script
                   </p>
                 </div>
 

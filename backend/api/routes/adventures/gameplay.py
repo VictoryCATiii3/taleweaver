@@ -21,6 +21,7 @@ from backend.api.routes.adventures.chat_snapshot import (
     load_full_world_debug,
     resolve_prompt_suggestions,
 )
+from backend.api.routes.adventures.dialog_routes import ensure_no_pending_dialog
 from backend.api.routes.adventures.gameplay_logic import (
     WALKTHROUGH_REVEAL_COST,
     GameTurnManager,
@@ -61,6 +62,7 @@ from backend.core.prompts import (
     BABLE_FISH_TRANSLATION_USER_PROMPT_TEMPLATE,
 )
 from backend.engine.adventure_updates import is_legacy_session
+from backend.engine.scripting.dialog import client_dialog, pending_dialog
 from backend.engine.sequence_walkthrough import (
     format_walkthrough_steps,
     sequence_walkthrough_steps,
@@ -210,6 +212,9 @@ async def get_chat_history(
         world_rumors=state.world_rumors or [],
         is_legacy_format=is_legacy_session(session=state.session, state=state, template=adventure),
         full_world=full_world_debug,
+        pending_dialog=None
+        if session_status in {"completed", "game_over"}
+        else client_dialog(pending_dialog(state.entity_states)),
     )
 
 
@@ -221,6 +226,7 @@ async def post_chat_message(
     current_user: User = Depends(get_current_user),
 ):
     """Processes a user message and returns a streaming response."""
+    await ensure_no_pending_dialog(db, game_id, current_user)
     try:
         manager = GameTurnManager(db, game_id, current_user)
         turn_id = uuid4().hex

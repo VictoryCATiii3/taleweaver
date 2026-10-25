@@ -20,6 +20,7 @@ import CombatLootPopup from '@/components/game/CombatLootPopup.vue'
 import ContainerModal from '@/components/game/ContainerModal.vue'
 import ContainerUnlockModal from '@/components/game/ContainerUnlockModal.vue'
 import SwitchStateModal from '@/components/game/SwitchStateModal.vue'
+import DialogChoiceModal from '@/components/game/DialogChoiceModal.vue'
 import SwitchUnlockModal from '@/components/game/SwitchUnlockModal.vue'
 import TextLogModal from '@/components/game/TextLogModal.vue'
 import AdventureGeneratorModal from '@/components/game/AdventureGeneratorModal.vue'
@@ -219,6 +220,7 @@ const {
   isCompleted,
   inputLocked,
   pendingTerminalEpilogue,
+  pendingDialog,
   promptSuggestions,
   worldMemories,
   worldRumors,
@@ -350,7 +352,26 @@ onBeforeUnmount(() => {
 
 const activeActionId = ref<string | null>(null)
 const isPassRunning = computed(() => status.value === 'loading')
-const isActionInputBlocked = computed(() => inputLocked.value || isPassRunning.value)
+const isDialogOpen = computed(() => !!pendingDialog.value && status.value !== 'game_over')
+const isActionInputBlocked = computed(() => inputLocked.value || isPassRunning.value || isDialogOpen.value)
+const dialogChoiceBusy = ref(false)
+const dialogChoiceError = ref('')
+
+/** Sends the player's answer to a script-opened choice dialog, then reloads the story. */
+const handleDialogChoice = async (index: number): Promise<void> => {
+  const dialog = pendingDialog.value
+  if (!dialog || dialogChoiceBusy.value) return
+  dialogChoiceBusy.value = true
+  dialogChoiceError.value = ''
+  try {
+    await api.chooseDialogOption(props.id, dialog.id, index, language.value)
+  } catch (error: any) {
+    dialogChoiceError.value = error?.message || 'Your choice could not be applied.'
+  } finally {
+    await refreshSession(true)
+    dialogChoiceBusy.value = false
+  }
+}
 
 const handleEntityClick = async (entity: any) => {
   if (isActionInputBlocked.value) return
@@ -1918,6 +1939,14 @@ usePlayAgentAutoLoop()
       @submit-code="handleExitUnlockCodeSubmit"
       @use-key-item="handleExitUnlockItemSubmit"
       @unlock-direct="handleExitUnlockDirectSubmit"
+    />
+
+    <DialogChoiceModal
+      :open="isDialogOpen && !isPassRunning"
+      :dialog="pendingDialog"
+      :busy="dialogChoiceBusy"
+      :error-message="dialogChoiceError"
+      @choose="handleDialogChoice"
     />
 
     <SwitchStateModal

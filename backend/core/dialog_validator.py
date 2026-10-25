@@ -1,0 +1,90 @@
+"""Static check for choice dialogs: every ``on_choice`` handler must live in the init script.
+
+``tw.dialog.choose(..., on_choice=handler)`` resolves the handler in a later request, where only
+functions from the global ``init_script`` are in scope. A handler defined in the opening script
+itself (or nowhere) would silently do nothing, so the editor validation flags it.
+"""
+
+from __future__ import annotations
+
+import ast
+from collections.abc import Iterator
+from typing import Any
+
+from backend.schemas.validation import ValidationFinding
+
+_DIALOG_MARKER = "dialog."
+_DIALOG_METHODS = {"choose", "ask"}
+_HANDLER_ARG_POSITION = 2
+
+
+def _strings(value: Any) -> Iterator[str]:
+    """Yields every string nested in dicts/lists that may contain a dialog call."""
+    if isinstance(value, str) and _DIALOG_MARKER in value:
+        yield value
+    elif isinstance(value, dict):
+        yield from (code for child in value.values() for code in _strings(child))
+    elif isinstance(value, (list, tuple)):
+        yield from (code for child in value for code in _strings(child))
+
+
+def _handler_name(call: ast.Call) -> str | None:
+    node = next((kw.value for kw in call.keywords if kw.arg == "on_choice"), None)
+    if node is None and len(call.args) > _HANDLER_ARG_POSITION:
+        node = call.args[_HANDLER_ARG_POSITION]
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _is_dialog_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return False
+    owner = node.func.value
+    return (
+        node.func.attr in _DIALOG_METHODS
+        and isinstance(owner, ast.Attribute)
+        and owner.attr == "dialog"
+    )
+
+
+def dialog_handlers(code: str) -> set[str]:
+    """Returns the handler names referenced by tw.dialog.choose/ask calls in ``code``."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()
+    calls = (node for node in ast.walk(tree) if _is_dialog_call(node))
+    return {name for call in calls if (name := _handler_name(call))}
+
+
+def init_functions(init_script: Any) -> set[str]:
+    if not isinstance(init_script, str) or not init_script.strip():
+        return set()
+    try:
+        tree = ast.parse(init_script)
+    except SyntaxError:
+        return set()
+    return {stmt.name for stmt in tree.body if isinstance(stmt, ast.FunctionDef)}
+
+
+def check_dialog_handlers(sources: list[Any], init_script: Any) -> list[ValidationFinding]:
+    """Flags dialog handlers that the init script does not define (one finding per name)."""
+    defined = init_functions(init_script)
+    referenced: set[str] = set()
+    for source in sources:
+        for code in _strings(source):
+            referenced |= dialog_handlers(code)
+    return [
+        ValidationFinding(
+            severity="warn",
+            code="dialog_handler_missing",
+            message=(
+                f"tw.dialog handler '{name}' is not defined in the global init_script; "
+                "the choice will have no effect."
+            ),
+            location="adventure",
+            context={"handler": name},
+        )
+        for name in sorted(referenced - defined)
+    ]

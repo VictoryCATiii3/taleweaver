@@ -23,6 +23,7 @@ The **TaleWeaver Scripting Engine** provides a secure, sandboxed environment for
    - [tw.quests](#twquests)
    - [tw.awards](#twawards)
    - [tw.dice](#twdice)
+   - [tw.dialog (Choice Dialogs)](#twdialog-choice-dialogs)
    - [tw.log & tw.debug (Logging & Diagnostics)](#twlog--twdebug-logging--diagnostics)
 6. [Practical Examples](#practical-examples)
    - [Example 1: Trapped Ancient Chest](#example-1-trapped-ancient-chest)
@@ -33,6 +34,8 @@ The **TaleWeaver Scripting Engine** provides a secure, sandboxed environment for
    - [Example 8: Switch Mechanism State & Guard Expression](#example-8-switch-mechanism-state--guard-expression)
    - [Example 9: Global Init Script with Helper Functions](#example-9-global-init-script-with-helper-functions)
    - [Example 10: NPC Hands the Player an Item (Sequence Soft Rule)](#example-10-npc-hands-the-player-an-item-sequence-soft-rule)
+   - [Example 11: Bomb Defusal Choice Dialog](#example-11-bomb-defusal-choice-dialog)
+   - [Example 12: Sphinx Riddle Conversation (Soft Rule + Dialog)](#example-12-sphinx-riddle-conversation-soft-rule--dialog)
 7. [Authoring in the World-Editor](#authoring-in-the-world-editor)
 
 ---
@@ -396,6 +399,26 @@ Provides deterministic, seeded random number generation:
 - `tw.dice.d20() -> int`: Convenience for a 20-sided die roll (1 to 20).
 - `tw.dice.random() -> float`: Returns a pseudo-random float between `0.0` and `1.0`.
 
+### `tw.dialog` (Choice Dialogs)
+Shows the player a multiple-choice dialog for NPC conversations, riddles and dilemmas. Only scripts (including soft rule scripts) can open a dialog; the LLM never sees this API.
+
+- `tw.dialog.choose(prompt, options, on_choice, speaker=None, narrate=False) -> bool` (alias `tw.dialog.ask`)
+  - `prompt`: the question or situation shown above the options.
+  - `options`: up to 8 entries, each a label string or `{"label": "...", "visible_if": "<guard expression>"}`. Hidden options keep their position, so indices stay stable.
+  - `on_choice`: name of the handler function (a string, or the function itself). **The handler must be defined in the global `init_script`.**
+  - `speaker`: optional NPC name shown as the dialog title.
+  - `narrate`: when `True`, the small model narrates the outcome after the handler ran (it is told the handler's messages are binding facts). Default `False`: only the handler's own messages appear, which is instant and deterministic.
+  - Returns `False` (and emits a debug note) when no dialog was opened: another dialog is already open this turn, the handler name is invalid, or no option is visible.
+
+**How it works.** Scripts run to completion inside one request, so `choose()` does not wait for the answer. It stores a *pending dialog* in the session state (`entity_states["__pending_dialog__"]`) and the client shows a modal that cannot be dismissed. Free-text input is rejected (HTTP 409) until the player answers. The answer goes to `POST /adventures/{game_id}/dialog/choice`, which:
+
+1. records the choice in the chat as `[Choice] <label>` (so the GM keeps continuity),
+2. calls `<on_choice>(index)` with the **position of the chosen option in `options`**, plus a `dialog_choice` dict (`index`, `label`, `dialog_id`) in scope,
+3. applies the handler's changeset (variables, items, HP, game over, sequence advance, …) and runs the post-turn checks (special unlocks, NPC attacks),
+4. optionally narrates the outcome (`narrate=True`).
+
+A handler may call `tw.dialog.choose()` again, which is how multi-step conversations and dialog trees are built. The editor validation warns (`dialog_handler_missing`) when a dialog references a handler that the init script does not define.
+
 ### `tw.log` & `tw.debug` (Logging & Diagnostics)
 Provides simple, clean logging methods to inspect state during development and playtesting:
 
@@ -636,6 +659,60 @@ if key:
 ```
 
 If Arthur has angered Brenda first, the guard fails and the flirt has no mechanical effect. Because `give_to_player` returns `None` when Brenda no longer holds the key, the dialogue only plays when the hand-over actually happens.
+
+### Example 11: Bomb Defusal Choice Dialog
+Handler in the **global init script**:
+```python
+def on_bomb_wire(answ):
+    if answ == 0:
+        tw.vars.set("bomb_disarmed", True)
+        tw.story.show_message("The ticking stops. You disarmed the trap.")
+        return
+    if answ == 1:
+        tw.game.game_over("The bomb exploded.")
+        return
+    tw.player.damage(5)
+    tw.dialog.choose("Panic costs you precious seconds. It is still ticking!",
+                     ["Cut the red wire", "Cut the blue wire", "Scream like a baby"],
+                     on_choice=on_bomb_wire)
+```
+
+Dialog opened by the bomb's inline `on_pickup_script`:
+```python
+tw.dialog.choose(
+    "The bomb starts ticking. What do you do?",
+    ["Cut the red wire", "Cut the blue wire", "Scream like a baby"],
+    on_choice="on_bomb_wire",
+)
+```
+
+Screaming re-opens the dialog (at the cost of 5 HP) until the player commits to a wire.
+
+### Example 12: Sphinx Riddle Conversation (Soft Rule + Dialog)
+Soft rule `SPHINX_ASK_PASSAGE` on the sequence, condition *"The player asks the sphinx to let them pass"*, `max_triggers: 1`:
+```python
+tw.dialog.choose(
+    "What walks on four legs at dawn, two at noon and three at dusk?",
+    ["A man", "A dog", {"label": "A ghost (read in the old scroll)",
+                        "visible_if": "tw.player.has_item('OLD_SCROLL')"}],
+    on_choice="on_sphinx_riddle",
+    speaker="The Sphinx",
+    narrate=True,
+)
+```
+
+Handler in the global init script:
+```python
+def on_sphinx_riddle(answ):
+    if answ == 0:
+        tw.exits.unlock("SCENE_SPHINX", "SCENE_TEMPLE")
+        tw.story.show_message("The sphinx steps aside.")
+        return
+    tw.player.damage(10)
+    tw.story.show_message("The sphinx's tail lashes you. (-10 HP)")
+```
+
+The GM decides *that* the player asked (soft rule); the dialog and its handler decide *what* happens, deterministically.
 
 ---
 

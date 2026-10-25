@@ -110,6 +110,10 @@ const availableSnippets = computed(() => {
       label: 'Defeat / Kill NPC',
       code: 'tw.npcs.kill("NPC_ID", drop_inventory=True)\n',
     },
+    {
+      label: 'Choice dialog',
+      code: '# Opens a choice dialog. The handler must be defined in the global init script:\n#   def on_wire_choice(answ):\n#       if answ == 0:\n#           tw.vars.set("bomb_disarmed", True)\ntw.dialog.choose("The bomb starts ticking. What do you do?", ["Cut the red wire", "Cut the blue wire", "Run"], on_choice="on_wire_choice")\n',
+    },
   ]
 
   if (props.context === 'on_pickup' || props.context === 'on_drop') {

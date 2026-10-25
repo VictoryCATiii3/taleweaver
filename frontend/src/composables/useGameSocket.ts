@@ -8,7 +8,7 @@ import { ref, watch, type Ref } from 'vue'
 import { useNotifications } from '@/composables/useNotifications'
 import { authState } from '@/store/auth'
 import { api } from '@/composables/useApi'
-import type { ChatMessage, CharacterSheet, CombatState } from '@/types'
+import type { ChatMessage, CharacterSheet, CombatState, PendingDialog } from '@/types'
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'game_over' | 'loading' | 'completed'
 
@@ -57,6 +57,7 @@ export interface UseGameSocket {
   statusNote: Ref<string>
   inputLocked: Ref<boolean>
   pendingTerminalEpilogue: Ref<boolean>
+  pendingDialog: Ref<PendingDialog | null>
   promptSuggestions: Ref<string[]>
   worldMemories: Ref<any[]>
   worldRumors: Ref<any[]>
@@ -77,6 +78,7 @@ export interface UseGameSocket {
   connect: (gameId: string) => Promise<void>
   disconnect: () => void
   haltActiveOperations: () => void
+  refreshSession: (includeMessages?: boolean) => Promise<void>
   sendMessage: (content: string, isRetry?: boolean) => Promise<void>
   retryLastAction: () => Promise<void>
   cancelTurnError: () => void
@@ -119,6 +121,7 @@ export function useGameSocket(): UseGameSocket {
   const statusNote = ref('')
   const inputLocked = ref(false)
   const pendingTerminalEpilogue = ref(false)
+  const pendingDialog = ref<PendingDialog | null>(null)
   const promptSuggestions = ref<string[]>([])
   const worldMemories = ref<any[]>([])
   const worldRumors = ref<any[]>([])
@@ -249,10 +252,10 @@ export function useGameSocket(): UseGameSocket {
     }
   }
 
-  async function refreshSession(): Promise<void> {
+  async function refreshSession(includeMessages = false): Promise<void> {
     if (!currentGameId) return
     const data = await fetchSessionSnapshot(currentGameId)
-    if (data) applySessionSnapshot(data, false)
+    if (data) applySessionSnapshot(data, includeMessages)
   }
 
   function applySessionSnapshot(data: any, updateMessages = true): void {
@@ -295,6 +298,9 @@ export function useGameSocket(): UseGameSocket {
     }
     if (data.pending_terminal_epilogue !== undefined) {
       pendingTerminalEpilogue.value = !!data.pending_terminal_epilogue
+    }
+    if (data.pending_dialog !== undefined) {
+      pendingDialog.value = data.pending_dialog || null
     }
     if (data.awards !== undefined) {
       awards.value = data.awards || []
@@ -409,6 +415,7 @@ export function useGameSocket(): UseGameSocket {
     statusText.value = ''
     inputLocked.value = false
     pendingTerminalEpilogue.value = false
+    pendingDialog.value = null
     promptSuggestions.value = []
     worldMemories.value = []
     worldRumors.value = []
@@ -1008,6 +1015,7 @@ export function useGameSocket(): UseGameSocket {
     statusNote,
     inputLocked,
     pendingTerminalEpilogue,
+    pendingDialog,
     promptSuggestions,
     worldMemories,
     worldRumors,

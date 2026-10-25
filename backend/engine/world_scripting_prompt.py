@@ -7,6 +7,9 @@ The trigger catalogue below mirrors what the gameplay engine actually executes:
   ``on_narration_done``, and ``on_turn_end``.
 * Inline ``on_*_script`` / ``on_*_text`` fields on entities are executed by the turn
   state applier (``turn_state_applier.py`` / ``turn_interactions.py``).
+* Sequence ``soft_rules`` are judged by the GM and run by the soft rule guard
+  (``engine/soft_rules.py``); ``tw.dialog`` choice handlers live in ``init_script``
+  (``engine/scripting/dialog.py``).
 
 Keep this catalogue in sync with ``docs/scripting_engine.md``.
 """
@@ -101,6 +104,13 @@ TW_API_REFERENCE = (
     "- tw.quests: complete(quest_id), fail(quest_id), is_completed(quest_id)\n"
     "- tw.awards.grant(award_key) | tw.sequences.advance() | tw.dice.d20()\n"
     "- tw.game: time | win(reason), game_over(reason)\n"
+    "- tw.dialog.choose(prompt, options, on_choice, speaker=None, narrate=False): shows the player a "
+    "multiple-choice dialog (NPC conversation, riddle, dilemma). `options` is a list of labels or "
+    "{'label': ..., 'visible_if': '<guard expression>'} dicts (max 8). The call does NOT wait: once "
+    "the player picks, the engine calls the function named by `on_choice` with the chosen option's "
+    "index (its position in `options`). That handler MUST be defined in the top-level `init_script`; "
+    "it may call tw.dialog.choose again for multi-step conversations. narrate=True lets the GM "
+    "narrate the outcome.\n"
     "- tw.log / tw.debug: tw.log(msg), tw.log.info/warn/error(msg) or print(msg) (outputs to server console); "
     "tw.debug(msg) (emits in-game [DEBUG: Script] notification when debug mode is ON)\n"
 )
@@ -159,6 +169,27 @@ _EXAMPLES = (
     "max_triggers=1, script):\n"
     "   if tw.npcs.give_to_player('BRENDA', 'BRENDA_KEY'):\\n"
     "       tw.npcs.say('BRENDA', 'Fine, charmer. Take it before I change my mind.')\n"
+    "18. Bomb choice dialog (handler in top-level init_script, dialog opened by the bomb's "
+    "on_pickup_script):\n"
+    "   init_script:\n"
+    "   def on_bomb_wire(answ):\\n"
+    "       if answ == 0:\\n"
+    "           tw.vars.set('bomb_disarmed', True)\\n"
+    "           tw.story.show_message('The ticking stops. You disarmed the trap.')\\n"
+    "       elif answ == 1:\\n"
+    "           tw.game.game_over('The bomb exploded.')\\n"
+    "       else:\\n"
+    "           tw.player.damage(5)\\n"
+    "           tw.story.show_message('Panic costs you precious seconds.')\n"
+    "   on_pickup_script:\n"
+    "   tw.dialog.choose('The bomb starts ticking. What do you do?', "
+    "['Cut the red wire', 'Cut the blue wire', 'Scream like a baby'], on_choice='on_bomb_wire')\n"
+    "19. Riddle conversation opened by a soft rule (sequence soft_rules entry: condition='The "
+    "player asks the sphinx to let them pass', max_triggers=1, script):\n"
+    "   tw.dialog.choose('What walks on four legs at dawn, two at noon, three at dusk?', "
+    "['A man', 'A dog', 'A ghost'], on_choice='on_sphinx_riddle', speaker='The Sphinx', "
+    "narrate=True)\n"
+    "   (init_script defines on_sphinx_riddle(answ) and unlocks the gate exit when answ == 0)\n"
 )
 
 
@@ -182,8 +213,9 @@ def build_scripts_requirement(scripts_generation_enabled: bool) -> str:
     """Return the scripting section appended to the world generation user prompt."""
     if not scripts_generation_enabled:
         return (
-            "\nSCRIPTING: Do NOT generate any custom scripts. Keep scripts: [] and do not "
-            "populate any on_*_script or on_*_text fields (leave them as empty strings)."
+            "\nSCRIPTING: Do NOT generate any custom scripts. Keep scripts: [], init_script empty, "
+            "every sequence's soft_rules: [] and do not populate any on_*_script or on_*_text "
+            "fields (leave them as empty strings). Do not use tw.dialog."
         )
     separator = "=" * 80
     return (
@@ -202,8 +234,22 @@ def build_scripts_requirement(scripts_generation_enabled: bool) -> str:
         "the story (aim for several across different entity kinds, e.g. a cursed item, a guarded scene, "
         "a boss that drops loot):\n"
         f"{_inline_trigger_lines()}\n"
+        "3) SEQUENCE SOFT RULES: every sequence has a `soft_rules` list of narrative rules that are "
+        "ONLY active while that sequence runs. Each entry has `id` (unique uppercase slug), "
+        "`condition` (a concrete, observable player action judged by the GM, e.g. 'The player bribes "
+        "the guard'), `script` (tw code the engine runs when the GM reports the condition as "
+        "fulfilled), optional `text`, optional `guard_expression` (deterministic precondition) and "
+        "optional `max_triggers` (use 1 for one-off rewards). Add soft rules where a chapter has "
+        "social or creative solutions (persuading, flirting, threatening, bargaining) that need a "
+        "deterministic effect. The GM never sees the script, so the condition must describe the "
+        "action, not its outcome. Use [] for sequences without such interactions.\n\n"
+        "4) CHOICE DIALOGS: use tw.dialog.choose (see API below) for NPC conversations, riddles and "
+        "dilemmas where the player picks from fixed answers. Open the dialog from a script or a soft "
+        "rule script and define its `on_choice` handler function in the top-level `init_script`. "
+        "Every branch must keep the adventure winnable: a wrong answer may cost HP or reopen the "
+        "dialog, but must not block the main path unless it is an intended game over.\n\n"
         "RULES:\n"
-        "- SOFT RULES VS. HARD RULES (MUTUAL EXCLUSIVITY): Use EITHER a soft narrative rule OR deterministic hard rules / scripted guards on any given asset, but NOT both. If you set a guard_expression or hard rule on a sequence, quest, award, container, exit, or win/loss condition, leave its soft rule empty (or strictly decorative).\n"
+        "- NATURAL-LANGUAGE CONDITIONS VS. HARD RULES (MUTUAL EXCLUSIVITY): Use EITHER a natural-language condition (quest goal, award/win/loss condition text judged by the GM) OR deterministic hard rules / scripted guards on any given asset, but NOT both. If you set a guard_expression or hard rule on a sequence, quest, award, container, exit, or win/loss condition, keep its natural-language condition strictly descriptive. This does not restrict sequence `soft_rules`, which may carry their own guard_expression.\n"
         "- Only reference scene/exit/NPC/object/quest IDs that exist in this manifest.\n"
         "- Prefer `..._text` for pure flavour, `..._script` for mechanics (damage, items, locks, flags).\n"
         "- Keep inline scripts short (max ~10 lines); never use imports, file/network access or loops over huge ranges.\n"

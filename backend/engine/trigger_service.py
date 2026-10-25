@@ -5,9 +5,11 @@ from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from backend.core.config import settings
-from backend.engine.scripting.context import GameContext
+from backend.engine.scripting.context import GameContext, ScriptChangeset
+from backend.engine.scripting.dialog import store_pending_dialog
 from backend.engine.scripting.runner import ScriptRunner
 from backend.engine.switch_service import SwitchService
 from backend.models.avatar import Avatar
@@ -161,39 +163,45 @@ class TriggerService:
                 )
                 messages.append(sys_msg)
 
-            if (
-                context.changeset.var_updates
-                or context.changeset.entity_updates
-                or context.changeset.exit_updates
-            ):
-                from sqlalchemy.orm.attributes import flag_modified
-
-                cur_states = dict(state.entity_states or {})
-                if context.changeset.var_updates:
-                    sv = dict(cur_states.get("__script_vars__", {}))
-                    sv.update(context.changeset.var_updates)
-                    cur_states["__script_vars__"] = sv
-                for upd in context.changeset.entity_updates:
-                    eid = upd.get("entity_id")
-                    if eid:
-                        st = dict(cur_states.get(eid, {}))
-                        for k, v in upd.items():
-                            if k != "entity_id":
-                                st[k] = v
-                        cur_states[eid] = st
-                state.entity_states = cur_states
-                flag_modified(state, "entity_states")
-
-                if context.changeset.exit_updates:
-                    exit_states = dict(state.exit_states or {})
-                    for eu in context.changeset.exit_updates:
-                        k = f"{eu['from_scene_id']}:{eu['to_scene_id']}"
-                        st_item = dict(exit_states.get(k, {}))
-                        st_item["is_locked"] = eu["is_locked"]
-                        if "lock_description" in eu:
-                            st_item["lock_description"] = eu["lock_description"]
-                        exit_states[k] = st_item
-                    state.exit_states = exit_states
-                    flag_modified(state, "exit_states")
+            cls._persist_entity_states(state, context.changeset)
+            cls._persist_exit_states(state, context.changeset)
 
         return messages
+
+    @staticmethod
+    def _persist_entity_states(state: SessionState, changeset: ScriptChangeset) -> None:
+        """Writes variable, entity and dialog updates of a trigger script to the session."""
+        if not (
+            changeset.var_updates
+            or changeset.entity_updates
+            or changeset.exit_updates
+            or changeset.pending_dialog
+        ):
+            return
+        cur_states = dict(state.entity_states or {})
+        if changeset.var_updates:
+            sv = dict(cur_states.get("__script_vars__", {}))
+            sv.update(changeset.var_updates)
+            cur_states["__script_vars__"] = sv
+        for upd in (u for u in changeset.entity_updates if u.get("entity_id")):
+            st = dict(cur_states.get(upd["entity_id"], {}))
+            st.update({k: v for k, v in upd.items() if k != "entity_id"})
+            cur_states[upd["entity_id"]] = st
+        store_pending_dialog(cur_states, changeset.pending_dialog)
+        state.entity_states = cur_states
+        flag_modified(state, "entity_states")
+
+    @staticmethod
+    def _persist_exit_states(state: SessionState, changeset: ScriptChangeset) -> None:
+        if not changeset.exit_updates:
+            return
+        exit_states = dict(state.exit_states or {})
+        for eu in changeset.exit_updates:
+            k = f"{eu['from_scene_id']}:{eu['to_scene_id']}"
+            st_item = dict(exit_states.get(k, {}))
+            st_item["is_locked"] = eu["is_locked"]
+            if "lock_description" in eu:
+                st_item["lock_description"] = eu["lock_description"]
+            exit_states[k] = st_item
+        state.exit_states = exit_states
+        flag_modified(state, "exit_states")
