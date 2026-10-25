@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime
 import json
 import logging
 import re
-import uuid
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
 
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import and_, func, or_, select
@@ -18,9 +17,7 @@ from backend.api.routes.adventures.gameplay_logic import (
     _friendly_llm_unexpected_error_message,
 )
 from backend.api.routes.adventures.logic import AdventureLogic
-from backend.core import prompts
 from backend.core.awards import SPOILER_SEEKER_AWARD
-from backend.core.config import settings
 from backend.engine.debug_engine import DebugEngine
 from backend.engine.switch_service import SwitchService
 from backend.engine.trigger_service import TriggerService
@@ -197,7 +194,10 @@ class TurnInteractionsManager:
             select(WorldScene).where(
                 or_(
                     WorldScene.session_id == self.state.session_id,
-                    and_(WorldScene.template_id == self.state.template_id, WorldScene.session_id.is_(None)),
+                    and_(
+                        WorldScene.template_id == self.state.template_id,
+                        WorldScene.session_id.is_(None),
+                    ),
                 ),
                 WorldScene.id == current_scene_id,
             )
@@ -245,6 +245,7 @@ class TurnInteractionsManager:
     ) -> AsyncGenerator[str, None]:
         """Performs scene exit traversal and triggers an LLM narration pass for the new scene."""
         import json
+
         from sqlalchemy import and_, func, or_
 
         current_scene_id = str(self.state.current_scene_id or "").strip()
@@ -1007,7 +1008,7 @@ class TurnInteractionsManager:
 
             # Grant universal negative award
             award_key = SPOILER_SEEKER_AWARD["key"]
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             user_awards = list(self.user.earned_awards or [])
             adv_id = (
                 self.manager.adventure.id

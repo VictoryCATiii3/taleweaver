@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import and_, func, or_, select
@@ -172,7 +172,7 @@ class TurnStateApplier:
 
         messages: list[str] = []
         user_awards = list(self.user.earned_awards or [])
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         modified = False
 
         for aw in self.adventure.awards:
@@ -931,7 +931,7 @@ class TurnStateApplier:
                 state_dirty = True
 
         if event.earned_award_keys:
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             award_defs = {
                 (aw.get("key") or ""): aw for aw in (self.adventure.awards or []) if aw.get("key")
             }
@@ -1247,7 +1247,7 @@ class TurnStateApplier:
 
                 new_mem = {
                     "id": str(uuid.uuid4()),
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "description": mem.description,
                     "npc_id": mem.npc_id,
                     "emotion": mem.emotion,

@@ -7,7 +7,7 @@ import re
 import time
 from types import SimpleNamespace
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi.encoders import jsonable_encoder
@@ -2311,7 +2311,6 @@ class GameTurnManager:
             )
             if updated_summary and updated_summary.strip():
                 last_msg = msgs_outside_memory[-1]
-                from datetime import timezone
 
                 self.state.compressed_history = {
                     "summary": updated_summary.strip(),
@@ -2364,7 +2363,7 @@ class GameTurnManager:
             or self.adventure.title,
             "status": status,
             "outcome_note": note,
-            "completed_at": datetime.utcnow().isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
         }
 
         current_log = list(self.user.game_log or [])
@@ -3071,9 +3070,7 @@ class GameTurnManager:
         if changeset.game_completed:
             await self._finalize_session("completed", changeset.status_note)
         elif changeset.game_over:
-            raise GameOverError(
-                changeset.status_note or f"{self.avatar.name} has met their end."
-            )
+            raise GameOverError(changeset.status_note or f"{self.avatar.name} has met their end.")
 
         if (
             changeset.sequence_completed

@@ -6,6 +6,7 @@ so subsequent /validation/latest calls don't return the deleted entries.
 """
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -84,7 +85,7 @@ async def _seed_template_with_run(*, structural: list[dict], ai: list[dict]) -> 
             error_count=error_count,
             warning_count=warning_count,
             ai_skipped_reason=None,
-            run_at=__import__("datetime").datetime.utcnow(),
+            run_at=datetime.now(timezone.utc),
         )
         db.add(run)
         await db.commit()

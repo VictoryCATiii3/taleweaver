@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -53,7 +53,7 @@ async def grant_awards(ctx: DebugContext) -> str:
 
     updated_awards = deepcopy(adventure.awards)
     granted: list[str] = []
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     for award in updated_awards:
         if award.get("is_earned"):
             continue

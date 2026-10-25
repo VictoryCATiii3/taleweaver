@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from sqlalchemy.orm.attributes import flag_modified
@@ -423,7 +423,7 @@ class TurnCombatStateHelper:
             "round": combat.get("round", 1),
             "type": entry_type,
             "text": text,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         if data:
             entry["data"] = data
