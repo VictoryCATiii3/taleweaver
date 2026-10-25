@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, onMounted } from 'vue'
 import { useGameSocket } from '@/composables/useGameSocket'
+import { BABLE_FISH_LANGUAGES } from '@/components/game/settings/bableFishLanguages'
 
 const triggerRef = ref<HTMLElement | null>(null)
 const dropdownStyle = computed(() => {
@@ -14,18 +15,7 @@ const dropdownStyle = computed(() => {
 
 const { language } = useGameSocket()
 
-const languages = [
-  { code: '', name: 'Default', icon: 'ra-spear-head' },
-  { code: 'German', name: 'Deutsch', icon: 'ra-castle' },
-  { code: 'English', name: 'English', icon: 'ra-tower' },
-  { code: 'French', name: 'Français', icon: 'ra-fleur-de-lis' },
-  { code: 'Spanish', name: 'Español', icon: 'ra-shield' },
-  { code: 'Italian', name: 'Italiano', icon: 'ra-scroll-unfurled' },
-  { code: 'Japanese', name: '日本語', icon: 'ra-shinto-shrine' },
-  { code: 'Chinese', name: '中文', icon: 'ra-dragon' },
-  { code: 'Russian', name: 'Русский', icon: 'ra-hammer' },
-  { code: 'Portuguese', name: 'Português', icon: 'ra-anchor' },
-]
+const languages = BABLE_FISH_LANGUAGES
 
 const isOpen = ref(false)
 const showTooltip = ref(false)

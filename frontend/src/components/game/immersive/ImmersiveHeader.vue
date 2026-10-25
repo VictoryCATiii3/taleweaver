@@ -3,18 +3,20 @@
  * ImmersiveHeader — Atmospheric top bar for the immersive RPG view
  *
  * Displays scene and adventure metadata, active sequence with description tooltip,
- * tracked quest badge, in-game clock, speech controls, BabelFish language selector,
- * and experience counter.
+ * tracked quest badge, in-game clock, experience counter, and a settings button that
+ * shows indicators while Auto-Speak or the Bable Fish translation is active.
  */
 import { ref, computed } from 'vue'
 import { configState } from '@/store/config'
 import { audioService } from '@/services/audioService'
 import GameClockWidget from '@/components/game/GameClockWidget.vue'
-import BableFishSelector from '@/components/game/BableFishSelector.vue'
+import { useGameSocket } from '@/composables/useGameSocket'
+import { findBableFishLanguage } from '@/components/game/settings/bableFishLanguages'
+import type { SettingsTabId } from '@/components/game/settings/types'
 import {
   History,
   Scroll,
-  Volume2,
+  AudioLines,
   VolumeX,
   Map as MapIcon,
   Sliders,
@@ -38,13 +40,25 @@ const props = defineProps<{
 const emit = defineEmits<{
   openChronicles: []
   openQuests: []
-  openSettings: []
+  openSettings: [tab?: SettingsTabId]
   openDebug: []
   toggleMobileInteract: []
   exitSession: []
 }>()
 
+const { language } = useGameSocket()
+
 const showSequenceTooltip = ref(false)
+
+const autoSpeechActive = computed(() => configState.isTtsEnabled && audioService.autoSpeechEnabled.value)
+const activeLanguage = computed(() => {
+  if (!language.value) {
+    return null
+  }
+  return (
+    findBableFishLanguage(language.value) ?? { name: language.value, short: language.value.slice(0, 2).toUpperCase() }
+  )
+})
 
 const sequenceTitle = computed(() => {
   if (!props.activeSequence) return ''
@@ -189,57 +203,66 @@ const sequenceOrder = computed(() => {
 
       <!-- Experience XP -->
       <div
-        class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-black tracking-wider shadow-sm shrink-0"
+        class="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-black tracking-wider shadow-sm shrink-0"
         title="Experience Points (XP)"
       >
         <i class="ra ra-laurels text-sm text-amber-400"></i>
         <span class="tabular-nums">{{ props.exp ?? 0 }} XP</span>
       </div>
 
-      <!-- TTS Toggle / Stop -->
-      <div v-if="configState.isTtsEnabled" class="flex items-center gap-1.5">
+      <!-- Stop Speech (only while audio is playing) -->
+      <button
+        v-if="configState.isTtsEnabled && audioService.isPlaying.value"
+        type="button"
+        @click="audioService.stop()"
+        class="flex items-center justify-center w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 hover:bg-red-500/30 transition-all animate-pulse cursor-pointer shrink-0"
+        title="Stop Speech"
+        aria-label="Stop speech"
+      >
+        <VolumeX class="w-4 h-4" />
+      </button>
+
+      <!-- Settings with active-feature indicators (Auto-Speak, Bable Fish) -->
+      <div class="flex items-center h-9 rounded-xl bg-slate-900/80 border border-slate-700/60 shadow-lg shrink-0 overflow-hidden">
         <button
-          v-if="audioService.isPlaying.value"
+          v-if="autoSpeechActive"
           type="button"
-          @click="audioService.stop()"
-          class="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 hover:bg-red-500/30 transition-all animate-pulse cursor-pointer"
-          title="Stop Speech (SPACE)"
+          @click="emit('openSettings', 'voice')"
+          class="flex items-center justify-center h-full px-2.5 text-amber-300 hover:bg-amber-500/10 border-r border-slate-700/60 transition-colors cursor-pointer"
+          title="Auto-Speak is on — open voice settings"
+          aria-label="Auto-Speak is on. Open voice settings"
         >
-          <VolumeX class="w-4 h-4" />
+          <AudioLines class="w-4 h-4" />
+        </button>
+        <button
+          v-if="activeLanguage"
+          type="button"
+          @click="emit('openSettings', 'translation')"
+          class="flex items-center gap-1.5 h-full px-2.5 text-cyan-300 hover:bg-cyan-500/10 border-r border-slate-700/60 transition-colors cursor-pointer"
+          :title="`Bable Fish translates to ${activeLanguage.name} — open translation settings`"
+          :aria-label="`Bable Fish translates to ${activeLanguage.name}. Open translation settings`"
+        >
+          <i class="ra ra-fish text-sm"></i>
+          <span class="hidden sm:inline text-[10px] font-black tracking-wider">{{ activeLanguage.short }}</span>
         </button>
         <button
           type="button"
-          @click="audioService.toggleAutoSpeech()"
-          class="flex items-center justify-center w-8 h-8 rounded-lg transition-all border cursor-pointer"
-          :class="[
-            audioService.autoSpeechEnabled.value
-              ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
-              : 'bg-slate-900/80 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-          ]"
-          :title="audioService.autoSpeechEnabled.value ? 'Auto-Narration ON (Click to disable)' : 'Auto-Narration OFF (Click to enable)'"
+          @click="emit('openSettings', 'memory')"
+          class="flex items-center justify-center h-full w-9 text-slate-400 hover:text-white hover:bg-amber-500/10 transition-colors cursor-pointer"
+          title="Session Settings"
+          aria-label="Open session settings"
         >
-          <Volume2 class="w-4 h-4" />
+          <Sliders class="w-4 h-4" />
         </button>
       </div>
-
-      <BableFishSelector />
-
-      <!-- Session Settings (Memory & Configuration) -->
-      <button
-        type="button"
-        @click="emit('openSettings')"
-        class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-700/60 text-slate-400 hover:text-white hover:border-amber-500/50 hover:bg-amber-500/10 transition-all cursor-pointer"
-        title="Session Settings & Turn Memory"
-      >
-        <Sliders class="w-4 h-4" />
-      </button>
 
       <!-- Leave / Exit Session Button -->
       <button
         type="button"
         @click="emit('exitSession')"
-        class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900/80 border border-slate-700/60 text-slate-400 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/10 transition-all cursor-pointer"
+        class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-400 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/10 transition-all cursor-pointer shrink-0"
         title="Exit Session (Return to Portal)"
+        aria-label="Exit session"
       >
         <LogOut class="w-4 h-4" />
       </button>

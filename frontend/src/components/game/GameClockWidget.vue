@@ -1,4 +1,13 @@
 <script setup lang="ts">
+/**
+ * GameClockWidget — Compact in-game clock for the immersive header.
+ *
+ * Shows a time-of-day icon framed by a ring that fills over the course of the day.
+ * Custom time-unit systems get an hourglass and no ring.
+ */
+import { computed, type Component } from 'vue'
+import { Sun, Moon, Sunrise, Sunset, Hourglass } from 'lucide-vue-next'
+
 const props = defineProps<{
   gameTime: {
     dateShort: string
@@ -9,60 +18,135 @@ const props = defineProps<{
   } | null
   clockTick: boolean
 }>()
+
+type DayPhase = { label: string; icon: Component; tone: string; ring: string }
+
+const PHASES: Record<'dawn' | 'day' | 'dusk' | 'night', DayPhase> = {
+  dawn: { label: 'Dawn', icon: Sunrise, tone: 'text-orange-300', ring: '#fdba74' },
+  day: { label: 'Daytime', icon: Sun, tone: 'text-amber-300', ring: '#fbbf24' },
+  dusk: { label: 'Dusk', icon: Sunset, tone: 'text-rose-300', ring: '#fda4af' },
+  night: { label: 'Night', icon: Moon, tone: 'text-indigo-300', ring: '#a5b4fc' },
+}
+
+const RING_RADIUS = 15
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
+/** Minutes since midnight parsed from "HH:MM" or "hh:MM AM/PM", or null if unparseable. */
+const minuteOfDay = computed<number | null>(() => {
+  if (!props.gameTime || props.gameTime.isUnits) {
+    return null
+  }
+  const match = /(\d{1,2}):(\d{2})\s*(AM|PM)?/i.exec(props.gameTime.time)
+  if (!match) {
+    return null
+  }
+  const meridiem = match[3]?.toUpperCase()
+  let hours = Number(match[1]) % (meridiem ? 12 : 24)
+  if (meridiem === 'PM') {
+    hours += 12
+  }
+  return hours * 60 + Number(match[2])
+})
+
+const phase = computed<DayPhase>(() => {
+  const hour = (minuteOfDay.value ?? 12 * 60) / 60
+  if (hour >= 5 && hour < 7) {
+    return PHASES.dawn
+  }
+  if (hour >= 7 && hour < 18) {
+    return PHASES.day
+  }
+  if (hour >= 18 && hour < 20) {
+    return PHASES.dusk
+  }
+  return PHASES.night
+})
+
+const ringOffset = computed(() => {
+  const fraction = (minuteOfDay.value ?? 0) / (24 * 60)
+  return RING_CIRCUMFERENCE * (1 - fraction)
+})
+
+const tooltip = computed(() => {
+  if (!props.gameTime) {
+    return ''
+  }
+  if (props.gameTime.isUnits) {
+    return `In-game time units (${props.gameTime.dateShort}) of your current session.`
+  }
+  return `${phase.value.label} · ${props.gameTime.dateShort} · In-game time of your current session.`
+})
 </script>
 
 <template>
-  <div v-if="props.gameTime" class="z-10">
-    <div class="relative group flex flex-col items-end select-none game-clock" :class="{ 'clock-tick': props.clockTick }">
-      <div class="flex items-center gap-2 sm:gap-2.5 px-2.5 py-1 sm:px-3.5 sm:py-1.5 bg-slate-900/80 border border-slate-700/60 rounded-xl backdrop-blur-md shadow-lg transition-all">
-        <svg v-if="!props.gameTime.isUnits" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500/80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-400/90 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0zM13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <div class="flex flex-col items-end min-w-0">
-          <span
-            class="text-[9px] sm:text-xs font-black uppercase tracking-widest leading-none mb-0.5 sm:mb-1 whitespace-nowrap truncate max-w-[120px]"
-            :class="props.gameTime.isUnits ? 'text-cyan-400/70' : 'text-amber-500/60'"
-          >
-            {{ props.gameTime.dateShort }}
-          </span>
-          <span
-            class="clock-time text-sm sm:text-lg font-black tracking-widest leading-none tabular-nums"
-            :class="props.gameTime.isUnits ? 'text-cyan-300' : 'text-amber-300'"
-          >
-            {{ props.gameTime.time }}
-          </span>
-        </div>
-      </div>
-      <div class="pointer-events-none absolute right-0 top-full mt-2 w-max max-w-xs rounded-lg border border-slate-700/60 bg-slate-900/95 px-3 py-2 text-[11px] font-semibold text-slate-200 shadow-2xl opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-        {{ props.gameTime.isUnits ? `In-game time units (${props.gameTime.dateShort}) of your current session.` : 'In-game time of your current session.' }}
-      </div>
+  <div
+    v-if="props.gameTime"
+    class="game-clock group relative flex h-9 shrink-0 select-none items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/80 pl-1 pr-2.5 shadow-lg backdrop-blur-md transition-all sm:pr-3"
+    :class="{ 'clock-tick': props.clockTick }"
+    :aria-label="tooltip"
+    role="timer"
+  >
+    <!-- Time-of-day icon with day-progress ring -->
+    <div class="relative flex h-7 w-7 shrink-0 items-center justify-center">
+      <svg v-if="!props.gameTime.isUnits" class="absolute inset-0 -rotate-90" viewBox="0 0 34 34" aria-hidden="true">
+        <circle cx="17" cy="17" :r="RING_RADIUS" fill="none" stroke="rgba(51,65,85,0.7)" stroke-width="2" />
+        <circle
+          cx="17"
+          cy="17"
+          :r="RING_RADIUS"
+          fill="none"
+          :stroke="phase.ring"
+          stroke-width="2"
+          stroke-linecap="round"
+          :stroke-dasharray="RING_CIRCUMFERENCE"
+          :stroke-dashoffset="ringOffset"
+          class="transition-[stroke-dashoffset] duration-700"
+        />
+      </svg>
+      <Hourglass v-if="props.gameTime.isUnits" class="h-4 w-4 text-cyan-300" />
+      <component :is="phase.icon" v-else :class="['h-3.5 w-3.5', phase.tone]" />
+    </div>
+
+    <div class="flex min-w-0 flex-col justify-center leading-none">
+      <span class="clock-font hidden max-w-[7rem] truncate text-[9px] uppercase tracking-[0.18em] text-slate-400 sm:block">
+        {{ props.gameTime.dateShort }}
+      </span>
+      <span
+        class="clock-font clock-time whitespace-nowrap text-sm tabular-nums tracking-wider sm:mt-0.5"
+        :class="props.gameTime.isUnits ? 'text-cyan-200' : 'text-slate-100'"
+      >
+        {{ props.gameTime.time }}
+      </span>
+    </div>
+
+    <div
+      class="pointer-events-none absolute right-0 top-full z-50 mt-2 w-max max-w-xs rounded-lg border border-slate-700/60 bg-slate-900/95 px-3 py-2 text-[11px] font-semibold text-slate-200 opacity-0 shadow-2xl transition-opacity duration-200 group-hover:opacity-100"
+    >
+      {{ tooltip }}
     </div>
   </div>
 </template>
 
 <style scoped>
-@font-face {
-  font-family: 'OrbitronClock';
-  src: url('/assets/fonts/Orbitron-VariableFont_wght.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
+.clock-font {
+  font-family: 'Acme', sans-serif;
 }
 
-.game-clock .clock-time,
-.game-clock .clock-date {
-  font-family: 'OrbitronClock', monospace;
+.clock-tick {
+  animation: clockGlow 0.6s ease-out;
 }
 
-.clock-tick span {
+.clock-tick .clock-time {
   animation: clockPulse 0.6s ease-out;
 }
 
+@keyframes clockGlow {
+  0% { border-color: rgba(251, 191, 36, 0.7); box-shadow: 0 0 16px -2px rgba(251, 191, 36, 0.5); }
+  100% { border-color: rgba(51, 65, 85, 0.6); box-shadow: none; }
+}
+
 @keyframes clockPulse {
-  0%   { color: #fbbf24; text-shadow: 0 0 12px rgba(251,191,36,0.8); }
-  100% { color: inherit;  text-shadow: none; }
+  0% { color: #fbbf24; }
+  100% { color: inherit; }
 }
 </style>
-

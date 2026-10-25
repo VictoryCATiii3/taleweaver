@@ -24,6 +24,7 @@ import ImmersiveInputBar from './immersive/ImmersiveInputBar.vue'
 import SceneTransitionOverlay from './immersive/SceneTransitionOverlay.vue'
 import CinematicSequenceOverlay from './immersive/CinematicSequenceOverlay.vue'
 import PlayAgentPanel from './immersive/PlayAgentPanel.vue'
+import type { SettingsTabId } from './settings/types'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -79,7 +80,7 @@ const emit = defineEmits<{
   openQuests: []
   openChronicles: []
   openMemories: []
-  openSettings: []
+  openSettings: [tab?: SettingsTabId]
   openDebug: []
   openWalkthrough: []
   npcHover: [entityOrName: any, event: MouseEvent]
@@ -236,7 +237,7 @@ defineExpose({
       @open-chronicles="emit('openChronicles')"
       @open-quests="emit('openQuests')"
       @open-memories="emit('openMemories')"
-      @open-settings="emit('openSettings')"
+      @open-settings="(tab?: SettingsTabId) => emit('openSettings', tab)"
       @open-debug="emit('openDebug')"
       @toggle-mobile-interact="showMobileInteract = !showMobileInteract"
       @exit-session="emit('exitSession')"

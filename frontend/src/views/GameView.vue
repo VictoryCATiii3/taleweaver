@@ -32,6 +32,7 @@ import ContextMenu from '@/components/game/ContextMenu.vue'
 import SetupWarningBanner from '@/components/portal/SetupWarningBanner.vue'
 import SessionNoteModal from '@/components/portal/SessionNoteModal.vue'
 import SessionSettingsModal from '@/components/game/SessionSettingsModal.vue'
+import type { SessionSettingsPayload, SettingsTabId } from '@/components/game/settings/types'
 import WorldMemoriesModal from '@/components/game/WorldMemoriesModal.vue'
 import DebugModal from '@/components/game/DebugModal.vue'
 import { api } from '@/composables/useApi'
@@ -141,18 +142,29 @@ const saveSessionNote = async (note: string) => {
 }
 
 const showSettingsModal = ref(false)
+const settingsInitialTab = ref<SettingsTabId>('memory')
 const showMemoriesModal = ref(false)
 const isSavingSettings = ref(false)
 
 const autoSpeakNarration = ref(localStorage.getItem('tw_autoSpeakNarration') !== 'false')
 const autoSpeakDialogues = ref(localStorage.getItem('tw_autoSpeakDialogues') !== 'false')
 
-const saveSessionSettings = async (payload: { turns: number; enableCompression?: boolean; autoSpeakNarration: boolean; autoSpeakDialogues: boolean }) => {
+const openSettingsModal = (tab: SettingsTabId = 'memory') => {
+  settingsInitialTab.value = tab
+  showSettingsModal.value = true
+}
+
+const saveSessionSettings = async (payload: SessionSettingsPayload) => {
   isSavingSettings.value = true
   localStorage.setItem('tw_autoSpeakNarration', String(payload.autoSpeakNarration))
   localStorage.setItem('tw_autoSpeakDialogues', String(payload.autoSpeakDialogues))
   autoSpeakNarration.value = payload.autoSpeakNarration
   autoSpeakDialogues.value = payload.autoSpeakDialogues
+  language.value = payload.language
+  // The save click is a user gesture, so this is the moment to unlock audio playback.
+  if (payload.autoSpeech !== audioService.autoSpeechEnabled.value) {
+    audioService.toggleAutoSpeech()
+  }
 
   try {
     await api.updateSession(props.id, {
@@ -221,6 +233,7 @@ const {
   retryLastAction,
   cancelTurnError,
   isLegacyFormat,
+  language,
 } = useGameSocket()
 
 const showLegacyFormatWarning = ref(true)
@@ -1688,7 +1701,7 @@ usePlayAgentAutoLoop()
       @open-quests="showQuests = true"
       @open-chronicles="openChroniclesModal"
       @open-memories="showMemoriesModal = true"
-      @open-settings="showSettingsModal = true"
+      @open-settings="openSettingsModal"
       @open-debug="openDebugInspector"
       @open-walkthrough="openWalkthroughPanel"
       @npc-hover="(ent, event) => typeof ent === 'object' && ent !== null ? handleHover(ent, event) : handleChatNpcHover(ent, event)"
@@ -1753,8 +1766,12 @@ usePlayAgentAutoLoop()
       v-if="showSettingsModal"
       :initial-turns="sheet?.max_memory_turns ?? 10"
       :initial-compression="sheet?.enable_history_compression ?? true"
+      :initial-auto-speech="audioService.autoSpeechEnabled.value"
       :initial-auto-speak-narration="autoSpeakNarration"
       :initial-auto-speak-dialogues="autoSpeakDialogues"
+      :initial-language="language"
+      :initial-tab="settingsInitialTab"
+      :tts-available="configState.isTtsEnabled"
       :is-saving="isSavingSettings"
       @close="showSettingsModal = false"
       @save="saveSessionSettings"

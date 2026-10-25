@@ -1,237 +1,187 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { Sliders, X, BrainCircuit, Sparkles } from 'lucide-vue-next'
+/**
+ * SessionSettingsModal — Tabbed in-game settings (memory, voice, translation).
+ *
+ * Renders as a bottom sheet on mobile and as a centered dialog on larger screens.
+ * All values are edited locally and only applied when the player saves.
+ */
+import { ref, onMounted, onUnmounted } from 'vue'
+import { Sliders, X, BrainCircuit, Volume2 } from 'lucide-vue-next'
+import SettingsMemoryTab from './settings/SettingsMemoryTab.vue'
+import SettingsVoiceTab from './settings/SettingsVoiceTab.vue'
+import SettingsTranslationTab from './settings/SettingsTranslationTab.vue'
+import type { SessionSettingsPayload, SettingsTabId } from './settings/types'
 
 const props = defineProps<{
   initialTurns?: number
   initialCompression?: boolean
+  initialAutoSpeech?: boolean
   initialAutoSpeakNarration?: boolean
   initialAutoSpeakDialogues?: boolean
+  initialLanguage?: string
+  initialTab?: SettingsTabId
+  ttsAvailable?: boolean
   isSaving?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'save', payload: { turns: number; enableCompression: boolean; autoSpeakNarration: boolean; autoSpeakDialogues: boolean }): void
+  (e: 'save', payload: SessionSettingsPayload): void
 }>()
 
+const TABS: { id: SettingsTabId; label: string }[] = [
+  { id: 'memory', label: 'Memory' },
+  { id: 'voice', label: 'Voice' },
+  { id: 'translation', label: 'Translation' },
+]
+
+const activeTab = ref<SettingsTabId>(props.initialTab ?? 'memory')
 const turns = ref(10)
-const enableCompression = ref(true)
-const autoSpeakNarration = ref(true)
-const autoSpeakDialogues = ref(true)
+const enableCompression = ref(props.initialCompression ?? true)
+const autoSpeech = ref(props.initialAutoSpeech ?? false)
+const autoSpeakNarration = ref(props.initialAutoSpeakNarration ?? true)
+const autoSpeakDialogues = ref(props.initialAutoSpeakDialogues ?? true)
+const language = ref(props.initialLanguage ?? '')
 
-onMounted(() => {
-  if (typeof props.initialTurns === 'number' && props.initialTurns >= 1) {
-    turns.value = Math.min(100, Math.max(1, props.initialTurns))
-  }
-  if (typeof props.initialCompression === 'boolean') {
-    enableCompression.value = props.initialCompression
-  }
-  if (typeof props.initialAutoSpeakNarration === 'boolean') {
-    autoSpeakNarration.value = props.initialAutoSpeakNarration
-  }
-  if (typeof props.initialAutoSpeakDialogues === 'boolean') {
-    autoSpeakDialogues.value = props.initialAutoSpeakDialogues
-  }
-})
+if (typeof props.initialTurns === 'number' && props.initialTurns >= 1) {
+  turns.value = Math.min(100, Math.max(1, props.initialTurns))
+}
 
-const tokenProfile = computed(() => {
-  if (turns.value <= 10) {
-    return {
-      label: 'Balanced Default (10 turns)',
-      class: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
-      description: 'Default setting (10 turns). Balances rich narrative continuity across scenes with efficient token usage before compacting.'
-    }
+function isTabActive(id: SettingsTabId): boolean {
+  if (id === 'voice') {
+    return !!props.ttsAvailable && autoSpeech.value
   }
-  if (turns.value <= 30) {
-    return {
-      label: 'Extended Memory',
-      class: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10',
-      description: 'Retains more uncompacted turns. Moderately increased token consumption per turn.'
-    }
+  if (id === 'translation') {
+    return !!language.value
   }
-  return {
-    label: 'Deep Memory',
-    class: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
-    description: 'Extensive narrative recall over many turns. Best for intricate plots, but consumes significantly more LLM tokens each turn.'
-  }
-})
+  return false
+}
 
-function handleInput(event: Event) {
-  const raw = Number((event.target as HTMLInputElement).value)
-  if (!isNaN(raw)) {
-    turns.value = Math.min(100, Math.max(1, raw))
+function save() {
+  emit('save', {
+    turns: turns.value,
+    enableCompression: enableCompression.value,
+    autoSpeech: autoSpeech.value,
+    autoSpeakNarration: autoSpeakNarration.value,
+    autoSpeakDialogues: autoSpeakDialogues.value,
+    language: language.value,
+  })
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    emit('close')
   }
 }
+
+onMounted(() => window.addEventListener('keydown', handleKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in" @click.self="emit('close')">
-    <div class="w-full max-w-lg rounded-3xl bg-slate-900 border border-white/10 shadow-2xl overflow-hidden" @click.stop>
+  <div
+    class="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm sm:items-center sm:p-4 animate-fade-in"
+    @click.self="emit('close')"
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="session-settings-title"
+      class="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-slate-900 shadow-2xl sm:max-h-[85vh] sm:max-w-xl sm:rounded-3xl animate-sheet-in"
+      @click.stop
+    >
+      <!-- Mobile grab handle -->
+      <div class="flex justify-center pt-2 sm:hidden" aria-hidden="true">
+        <span class="h-1 w-10 rounded-full bg-slate-700"></span>
+      </div>
+
       <!-- Header -->
-      <div class="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-slate-950/40">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 shadow-inner">
-            <Sliders class="w-5 h-5 text-amber-400" />
+      <div class="flex items-center justify-between gap-3 px-5 pb-3 pt-3 sm:px-6 sm:pt-5">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-500/40 bg-amber-500/15">
+            <Sliders class="h-5 w-5 text-amber-400" />
           </div>
-          <div>
-            <h3 class="text-base sm:text-lg font-black text-white font-display uppercase tracking-wider">Session Memory & Settings</h3>
-            <p class="text-xs text-slate-400">Configure LLM context memory for this active session.</p>
+          <div class="min-w-0">
+            <h3 id="session-settings-title" class="font-display text-base font-black uppercase tracking-wider text-white sm:text-lg">
+              Session Settings
+            </h3>
+            <p class="truncate text-xs text-slate-400">Applies to this adventure session only.</p>
           </div>
         </div>
-        <button 
-          class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors"
-          @click="emit('close')"
+        <button
+          type="button"
+          class="rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/5 hover:text-white cursor-pointer"
           title="Close"
+          aria-label="Close settings"
+          @click="emit('close')"
         >
-          <X class="w-5 h-5" />
+          <X class="h-5 w-5" />
         </button>
       </div>
 
-      <!-- Content -->
-      <div class="px-6 py-6 flex flex-col gap-6">
-        <!-- Memory Turns Slider Panel -->
-        <div class="space-y-4">
-          <div class="flex justify-between items-start gap-4">
-            <div>
-              <label class="block text-xs font-black uppercase tracking-widest text-slate-300">Narrator Turn Memory</label>
-              <p class="text-xs text-slate-400 mt-1">
-                Number of past turns passed to the narrator in this session.
-              </p>
-            </div>
-            <div class="flex items-center gap-2 bg-black/60 border border-white/15 px-3 py-1.5 rounded-xl shrink-0">
-              <input
-                type="number"
-                min="1"
-                max="100"
-                :value="turns"
-                @input="handleInput"
-                class="w-12 bg-transparent text-center text-white font-mono font-bold text-sm focus:outline-none"
-              />
-              <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Turns</span>
-            </div>
-          </div>
-
-          <!-- Slider -->
-          <div class="space-y-2 pt-2">
-            <input
-              type="range"
-              min="1"
-              max="100"
-              :value="turns"
-              @input="handleInput"
-              class="w-full accent-amber-500 cursor-pointer h-2 bg-slate-800 rounded-lg"
-            />
-            <div class="flex justify-between items-center text-[10px] text-slate-500 uppercase tracking-widest">
-              <span>1 Turn</span>
-              <span class="text-amber-400 font-bold">10 Default</span>
-              <span>100 Turns</span>
-            </div>
-          </div>
-
-          <!-- Token Impact Profile Badge & Explanation -->
-          <div :class="['rounded-2xl border p-4 space-y-2 transition-all', tokenProfile.class]">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <BrainCircuit class="w-4 h-4" />
-                <span class="text-xs font-black uppercase tracking-wider">{{ tokenProfile.label }}</span>
-              </div>
-              <span class="text-[11px] font-mono font-bold">{{ turns }} / 100 turns</span>
-            </div>
-            <p class="text-xs opacity-90 leading-relaxed">
-              {{ tokenProfile.description }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Automatic History Compression Checkbox/Toggle -->
-        <div class="flex items-start justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <label class="block text-xs font-black uppercase tracking-widest text-slate-200 cursor-pointer" @click="enableCompression = !enableCompression">
-                Automatic History Compression
-              </label>
-              <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                English
-              </span>
-            </div>
-            <p class="text-xs text-slate-400 leading-relaxed">
-              When turns exceed the memory limit, older turns are automatically compressed into an English chronicle summary and passed to the narrator.
-            </p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-            <input type="checkbox" v-model="enableCompression" class="sr-only peer">
-            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-white"></div>
-          </label>
-        </div>
-
-        <!-- Auto Speak Narrator Checkbox -->
-        <div class="flex items-start justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <label class="block text-xs font-black uppercase tracking-widest text-slate-200 cursor-pointer" @click="autoSpeakNarration = !autoSpeakNarration">
-                Auto-Speak Game Master
-              </label>
-              <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                Audio
-              </span>
-            </div>
-            <p class="text-xs text-slate-400 leading-relaxed">
-              Automatically generate and play voice audio for the Game Master's narration texts when Auto-Speak is enabled.
-            </p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-            <input type="checkbox" v-model="autoSpeakNarration" class="sr-only peer">
-            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-white"></div>
-          </label>
-        </div>
-
-        <!-- Auto Speak Dialogues Checkbox -->
-        <div class="flex items-start justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <label class="block text-xs font-black uppercase tracking-widest text-slate-200 cursor-pointer" @click="autoSpeakDialogues = !autoSpeakDialogues">
-                Auto-Speak Characters
-              </label>
-              <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                Audio
-              </span>
-            </div>
-            <p class="text-xs text-slate-400 leading-relaxed">
-              Automatically generate and play voice audio for NPC and player character dialogue bubbles when Auto-Speak is enabled.
-            </p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-            <input type="checkbox" v-model="autoSpeakDialogues" class="sr-only peer">
-            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-white"></div>
-          </label>
-        </div>
-
-        <!-- Helpful tip note -->
-        <div class="flex items-start gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/5 text-slate-400 text-xs leading-relaxed">
-          <Sparkles class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <span>
-            Changes take effect immediately on your next action. Intermediate game events (such as dice rolls) are formatted automatically without consuming extra turns.
-          </span>
+      <!-- Tabs -->
+      <div class="px-5 sm:px-6">
+        <div role="tablist" aria-label="Settings sections" class="grid grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-slate-950/60 p-1">
+          <button
+            v-for="tab in TABS"
+            :key="tab.id"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.id"
+            class="relative flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer"
+            :class="
+              activeTab === tab.id
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            "
+            @click="activeTab = tab.id"
+          >
+            <BrainCircuit v-if="tab.id === 'memory'" class="h-4 w-4 shrink-0" />
+            <Volume2 v-else-if="tab.id === 'voice'" class="h-4 w-4 shrink-0" />
+            <i v-else class="ra ra-fish shrink-0 text-sm"></i>
+            <span class="truncate">{{ tab.label }}</span>
+            <span
+              v-if="isTabActive(tab.id)"
+              class="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full"
+              :class="activeTab === tab.id ? 'bg-slate-950' : 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'"
+            ></span>
+          </button>
         </div>
       </div>
 
+      <!-- Tab content -->
+      <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6" role="tabpanel">
+        <SettingsMemoryTab
+          v-if="activeTab === 'memory'"
+          v-model:turns="turns"
+          v-model:enable-compression="enableCompression"
+        />
+        <SettingsVoiceTab
+          v-else-if="activeTab === 'voice'"
+          v-model:auto-speech="autoSpeech"
+          v-model:auto-speak-narration="autoSpeakNarration"
+          v-model:auto-speak-dialogues="autoSpeakDialogues"
+          :tts-available="!!props.ttsAvailable"
+        />
+        <SettingsTranslationTab v-else v-model:language="language" />
+      </div>
+
       <!-- Footer -->
-      <div class="px-6 py-4 border-t border-white/10 flex justify-end gap-3 bg-slate-950/40">
+      <div class="flex gap-3 border-t border-white/10 bg-slate-950/40 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:justify-end sm:px-6">
         <button
           type="button"
-          class="px-4 py-2 rounded-xl border border-white/15 text-slate-300 text-xs font-bold uppercase tracking-wider hover:bg-white/5 transition-colors"
+          class="flex-1 rounded-xl border border-white/15 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-300 transition-colors hover:bg-white/5 sm:flex-none cursor-pointer"
           @click="emit('close')"
         >
           Cancel
         </button>
         <button
           type="button"
-          class="px-5 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-widest hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer"
+          class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-slate-950 shadow-lg shadow-amber-500/20 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none cursor-pointer"
           :disabled="props.isSaving"
-          @click="emit('save', { turns, enableCompression, autoSpeakNarration, autoSpeakDialogues })"
+          @click="save"
         >
-          <span v-if="props.isSaving" class="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin"></span>
+          <span v-if="props.isSaving" class="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950"></span>
           {{ props.isSaving ? 'Saving...' : 'Save Settings' }}
         </button>
       </div>
@@ -243,8 +193,15 @@ function handleInput(event: Event) {
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
 }
+.animate-sheet-in {
+  animation: sheetIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheetIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
