@@ -76,6 +76,7 @@ graph TD
 ### Pass 1.5: Rule Validation & Reversion (Critical Guardrail)
 * **Design Rule**: Never parse freeform text to identify which entity or container the player is interacting with.
 * Instead, systematically inspect any state updates requested by the LLM in Pass 1:
+  * **Sequence Soft Rules** (`guardrails/soft_rules.py`, `engine/soft_rules.py`): sequences may declare `soft_rules` (`id`, natural-language `condition`, `script`, `text`, `guard_expression`, `max_triggers`). Pass 1 only sees `{id, condition}` of the active sequence's open rules and reports fulfilled ones in `triggered_soft_rule_ids`; Pass 1.5 runs first in the chain, checks sequence scope, trigger limit (`entity_states["__soft_rule_counts__"]`) and guard, then executes the script. Rejected rules are dropped silently (not violations).
   * **Containers & Exits (Deterministic Unlock Guard)**: Validate if `item_to_unlock` is in inventory, `unlock_code` matches, or if deterministic guard `unlock_expression` evaluates to truthy. Execute `on_unlock_success` or `on_unlock_failure` scripts accordingly.
   * **Exits & Movement**: Validate exit locks, destination scene graph connectivity, and fire transition hooks (`on_leave_scene`, `on_open_exit`, `on_exit_used`, `on_enter_scene`) while preventing accidental teleports from hypothetical chat.
   * **Switches**: Verify state transitions match allowed `switch_states`.

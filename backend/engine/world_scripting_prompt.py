@@ -89,6 +89,7 @@ TW_API_REFERENCE = (
     "unlock(from_scene_id, to_scene_id)  (ALWAYS pass the two scene IDs of the exit)\n"
     "- tw.npcs / tw.objects (alias tw.items): get(id), exists(id), say(id, text), move(id, scene_id), "
     "move_to_player(id), kill(id), give_item(npc_id, item_id), drop_item(npc_id, item_id, scene_id=None), "
+    "give_to_player(npc_id, item_id) (NPC hands an item it carries to the protagonist; None if it lacks it), "
     "attack(npc_id) (an NPC in the current scene starts turn-based combat after the turn)\n"
     "- entity proxies from get(): id, name, current_scene_id, is_hidden, set_hidden(bool); NPCs also hp, is_defeated, say(text), attack(); "
     "objects also state, switch_state, flip(), toggle()\n"
@@ -154,6 +155,10 @@ _EXAMPLES = (
     "       tw.story.show_message('The insult is so brutal that the troll starts to cry.')\n"
     "16. Special attack unlock guard (protagonist special_actions entry with is_locked=true):\n"
     "   unlock_guard_expression = \"tw.vars.get('trained_with_master') == True\"\n"
+    "17. NPC hands over an item (sequence soft_rules entry: condition='Arthur flirts with Brenda', "
+    "max_triggers=1, script):\n"
+    "   if tw.npcs.give_to_player('BRENDA', 'BRENDA_KEY'):\\n"
+    "       tw.npcs.say('BRENDA', 'Fine, charmer. Take it before I change my mind.')\n"
 )
 
 

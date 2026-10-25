@@ -14,6 +14,7 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from backend.api.routes.adventures.logic import AdventureLogic
 from backend.engine.rule_engine import GameEvent, GameOverException, RuleEngine
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,13 @@ async def run_guardrail_chain(
     """Runs Pass 1.5 (deterministic rule enforcement) and applies the validated event.
 
     Violations are appended to `rule_violations` so Pass 2 narrates the failure.
+    Soft rules run first, against the sequence active when the message started; their
+    outcomes are regular events, not violations.
     """
+    active_sequence = AdventureLogic.resolve_active_sequence(manager.adventure, manager.state)
+    for message in await manager.guardrails._enforce_soft_rules(game_event, active_sequence):
+        yield sse_system(message)
+
     for method_name, takes_user_msg in _GUARDRAIL_STEPS:
         enforce = getattr(manager, method_name)
         args = (game_event, user_msg) if takes_user_msg else (game_event,)

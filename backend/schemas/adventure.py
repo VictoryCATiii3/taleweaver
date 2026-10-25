@@ -17,6 +17,15 @@ class QuestSchema(BaseModel):
     guard_expression: Optional[str] = ""
 
 
+class SoftRuleSchema(BaseModel):
+    id: str
+    condition: str
+    script: Optional[str] = ""
+    text: Optional[str] = ""
+    guard_expression: Optional[str] = ""
+    max_triggers: Optional[int] = None
+
+
 class SequenceSchema(BaseModel):
     id: str
     order: int
@@ -34,6 +43,7 @@ class SequenceSchema(BaseModel):
     on_start_sequence_text: Optional[str] = ""
     on_end_sequence_script: Optional[str] = ""
     on_end_sequence_text: Optional[str] = ""
+    soft_rules: list[SoftRuleSchema] = Field(default_factory=list)
 
 
 class AwardSchema(BaseModel):

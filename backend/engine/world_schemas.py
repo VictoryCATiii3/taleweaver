@@ -672,6 +672,32 @@ class WorldObjectSchema(WorldBaseSchema):
     model_config = {"extra": "forbid"}
 
 
+class SoftRuleSchema(WorldBaseSchema):
+    id: str = Field(..., description="Unique slug for the soft rule, e.g. BRENDA_FLIRT")
+    condition: str = Field(
+        ...,
+        description="Narrative condition judged by the GM, e.g. 'Arthur flirts with Brenda'.",
+    )
+    script: Optional[str] = Field(
+        default="",
+        description="Script executed when the GM judges the condition fulfilled. Use empty string for none.",
+    )
+    text: Optional[str] = Field(
+        default="",
+        description="Optional text output when the rule fires. Use empty string for none.",
+    )
+    guard_expression: Optional[str] = Field(
+        default="",
+        description="Optional deterministic guard that must also hold, e.g. tw.vars.get('BRENDA_TRUST', 0) >= 0. Keep empty if none.",
+    )
+    max_triggers: Optional[int] = Field(
+        default=None,
+        description="How often the rule may fire per session (e.g. 1 for one-time rewards). Null for unlimited.",
+    )
+
+    model_config = {"extra": "ignore"}
+
+
 class SequenceSchema(WorldBaseSchema):
     id: str = Field(..., description="Unique slug for the sequence, e.g., SEQ_1_DRAGON")
     order: int = Field(..., description="The sequence order (1, 2, 3...)")
@@ -721,6 +747,10 @@ class SequenceSchema(WorldBaseSchema):
     on_end_sequence_text: Optional[str] = Field(
         default="",
         description="Optional text output when this sequence ends/completes. Use empty string for none.",
+    )
+    soft_rules: list[SoftRuleSchema] = Field(
+        default_factory=list,
+        description="Narrative rules only active during this sequence: the GM judges the condition, the engine runs the script. Use [] if none.",
     )
 
     model_config = {"extra": "ignore"}

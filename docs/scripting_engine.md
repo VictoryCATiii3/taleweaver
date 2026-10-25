@@ -32,6 +32,7 @@ The **TaleWeaver Scripting Engine** provides a secure, sandboxed environment for
    - [Example 5: Turn-Based Survival Countdown](#example-5-turn-based-survival-countdown)
    - [Example 8: Switch Mechanism State & Guard Expression](#example-8-switch-mechanism-state--guard-expression)
    - [Example 9: Global Init Script with Helper Functions](#example-9-global-init-script-with-helper-functions)
+   - [Example 10: NPC Hands the Player an Item (Sequence Soft Rule)](#example-10-npc-hands-the-player-an-item-sequence-soft-rule)
 7. [Authoring in the World-Editor](#authoring-in-the-world-editor)
 
 ---
@@ -164,6 +165,23 @@ For **all assets** in TaleWeaver (Win/Loss conditions, Sequences, Quests, Awards
 > **Use EITHER a soft narrative rule OR deterministic hard rules / scripted guards, but NOT both on the same asset.**
 > 
 > Mixing a narrative soft rule and a scripted guard expression on the same asset causes ambiguous triggers and LLM hallucination conflicts. If an asset has hard rules or guard expressions, leave its soft narrative rule empty or purely decorative. If an asset relies on narrative GM judgment, leave its hard rules and guard expressions empty.
+>
+> **Exception: sequence soft rules.** A `soft_rules` entry on a sequence is built to combine both: the GM judges the narrative `condition`, and the optional `guard_expression` is a deterministic *precondition* that must also hold. They never compete, because the guard can only veto, never trigger.
+
+### Sequence Soft Rules
+
+Sequences can declare `soft_rules`, which are active only while that sequence is active. Each rule pairs a narrative condition with a deterministic effect:
+
+| Field | Purpose |
+|---|---|
+| `id` | Unique slug, e.g. `BRENDA_FLIRT`. |
+| `condition` | Natural-language condition judged by the GM, e.g. `"Arthur flirts with Brenda"`. |
+| `script` | Script executed when the rule fires (trigger name `on_soft_rule`). |
+| `text` | Optional system message shown when the rule fires. |
+| `guard_expression` | Optional deterministic precondition; the rule is ignored while it is falsy. |
+| `max_triggers` | How often the rule may fire per session (`1` for one-time rewards); empty means unlimited. |
+
+Pass 1 only ever sees each open rule's `id` and `condition` (never the script or guard) and reports fulfilled rules in `triggered_soft_rule_ids`. Pass 1.5 then checks each one in reported order: it must belong to the sequence active when the message started, be under its trigger limit, and pass its guard. Only then does the script run. Later rules see the effects of earlier ones in the same message. Rules that fail a check are dropped silently (with a `[DEBUG soft_rule …]` line in debug mode).
 
 ### Deterministic Guard Expressions
 
@@ -289,6 +307,7 @@ Inspects, dialogues with, moves, and manages Non-Player Characters:
 - `tw.npcs.move_to_player(npc_id: str, spatial_position: str = "")`: Convenience shortcut to move an NPC directly into the player's current scene.
 - `tw.npcs.drop_item(npc_id: str, item_id: str, scene_id: str = None, spatial_position: str = "")`: Transfers an item from an NPC's inventory into a scene. If `scene_id` is omitted, it drops into the NPC's current scene; passing `"current"` drops it into the player's scene.
 - `tw.npcs.give_item(npc_id: str, item_id: str)`: Transfers an item from a scene into an NPC's inventory and conceals it from the scene view.
+- `tw.npcs.give_to_player(npc_id: str, item_id: str) -> dict | None`: Hands an item the NPC carries directly to the protagonist. The item leaves the NPC's inventory and keeps its world entity data (name, description, image, stats). Returns the new inventory entry, or `None` (and changes nothing) if the NPC doesn't hold the item, so scripts can't conjure items.
 - `tw.npcs.kill(npc_id: str, drop_inventory: bool = True)`: Kills the NPC, setting HP to 0 and marking `is_defeated: True`. When `drop_inventory=True` (default), all items held by the NPC are dropped into their scene.
 - `tw.npcs.attack(npc_id: str)`: Makes an NPC attack the protagonist. Turn-based combat starts right after the current turn if the NPC is in the protagonist's scene, alive and attackable (ignored while a fight is already running). Example (`on_turn_end`): `if tw.player.has_item('IDOL') and not tw.vars.get('alarm'): tw.vars.set('alarm', True); tw.npcs.attack('TEMPLE_GUARD')`.
 - `tw.npcs.get(npc_id: str) -> NPCProxy`: Returns an `NPCProxy` instance. Available properties and methods on `NPCProxy`:
@@ -298,6 +317,7 @@ Inspects, dialogues with, moves, and manages Non-Player Characters:
   - `.move_to_player(spatial_position: str = "")`
   - `.drop_item(item_id: str, scene_id: str = None, spatial_position: str = "")`
   - `.give_item(item_id: str)`
+  - `.give_to_player(item_id: str) -> dict | None`
   - `.has_item(item_id: str) -> bool`
   - `.kill(drop_inventory: bool = True)` / `.die()`
   - `.attack()` (see `tw.npcs.attack`)
@@ -598,6 +618,24 @@ Event Script using `discover_clue` (Trigger: `on_interact`, Target: `ITEM_SECRET
 discover_clue("Conspirator Journal")
 tw.player.remove_item("ITEM_SECRET_JOURNAL")
 ```
+
+### Example 10: NPC Hands the Player an Item (Sequence Soft Rule)
+Configured in: **Sequence → Soft Rules** (sequence `SEQ_1_TAVERN`, NPC `BRENDA` carries `BRENDA_KEY`)
+
+Soft rule `BRENDA_ANGRY`, condition *"Arthur makes Brenda angry"*:
+```python
+tw.vars.set("BRENDA_TRUST", tw.vars.get("BRENDA_TRUST", 0) - 1)
+```
+
+Soft rule `BRENDA_FLIRT`, condition *"Arthur flirts with Brenda"*, `max_triggers: 1`, guard `tw.vars.get("BRENDA_TRUST", 0) >= 0 and tw.npcs.get("BRENDA").current_scene_id == tw.scene.id`:
+```python
+key = tw.npcs.give_to_player("BRENDA", "BRENDA_KEY")
+if key:
+    tw.npcs.say("BRENDA", "Fine, charmer. Take it before I change my mind.")
+    tw.story.show_message("Brenda slips you " + key["name"] + ".")
+```
+
+If Arthur has angered Brenda first, the guard fails and the flirt has no mechanical effect. Because `give_to_player` returns `None` when Brenda no longer holds the key, the dialogue only plays when the hand-over actually happens.
 
 ---
 

@@ -20,6 +20,11 @@ from backend.api.routes.adventures.turn_context_helpers import (
 )
 from backend.core.llm_logger import log_structured_event
 from backend.engine.memory_manager import MemoryManager
+from backend.engine.soft_rules import (
+    build_soft_rules_prompt_block,
+    fired_counts,
+    sequence_soft_rules,
+)
 from backend.models.chat import ChatMessage
 from backend.models.world_entity import WorldEntity, WorldExit, WorldScene
 
@@ -77,7 +82,9 @@ class TurnLlmContextBuilder:
 
     @staticmethod
     def _is_entity_locked_by_requirements(entity: WorldEntity, overrides: dict[str, Any]) -> bool:
-        state_locked = (overrides.get(entity.id) or {}).get("locked") if isinstance(overrides, dict) else None
+        state_locked = (
+            (overrides.get(entity.id) or {}).get("locked") if isinstance(overrides, dict) else None
+        )
         if isinstance(state_locked, bool):
             return state_locked
 
@@ -309,8 +316,15 @@ class TurnLlmContextBuilder:
             + self.manager._build_compressed_history_prompt_block()
             + self.manager._build_world_memories_prompt_block()
         )
+        soft_rules_block = build_soft_rules_prompt_block(
+            sequence_soft_rules(AdventureLogic.resolve_active_sequence(adventure, state)),
+            fired_counts(state.entity_states),
+        )
         return (
-            mechanics_state_block + session_memory_block + global_unlock_rules_prompt_block,
+            mechanics_state_block
+            + session_memory_block
+            + global_unlock_rules_prompt_block
+            + soft_rules_block,
             narration_state_block + session_memory_block,
         )
 

@@ -14,6 +14,7 @@ from backend.api.routes.adventures.guardrails.locks import LockEngineMixin
 from backend.api.routes.adventures.guardrails.progress import ProgressGuardMixin
 from backend.api.routes.adventures.guardrails.reading import ReadingMixin
 from backend.api.routes.adventures.guardrails.reveals import RevealGuardMixin
+from backend.api.routes.adventures.guardrails.soft_rules import SoftRuleGuardMixin
 from backend.api.routes.adventures.guardrails.world_rules import WorldRulesMixin
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ class TurnGuardrailsManager(
     CraftingGuardMixin,
     RevealGuardMixin,
     ProgressGuardMixin,
+    SoftRuleGuardMixin,
     WorldRulesMixin,
     ReadingMixin,
     GuardrailBase,

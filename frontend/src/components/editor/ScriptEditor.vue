@@ -104,7 +104,7 @@ const availableSnippets = computed(() => {
     },
     {
       label: 'Transfer item (NPC)',
-      code: '# Drop from NPC into scene:\ntw.npcs.drop_item("NPC_ID", "ITEM_ID")\n# Or give item to NPC:\n# tw.npcs.give_item("NPC_ID", "ITEM_ID")\n',
+      code: '# NPC hands an item it carries to the player:\ntw.npcs.give_to_player("NPC_ID", "ITEM_ID")\n# Or drop from NPC into scene:\n# tw.npcs.drop_item("NPC_ID", "ITEM_ID")\n# Or give item to NPC:\n# tw.npcs.give_item("NPC_ID", "ITEM_ID")\n',
     },
     {
       label: 'Defeat / Kill NPC',
@@ -117,6 +117,20 @@ const availableSnippets = computed(() => {
       {
         label: 'Pickup curse / buff',
         code: 'tw.player.set_stat("strength", tw.player.get_stat("strength", 10) + 2)\ntw.narrate("You feel surging power coursing through your veins.")\n',
+      },
+      ...common,
+    ]
+  }
+
+  if (props.context === 'soft_rule') {
+    return [
+      {
+        label: 'NPC hands player an item',
+        code: 'item = tw.npcs.give_to_player("NPC_ID", "ITEM_ID")\nif item:\n    tw.npcs.say("NPC_ID", "Here, take it.")\n',
+      },
+      {
+        label: 'Change NPC trust',
+        code: 'tw.vars.set("NPC_TRUST", tw.vars.get("NPC_TRUST", 0) - 1)\n',
       },
       ...common,
     ]

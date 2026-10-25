@@ -383,6 +383,27 @@ def _check_sequences(sequences: Any) -> list[ValidationFinding]:
                     extra_context={"sequence_id": sid},
                 )
             )
+        findings.extend(_check_soft_rules(seq.get("soft_rules"), loc, sid))
+    return findings
+
+
+def _check_soft_rules(rules: Any, loc: str, sid: str) -> list[ValidationFinding]:
+    findings: list[ValidationFinding] = []
+    for rule in rules if isinstance(rules, list) else []:
+        if not isinstance(rule, dict):
+            continue
+        context = {"sequence_id": sid, "soft_rule_id": rule.get("id") or "?"}
+        findings.extend(
+            _validate_guard_expression(
+                rule.get("guard_expression"),
+                "guard_expression",
+                location=loc,
+                extra_context=context,
+            )
+        )
+        findings.extend(
+            _validate_script_code(rule.get("script"), "script", location=loc, extra_context=context)
+        )
     return findings
 
 

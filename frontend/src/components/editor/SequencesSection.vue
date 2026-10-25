@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import ScriptEditor from '@/components/editor/ScriptEditor.vue'
+import SoftRulesEditor from '@/components/editor/SoftRulesEditor.vue'
 import {
   Plus,
   Trash2,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   Sparkles,
   Code2,
+  MessageSquareQuote,
 } from 'lucide-vue-next'
 
 const props = withDefaults(
@@ -90,7 +92,7 @@ const availableNpcs = computed(() => {
 
 const showModal = ref(false)
 const isNewSequence = ref(false)
-const activeModalTab = ref<'general' | 'advanced'>('general')
+const activeModalTab = ref<'general' | 'advanced' | 'soft_rules'>('general')
 const modalSequence = ref<any>({
   id: '',
   order: 1,
@@ -107,6 +109,7 @@ const modalSequence = ref<any>({
   on_start_sequence_text: '',
   on_end_sequence_script: '',
   on_end_sequence_text: '',
+  soft_rules: [],
 })
 
 const showDeleteConfirm = ref(false)
@@ -137,6 +140,7 @@ function openAddModal() {
     on_start_sequence_text: '',
     on_end_sequence_script: '',
     on_end_sequence_text: '',
+    soft_rules: [],
   }
   showModal.value = true
 }
@@ -160,6 +164,7 @@ function openEditModal(seq: any) {
     on_start_sequence_text: seq.on_start_sequence_text || '',
     on_end_sequence_script: seq.on_end_sequence_script || '',
     on_end_sequence_text: seq.on_end_sequence_text || '',
+    soft_rules: seq.soft_rules || [],
   }
   showModal.value = true
 }
@@ -171,6 +176,16 @@ function closeModal() {
 function saveSequence() {
   if (!modalSequence.value.title.trim()) {
     emit('notify', 'Sequence title is required.', 'error')
+    return
+  }
+  const softRules: any[] = modalSequence.value.soft_rules || []
+  const softRuleIds = softRules.map((rule) => String(rule.id || '').trim())
+  if (softRules.some((rule) => !String(rule.condition || '').trim()) || softRuleIds.some((id) => !id)) {
+    emit('notify', 'Every soft rule needs an ID and a condition.', 'error')
+    return
+  }
+  if (new Set(softRuleIds).size !== softRuleIds.length) {
+    emit('notify', 'Soft rule IDs must be unique within the sequence.', 'error')
     return
   }
 
@@ -438,6 +453,15 @@ function confirmDelete() {
               <Sparkles class="w-3.5 h-3.5" />
               <span>Advanced Triggers</span>
               <span v-if="modalSequence.on_start_sequence_script || modalSequence.on_end_sequence_script" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            </button>
+            <button
+              type="button"
+              @click="activeModalTab = 'soft_rules'"
+              :class="['pb-2 text-xs font-black uppercase tracking-widest transition-colors border-b-2 flex items-center gap-1.5', activeModalTab === 'soft_rules' ? 'text-amber-400 border-amber-400' : 'text-slate-500 border-transparent hover:text-white']"
+            >
+              <MessageSquareQuote class="w-3.5 h-3.5" />
+              <span>Soft Rules</span>
+              <span v-if="modalSequence.soft_rules?.length" class="text-[10px] text-amber-300">{{ modalSequence.soft_rules.length }}</span>
             </button>
           </div>
 
@@ -716,6 +740,11 @@ function confirmDelete() {
                 ></textarea>
               </div>
             </div>
+          </div>
+
+          <!-- Soft Rules Tab -->
+          <div v-show="activeModalTab === 'soft_rules'">
+            <SoftRulesEditor v-model="modalSequence.soft_rules" />
           </div>
         </div>
 

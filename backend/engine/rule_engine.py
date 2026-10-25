@@ -313,6 +313,10 @@ class GameEvent(BaseModel):
         False,
         description="Set to true if the protagonist has met the end condition for the current sequence.",
     )
+    triggered_soft_rule_ids: Optional[list[str]] = Field(
+        None,
+        description="IDs from ACTIVE SOFT RULES whose condition the player's action fulfilled this message.",
+    )
 
     combination_intent: bool = Field(
         False,

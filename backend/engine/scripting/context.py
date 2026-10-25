@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from backend.engine.scripting.item_transfer import inventory_entry, take_from_inventory
 from backend.engine.scripting.switch_proxy import SwitchesProxy, SwitchProxy
 
 logger = logging.getLogger(__name__)
@@ -546,6 +547,25 @@ class NPCProxy(EntityProxy):
             }
         )
 
+    def give_to_player(self, item_id: str) -> Optional[dict[str, Any]]:
+        """Hands an item this NPC carries to the protagonist; returns None if the NPC lacks it."""
+        taken, remaining = take_from_inventory(self.inventory, item_id)
+        if taken is None:
+            return None
+        entity_data = self._entity_mgr.item_data(item_id) if self._entity_mgr else None
+        entry = inventory_entry(taken, entity_data)
+        self._changeset.entity_updates.append({"entity_id": self._id, "inventory": remaining})
+        self._changeset.player_new_items.append(entry)
+        self._changeset.entity_updates.append(
+            {
+                "entity_id": entry["id"],
+                "current_scene_id": "INVENTORY",
+                "is_in_inventory": True,
+                "is_hidden": False,
+            }
+        )
+        return entry
+
     def has_item(self, item_id: str) -> bool:
         """Checks if the NPC possesses the specified item."""
         iid = str(item_id).strip().upper()
@@ -722,11 +742,22 @@ class EntityManagerProxy:
         changeset: ScriptChangeset,
         proxy_cls: type[EntityProxy],
         current_player_scene_id: str = "",
+        item_entities: Optional[dict[str, dict[str, Any]]] = None,
     ):
         self._entities = entities
         self._changeset = changeset
         self._proxy_cls = proxy_cls
         self._current_player_scene_id = current_player_scene_id
+        # World items NPC proxies may hand over (keyed by entity ID).
+        self._item_entities = item_entities or {}
+
+    def item_data(self, item_id: str) -> Optional[dict[str, Any]]:
+        """Returns a world item's entity data (case-insensitive ID match)."""
+        target = str(item_id).strip().upper()
+        return next(
+            (data for eid, data in self._item_entities.items() if str(eid).upper() == target),
+            None,
+        )
 
     def get(self, entity_id: str) -> EntityProxy:
         if entity_id in self._entities:
@@ -821,6 +852,11 @@ class EntityManagerProxy:
         ent = self.get(npc_id)
         if isinstance(ent, NPCProxy):
             ent.give_item(item_id_or_dict)
+
+    def give_to_player(self, npc_id: str, item_id: str) -> Optional[dict[str, Any]]:
+        """Hands an item from an NPC's inventory to the protagonist (None if the NPC lacks it)."""
+        ent = self.get(npc_id)
+        return ent.give_to_player(item_id) if isinstance(ent, NPCProxy) else None
 
     def kill(self, entity_id: str, drop_inventory: bool = True) -> None:
         """Kills an NPC by entity ID."""
@@ -1131,28 +1167,23 @@ class GameContext:
         self.changeset = ScriptChangeset()
         self.player = PlayerProxy(avatar_data or {}, self.changeset)
         entity_dict = entities or {}
+        npc_entities = {
+            k: v
+            for k, v in entity_dict.items()
+            if str(v.get("entity_type") or "").upper() == "NPC"
+            or v.get("npc_type")
+            or v.get("is_npc")
+        }
+        object_entities = {k: v for k, v in entity_dict.items() if k not in npc_entities}
         self.npcs = EntityManagerProxy(
-            {
-                k: v
-                for k, v in entity_dict.items()
-                if str(v.get("entity_type") or "").upper() == "NPC"
-                or v.get("npc_type")
-                or v.get("is_npc")
-            },
+            npc_entities,
             self.changeset,
             NPCProxy,
             current_player_scene_id=current_scene_id,
+            item_entities=object_entities,
         )
         self.objects = EntityManagerProxy(
-            {
-                k: v
-                for k, v in entity_dict.items()
-                if not (
-                    str(v.get("entity_type") or "").upper() == "NPC"
-                    or v.get("npc_type")
-                    or v.get("is_npc")
-                )
-            },
+            object_entities,
             self.changeset,
             ObjectProxy,
             current_player_scene_id=current_scene_id,
