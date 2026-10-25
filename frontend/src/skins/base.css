@@ -472,3 +472,13 @@
     animation: none;
   }
 }
+
+/* ---------- Scene image button (top-right of the story area) ---------- */
+.tw-scene-image-button {
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  /* Floats above the story, tabs and overlays. */
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+}

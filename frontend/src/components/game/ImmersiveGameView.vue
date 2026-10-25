@@ -21,6 +21,7 @@ import ImmersiveCharacterStage from './immersive/ImmersiveCharacterStage.vue'
 import ImmersiveStoryTabs from './immersive/ImmersiveStoryTabs.vue'
 import StoryTabPanel from './immersive/tabs/StoryTabPanel.vue'
 import SceneImageViewer from './immersive/SceneImageViewer.vue'
+import { Image as ImageIcon } from 'lucide-vue-next'
 import ImmersiveStoryFeed from './immersive/ImmersiveStoryFeed.vue'
 import ImmersiveActionBar from './immersive/ImmersiveActionBar.vue'
 import ImmersiveInputBar from './immersive/ImmersiveInputBar.vue'
@@ -281,8 +282,6 @@ defineExpose({
       :exp="props.exp"
       :mode="props.mode"
       :debug-mode="!!props.sheet?.debug_mode"
-      :has-scene-image="!!activeSceneImageUrl"
-      @view-scene-image="showSceneImage = true"
       @open-chronicles="emit('openChronicles')"
       @open-quests="emit('openQuests')"
       @open-memories="emit('openMemories')"
@@ -306,8 +305,23 @@ defineExpose({
 
       <!-- 3B. CENTER / STORY AREA WITH SCENE HOTSPOTS & COMIC FEED -->
       <main class="flex-1 flex flex-col justify-between min-h-0 relative overflow-hidden">
+        <!-- Full scene artwork (top-right corner of the story area) -->
+        <!-- Wrapper owns the positioning: .tw-tab sets position: relative on the button itself. -->
+        <div v-if="activeSceneImageUrl" class="absolute right-0 top-0 z-[90]">
+          <button
+            type="button"
+            class="tw-tab tw-scene-image-button"
+            title="View the full scene image"
+            aria-label="View the full scene image"
+            @click="showSceneImage = true"
+          >
+            <ImageIcon class="w-5 h-5" />
+          </button>
+        </div>
+
         <ImmersiveStoryTabs
           v-model="activeStoryTab"
+          :class="{ 'pr-14': activeSceneImageUrl }"
           :exit-count="sceneExits.length"
           :has-locked-exits="hasLockedExits"
           :item-count="sceneItems.length"
