@@ -475,7 +475,7 @@ export function useGameSocket(): UseGameSocket {
       return
     }
 
-    const silentCommands = ['/take_direct', '/rule-pass', '/equip', '/unequip', '/consume', '/shuffle', '/suggest', '/suggestions', '/traverse_exit']
+    const silentCommands = ['/take_direct', '/rule-pass', '/equip', '/unequip', '/consume', '/shuffle', '/suggest', '/suggestions', '/traverse_exit', '/roll']
     const isSilent = silentCommands.some(cmd => normalizedContent.toLowerCase().startsWith(cmd))
 
     if (normalizedContent && !isSilent) {

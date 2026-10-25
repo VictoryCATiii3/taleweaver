@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 SAFE_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"}
 _THUMBNAIL_SIZE = (480, 480)
 _SECONDS_PER_DAY = 24 * 60 * 60
+# Monotonic timestamp of the last stale-dir sweep (see cleanup_stale_empty_session_dirs).
+_CLEANUP_STATE: dict[str, Optional[float]] = {"last_run": None}
 
 
 def sessions_root() -> str:
@@ -279,10 +281,21 @@ def _orphaned_session_dirs(root: str, active_session_ids: set[str]) -> list[str]
     return [path for path in candidates if os.path.isdir(path)]
 
 
-def cleanup_stale_empty_session_dirs(active_session_ids: set[str], max_age_days: int) -> int:
-    """Remove orphaned empty session directories older than max_age_days."""
+def cleanup_stale_empty_session_dirs(
+    active_session_ids: set[str], max_age_days: int, min_interval_seconds: float = 0.0
+) -> int:
+    """Remove orphaned empty session directories older than max_age_days.
+
+    With ``min_interval_seconds`` the sweep is skipped when the last one ran more recently;
+    it touches every session folder, which takes seconds once thousands exist.
+    """
     if max_age_days <= 0:
         return 0
+    now = time.monotonic()
+    last_run = _CLEANUP_STATE["last_run"]
+    if last_run is not None and now - last_run < min_interval_seconds:
+        return 0
+    _CLEANUP_STATE["last_run"] = now
     root = sessions_root()
     if not os.path.isdir(root):
         return 0

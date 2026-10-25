@@ -4,6 +4,7 @@
  *
  * Displays an atmospheric, cinematic title overlay across the story chat
  * when entering a new sequence/chapter, with gentle fade in and out.
+ * Colors and fonts follow the active dialog skin (--tw-overlay-* tokens).
  */
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
@@ -77,20 +78,22 @@ onBeforeUnmount(() => {
   <Transition name="cinematic-fade">
     <div
       v-if="isVisible && displayedSequence"
-      class="absolute inset-0 z-[70] flex flex-col items-center justify-center p-6 select-none bg-slate-950/90 backdrop-blur-md cursor-pointer overflow-hidden"
+      class="tw-overlay tw-overlay--translucent absolute inset-0 z-[70] flex flex-col items-center justify-center p-6 select-none backdrop-blur-md cursor-pointer overflow-hidden"
       @click="dismiss"
     >
       <!-- Cinematic Vignette / Letterbox Lighting -->
-      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-slate-950/60 to-slate-950/95 pointer-events-none"></div>
+      <div class="tw-overlay-veil absolute inset-0 pointer-events-none"></div>
+      <div class="tw-overlay-wash absolute inset-0 pointer-events-none opacity-60"></div>
+      <div class="tw-overlay-texture absolute inset-0 pointer-events-none"></div>
 
       <!-- Glowing Ambient Orb behind title -->
-      <div class="absolute w-96 h-96 rounded-full bg-amber-400/10 blur-3xl pointer-events-none animate-pulse"></div>
+      <div class="tw-overlay-glow absolute w-96 h-96 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
 
       <div class="relative z-10 flex flex-col items-center text-center max-w-2xl px-6">
         <!-- Sequence Chapter Eyebrow -->
         <div class="flex items-center gap-3 mb-3">
-          <div class="w-8 sm:w-16 h-[1px] bg-gradient-to-r from-transparent to-amber-400/80"></div>
-          <span class="text-[11px] sm:text-xs font-mono font-bold tracking-[0.35em] uppercase text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]">
+          <div class="tw-overlay-rule w-8 sm:w-16 h-[1px]"></div>
+          <span class="tw-overlay-eyebrow text-[11px] sm:text-xs font-bold tracking-[0.35em] uppercase">
             <template v-if="displayedSequence.order">
               Chapter {{ displayedSequence.order }}
             </template>
@@ -98,31 +101,31 @@ onBeforeUnmount(() => {
               Sequence
             </template>
           </span>
-          <div class="w-8 sm:w-16 h-[1px] bg-gradient-to-l from-transparent to-amber-400/80"></div>
+          <div class="tw-overlay-rule w-8 sm:w-16 h-[1px]"></div>
         </div>
 
         <!-- Grand Cinematic Sequence Title -->
-        <h1 class="text-2xl sm:text-4xl md:text-5xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-slate-300 drop-shadow-[0_6px_25px_rgba(0,0,0,0.95)] leading-tight cinema-title">
+        <h1 class="tw-overlay-title tw-overlay-title--chapter text-2xl sm:text-4xl md:text-5xl font-black tracking-wider leading-tight cinema-title">
           {{ displayedSequence.title || displayedSequence.id }}
         </h1>
 
         <!-- Ornate Center Accent Divider -->
         <div class="flex items-center justify-center gap-2 my-3 sm:my-4 w-full">
-          <div class="w-16 sm:w-28 h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent"></div>
-          <div class="w-1.5 h-1.5 rotate-45 bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"></div>
-          <div class="w-16 sm:w-28 h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent"></div>
+          <div class="tw-overlay-rule w-16 sm:w-28 h-[1px]"></div>
+          <div class="tw-overlay-diamond w-1.5 h-1.5 rotate-45"></div>
+          <div class="tw-overlay-rule w-16 sm:w-28 h-[1px]"></div>
         </div>
 
         <!-- Optional Description / Tagline -->
         <p
           v-if="displayedSequence.description"
-          class="text-xs sm:text-sm text-slate-300/90 font-serif italic max-w-md sm:max-w-lg leading-relaxed text-center drop-shadow px-2"
+          class="tw-overlay-muted text-xs sm:text-sm font-serif italic max-w-md sm:max-w-lg leading-relaxed text-center drop-shadow px-2"
         >
           {{ displayedSequence.description }}
         </p>
 
         <!-- Subtle Skip Hint -->
-        <span class="text-[9px] uppercase tracking-[0.25em] text-slate-500/70 font-semibold mt-6 transition-opacity hover:text-slate-300">
+        <span class="tw-overlay-muted text-[9px] uppercase tracking-[0.25em] font-semibold mt-6 opacity-60 transition-opacity hover:opacity-100">
           Click anywhere to continue
         </span>
       </div>

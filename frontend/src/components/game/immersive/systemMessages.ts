@@ -20,6 +20,23 @@ export function isTurnErrorMessage(msg: SystemMessage | null | undefined, turnEr
   return Boolean(turnError?.message && String(msg?.content || '').includes(turnError.message))
 }
 
+export type SystemNoteKind = 'dice' | 'item' | 'vitals' | 'quest' | 'reward' | 'info'
+
+// First match wins; English and German engine wording (word prefixes, so inflections match).
+const NOTE_KIND_PATTERNS: [SystemNoteKind, RegExp][] = [
+  ['dice', /\b(roll|dice|d20|skill check|saving throw|würfel|probe)/i],
+  ['reward', /\b(xp\b|experience|award|achievement|erfahrung|auszeichnung)/i],
+  ['quest', /\b(quest|objective|aufgabe)/i],
+  ['vitals', /\b(hp\b|health|damage|heal|stamina|mana\b|schaden|geheilt|lebenspunkt|ausdauer)/i],
+  ['item', /\b(item|inventory|added|received|picked up|obtained|gegenstand|inventar|erhalten|aufgenommen)/i],
+]
+
+/** Picks an icon category for a compact system note in the story feed. */
+export function systemNoteKind(content: string): SystemNoteKind {
+  const match = NOTE_KIND_PATTERNS.find(([, pattern]) => pattern.test(content))
+  return match ? match[0] : 'info'
+}
+
 /** Removes inline debug trigger markers from regular system messages. */
 export function cleanSystemContent(msg: SystemMessage | null | undefined): string {
   const content = String(msg?.content || '')

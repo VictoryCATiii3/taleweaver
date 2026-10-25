@@ -1,5 +1,5 @@
 import uuid6
-from sqlalchemy import Column, ForeignKey, String, Text, event, inspect
+from sqlalchemy import Column, ForeignKey, Index, String, Text, event, inspect
 from sqlalchemy.orm import Session
 
 from backend.models.base import Base, TimestampMixin
@@ -10,7 +10,9 @@ class ChatMessage(Base, TimestampMixin):
     """
     Stores conversational history for the sliding-window memory management.
     """
+
     __tablename__ = "chat_messages"
+    __table_args__ = (Index("ix_chat_messages_session_id_created_at", "session_id", "created_at"),)
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid6.uuid7()))
     session_id = Column(String(36), ForeignKey("game_sessions.id"), nullable=False)

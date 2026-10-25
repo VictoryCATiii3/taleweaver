@@ -17,6 +17,7 @@ from httpx import AsyncClient
 from PIL import Image
 from sqlalchemy import delete, func, select
 
+from backend.api.routes.adventures import session_assets
 from backend.api.routes.adventures.schemas import StoryIdeaSuggestionResponse
 from backend.core.config import settings
 from backend.engine.debug_engine import DebugEngine
@@ -2706,6 +2707,8 @@ async def test_list_sessions_cleans_up_stale_empty_orphan_dirs(
     data_dir = tmp_path / "data"
     monkeypatch.setattr(settings, "DATA_DIR", str(data_dir))
     monkeypatch.setattr(settings, "SESSION_EMPTY_DIR_CLEANUP_DAYS", 1)
+    # The sweep is throttled across requests; start from "never ran".
+    monkeypatch.setitem(session_assets._CLEANUP_STATE, "last_run", None)
 
     ids = await _create_adventure(client, "Cleanup Session Quest")
     active_game_id = ids["game_id"]

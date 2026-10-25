@@ -19,6 +19,7 @@ from backend.api.routes.adventures.agent_commands import (
     handle_playagent_command,
 )
 from backend.api.routes.adventures.logic import AdventureLogic
+from backend.engine.dice_command import handle_roll_command, is_roll_command
 from backend.api.routes.adventures.turn_helpers import (
     TurnCombatStateHelper,
     TurnProgressionBuilder,
@@ -787,6 +788,22 @@ class GameTurnManager:
             async for hooked in hooks.process_final(chunk):
                 yield hooked
 
+    async def _command_final_event(self) -> str:
+        """Final SSE event for commands that skip the narration pass (state snapshot only)."""
+        final_data = jsonable_encoder(
+            {
+                "sheet": await AdventureLogic.build_sheet_snapshot(
+                    self.avatar, self.state, self.db
+                ),
+                "entities": await AdventureLogic.build_session_entities(self.db, self.state),
+                "combat": AdventureLogic.get_combat_snapshot(self.state),
+                **self._build_prompt_suggestions_payload(),
+                **self._build_terminal_flags_payload(),
+                "status": "success",
+            }
+        )
+        return f"event: final\ndata: {json.dumps(final_data)}\n\n"
+
     async def _process_turn_inner(
         self, message: str, auto_visualize: bool = False, language: str | None = None
     ) -> AsyncGenerator[str, None]:
@@ -814,19 +831,7 @@ class GameTurnManager:
             last_response = await self._load_last_assistant_message()
             await self._generate_prompt_suggestions(last_response)
             await self.db.commit()
-            final_data = jsonable_encoder(
-                {
-                    "sheet": await AdventureLogic.build_sheet_snapshot(
-                        self.avatar, self.state, self.db
-                    ),
-                    "entities": await AdventureLogic.build_session_entities(self.db, self.state),
-                    "combat": AdventureLogic.get_combat_snapshot(self.state),
-                    **self._build_prompt_suggestions_payload(),
-                    **self._build_terminal_flags_payload(),
-                    "status": "success",
-                }
-            )
-            yield f"event: final\ndata: {json.dumps(final_data)}\n\n"
+            yield await self._command_final_event()
             return
 
         cmd_parts = user_msg.strip().split(None, 1)
@@ -835,19 +840,7 @@ class GameTurnManager:
             async for chunk in handle_playagent_command(self, cmd_args):
                 yield chunk
 
-            final_data = jsonable_encoder(
-                {
-                    "sheet": await AdventureLogic.build_sheet_snapshot(
-                        self.avatar, self.state, self.db
-                    ),
-                    "entities": await AdventureLogic.build_session_entities(self.db, self.state),
-                    "combat": AdventureLogic.get_combat_snapshot(self.state),
-                    **self._build_prompt_suggestions_payload(),
-                    **self._build_terminal_flags_payload(),
-                    "status": "success",
-                }
-            )
-            yield f"event: final\ndata: {json.dumps(final_data)}\n\n"
+            yield await self._command_final_event()
             return
 
         if self._is_input_locked():
@@ -856,19 +849,14 @@ class GameTurnManager:
                 "quests, awards, walkthrough, and chat history, but no further actions can be taken."
             )
             yield f"event: system\ndata: {json.dumps({'role': 'system', 'content': lock_message})}\n\n"
-            final_data = jsonable_encoder(
-                {
-                    "sheet": await AdventureLogic.build_sheet_snapshot(
-                        self.avatar, self.state, self.db
-                    ),
-                    "entities": await AdventureLogic.build_session_entities(self.db, self.state),
-                    "combat": AdventureLogic.get_combat_snapshot(self.state),
-                    **self._build_prompt_suggestions_payload(),
-                    **self._build_terminal_flags_payload(),
-                    "status": "success",
-                }
-            )
-            yield f"event: final\ndata: {json.dumps(final_data)}\n\n"
+            yield await self._command_final_event()
+            return
+
+        # /roll [sides]: a single die roll, no narration pass
+        if is_roll_command(user_msg):
+            async for chunk in handle_roll_command(self, user_msg):
+                yield chunk
+            yield await self._command_final_event()
             return
 
         # traverse_exit internal command: move scene, then run LLM narration pass

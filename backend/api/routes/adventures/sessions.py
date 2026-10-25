@@ -40,6 +40,8 @@ from backend.schemas.session import GameSessionUpdate
 from backend.utils.path_security import ensure_within_data_dir, sanitize_path_component
 
 router = APIRouter(tags=["Sessions"])
+# The session list sweeps stale session folders at most hourly (startup always sweeps).
+SESSION_DIR_CLEANUP_INTERVAL_SECONDS = 3600.0
 # _cleanup_stale_empty_session_dirs keeps its old name: backend.main imports it from here.
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,7 @@ async def list_sessions(
     removed_dirs = _cleanup_stale_empty_session_dirs(
         active_session_ids=all_session_ids,
         max_age_days=max(0, int(getattr(settings, "SESSION_EMPTY_DIR_CLEANUP_DAYS", 7))),
+        min_interval_seconds=SESSION_DIR_CLEANUP_INTERVAL_SECONDS,
     )
     if removed_dirs:
         logger.info("Removed %s stale empty session directories.", removed_dirs)

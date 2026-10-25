@@ -1,0 +1,61 @@
+/*
+ * Text density of the story feed (player setting, data-density on the immersive root).
+ * Independent of the skin: only sizes and spacing change, never colors or shapes.
+ */
+
+.tw-skin {
+  --tw-text-size: 0.875rem;
+  --tw-text-leading: 1.625;
+  --tw-feed-gap: 1rem;
+  --tw-narration-pad-y: 1rem;
+  --tw-narration-pad-x: 1rem;
+  --tw-bubble-pad-y: 0.875rem;
+  --tw-bubble-pad-x: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .tw-skin {
+    --tw-text-size: 1rem;
+    --tw-narration-pad-y: 1.25rem;
+    --tw-narration-pad-x: 1.25rem;
+    --tw-bubble-pad-y: 1.125rem;
+    --tw-bubble-pad-x: 1.125rem;
+  }
+}
+
+.tw-skin[data-density='compact'] {
+  --tw-text-size: 0.8125rem;
+  --tw-text-leading: 1.45;
+  --tw-feed-gap: 0.5rem;
+  --tw-narration-pad-y: 0.625rem;
+  --tw-narration-pad-x: 0.875rem;
+  --tw-bubble-pad-y: 0.5rem;
+  --tw-bubble-pad-x: 0.75rem;
+}
+
+.tw-skin[data-density='spacious'] {
+  --tw-text-size: 0.95rem;
+  --tw-text-leading: 1.8;
+  --tw-feed-gap: 1.5rem;
+  --tw-narration-pad-y: 1.25rem;
+  --tw-narration-pad-x: 1.5rem;
+  --tw-bubble-pad-y: 1rem;
+  --tw-bubble-pad-x: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .tw-skin[data-density='compact'] {
+    --tw-text-size: 0.9rem;
+  }
+
+  .tw-skin[data-density='spacious'] {
+    --tw-text-size: 1.125rem;
+    --tw-narration-pad-y: 1.5rem;
+    --tw-narration-pad-x: 1.75rem;
+  }
+}
+
+.tw-feed,
+.tw-exchange {
+  gap: var(--tw-feed-gap);
+}

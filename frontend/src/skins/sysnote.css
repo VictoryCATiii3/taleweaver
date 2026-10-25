@@ -1,0 +1,263 @@
+/*
+ * Compact system notes in the story feed (dice rolls, items, stat and quest changes).
+ * One line where possible; size follows the text density.
+ */
+
+.tw-skin {
+  --tw-sysnote-bg: rgba(6, 46, 38, 0.82);
+  --tw-sysnote-ink: #d1fae5;
+  --tw-sysnote-border: 1px solid rgba(52, 211, 153, 0.35);
+  --tw-sysnote-radius: 999px;
+  --tw-sysnote-icon: #34d399;
+  --tw-sysnote-font: ui-sans-serif, system-ui, sans-serif;
+  --tw-sysnote-style: normal;
+  --tw-sysnote-transform: none;
+  --tw-sysnote-tracking: 0.01em;
+  --tw-sysnote-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --tw-sysnote-rotate: 0deg;
+}
+
+.tw-sysnote {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.2rem 0.75rem 0.25rem 0.6rem;
+  border: var(--tw-sysnote-border);
+  border-radius: var(--tw-sysnote-radius);
+  background: var(--tw-sysnote-bg);
+  color: var(--tw-sysnote-ink);
+  box-shadow: var(--tw-sysnote-shadow);
+  font-family: var(--tw-sysnote-font);
+  font-size: calc(var(--tw-text-size) * 0.8);
+  font-style: var(--tw-sysnote-style);
+  line-height: 1.4;
+  letter-spacing: var(--tw-sysnote-tracking);
+  text-transform: var(--tw-sysnote-transform);
+  transform: rotate(var(--tw-sysnote-rotate));
+  backdrop-filter: blur(10px);
+}
+
+.tw-sysnote-icon {
+  width: 0.95em;
+  height: 0.95em;
+  align-self: center;
+  color: var(--tw-sysnote-icon);
+}
+
+.tw-sysnote-text strong {
+  color: inherit;
+  font-weight: 800;
+}
+
+/* Kind accents (icon color only, so the skin look stays intact). */
+.tw-sysnote[data-kind='dice'] { --tw-sysnote-icon-kind: #fbbf24; }
+.tw-sysnote[data-kind='vitals'] { --tw-sysnote-icon-kind: #f87171; }
+.tw-sysnote[data-kind='reward'] { --tw-sysnote-icon-kind: #facc15; }
+.tw-sysnote[data-kind='quest'] { --tw-sysnote-icon-kind: #a78bfa; }
+
+.tw-sysnote[data-kind]:not([data-kind='info']) .tw-sysnote-icon {
+  color: var(--tw-sysnote-icon-kind, var(--tw-sysnote-icon));
+}
+
+/* ---------- Skins ---------- */
+
+/* Chronicle: a scribe's marginal note on a strip of parchment. */
+[data-skin='chronicle'] {
+  --tw-sysnote-bg: rgba(234, 220, 188, 0.94);
+  --tw-sysnote-ink: #4a2f14;
+  --tw-sysnote-border: 1px solid rgba(120, 72, 24, 0.35);
+  --tw-sysnote-radius: 2px;
+  --tw-sysnote-icon: #8a2b1a;
+  --tw-sysnote-font: 'IM Fell English', Georgia, serif;
+  --tw-sysnote-style: italic;
+  --tw-sysnote-tracking: 0;
+}
+
+/* Noir: embossed label-maker tape. */
+[data-skin='noir'] {
+  --tw-sysnote-bg: #111111;
+  --tw-sysnote-ink: #ececec;
+  --tw-sysnote-border: 0 solid transparent;
+  --tw-sysnote-radius: 2px;
+  --tw-sysnote-icon: #c8102e;
+  --tw-sysnote-font: 'Courier Prime', 'Courier New', monospace;
+  --tw-sysnote-transform: uppercase;
+  --tw-sysnote-tracking: 0.1em;
+  --tw-sysnote-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+  --tw-sysnote-rotate: -0.6deg;
+}
+
+[data-skin='noir'] .tw-sysnote {
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Terminal: a log line from the ship's computer. */
+[data-skin='terminal'] {
+  --tw-sysnote-bg: rgba(3, 14, 20, 0.88);
+  --tw-sysnote-ink: #9be7f3;
+  --tw-sysnote-border: 1px solid color-mix(in srgb, var(--tw-accent) 35%, transparent);
+  --tw-sysnote-radius: 2px;
+  --tw-sysnote-icon: var(--tw-accent);
+  --tw-sysnote-font: 'Share Tech Mono', ui-monospace, monospace;
+  --tw-sysnote-shadow: 0 0 12px color-mix(in srgb, var(--tw-accent) 18%, transparent);
+}
+
+[data-skin='terminal'] .tw-sysnote-text::before {
+  content: 'SYS> ';
+  opacity: 0.6;
+}
+
+/* Grimoire: a whispered omen in red ink. */
+[data-skin='grimoire'] {
+  --tw-sysnote-bg: rgba(22, 16, 14, 0.9);
+  --tw-sysnote-ink: #f0d9c8;
+  --tw-sysnote-border: 1px solid color-mix(in srgb, var(--tw-accent) 40%, transparent);
+  --tw-sysnote-radius: 2px;
+  --tw-sysnote-icon: var(--tw-accent-soft);
+  --tw-sysnote-font: 'IM Fell English', Georgia, serif;
+  --tw-sysnote-style: italic;
+  --tw-sysnote-tracking: 0;
+}
+
+/* ---------- Dice (die rolls in system notes) ---------- */
+
+.tw-skin {
+  --tw-die-face: #f8f5ec;
+  --tw-die-edge: #f59e0b;
+  --tw-die-ink: #1e293b;
+  --tw-die-shine: rgba(255, 255, 255, 0.55);
+  --tw-die-crit: #fbbf24;
+  --tw-die-fumble: #ef4444;
+  --tw-die-number-font: 'Acme', sans-serif;
+}
+
+[data-skin='chronicle'] {
+  --tw-die-face: #f3e6c8;
+  --tw-die-edge: #8a2b1a;
+  --tw-die-ink: #2b1d0e;
+  --tw-die-number-font: 'IM Fell English SC', Georgia, serif;
+}
+
+/* Noir: a red casino die. */
+[data-skin='noir'] {
+  --tw-die-face: #c8102e;
+  --tw-die-edge: #f1ece0;
+  --tw-die-ink: #ffffff;
+  --tw-die-shine: rgba(255, 255, 255, 0.25);
+  --tw-die-crit: #e9d27a;
+  --tw-die-number-font: 'Special Elite', 'Courier New', monospace;
+}
+
+/* Terminal: a holographic wireframe die. */
+[data-skin='terminal'] {
+  --tw-die-face: rgba(34, 211, 238, 0.1);
+  --tw-die-edge: var(--tw-accent);
+  --tw-die-ink: #c7f9ff;
+  --tw-die-shine: rgba(34, 211, 238, 0.12);
+  --tw-die-number-font: 'Orbitron', ui-sans-serif, sans-serif;
+}
+
+/* Grimoire: a bone die with blood-red pips. */
+[data-skin='grimoire'] {
+  --tw-die-face: #e8dccb;
+  --tw-die-edge: #7f1d1d;
+  --tw-die-ink: #991b1b;
+  --tw-die-crit: #f87171;
+  --tw-die-number-font: 'Cinzel', Georgia, serif;
+}
+
+.tw-sysnote--roll {
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.85rem 0.3rem 0.4rem;
+}
+
+.tw-die {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 2.6em;
+  animation: tw-die-tumble 0.9s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+
+.tw-die--still {
+  width: 1.9em;
+  animation: none;
+}
+
+.tw-die svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+
+.tw-die-face {
+  fill: var(--tw-die-face);
+  stroke: var(--tw-die-edge);
+  stroke-width: 5;
+}
+
+.tw-die-shine {
+  fill: var(--tw-die-shine);
+}
+
+.tw-die-pip {
+  fill: var(--tw-die-ink);
+}
+
+.tw-die-number {
+  fill: var(--tw-die-ink);
+  font-family: var(--tw-die-number-font);
+  font-weight: 700;
+}
+
+.tw-die-sides {
+  margin-top: 0.1rem;
+  font-family: var(--tw-sysnote-font);
+  font-size: 0.6em;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.tw-die--crit svg {
+  filter: drop-shadow(0 0 8px var(--tw-die-crit)) drop-shadow(0 0 2px var(--tw-die-crit));
+}
+
+.tw-die--crit .tw-die-face {
+  stroke: var(--tw-die-crit);
+}
+
+.tw-die--fumble .tw-die-face {
+  stroke: var(--tw-die-fumble);
+}
+
+.tw-die--fumble svg {
+  filter: drop-shadow(0 0 6px var(--tw-die-fumble));
+}
+
+@keyframes tw-die-tumble {
+  0% {
+    opacity: 0;
+    transform: translate(-1.2em, -0.8em) rotate(-540deg) scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(0.1em, 0.1em) rotate(20deg) scale(1.1);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-die {
+    animation: none;
+  }
+}

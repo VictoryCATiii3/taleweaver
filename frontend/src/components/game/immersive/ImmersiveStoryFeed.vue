@@ -75,7 +75,7 @@ function isLatestExchange(exIdx: number): boolean {
     <!-- COMIC STORY CONTAINER (Page Display) -->
     <div
       ref="storyContainerRef"
-      class="comic-story-container flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 flex flex-col gap-4 min-h-0 relative"
+      class="comic-story-container tw-feed flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 flex flex-col min-h-0 relative"
     >
       <!-- Empty State -->
       <div v-if="!props.activeTurn && !props.isEvaluating" class="flex-1 flex flex-col items-center justify-center text-slate-500">

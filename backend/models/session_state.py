@@ -1,5 +1,5 @@
 import uuid6
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship, synonym
 
 from backend.models.base import Base, TimestampMixin
@@ -7,6 +7,10 @@ from backend.models.base import Base, TimestampMixin
 
 class SessionState(Base, TimestampMixin):
     __tablename__ = "session_states"
+    __table_args__ = (
+        Index("ix_session_states_session_id", "session_id"),
+        Index("ix_session_states_template_id", "template_id"),
+    )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid6.uuid7()))
     session_id = Column(String(36), ForeignKey("game_sessions.id"), nullable=False)

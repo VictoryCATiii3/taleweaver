@@ -12,6 +12,7 @@ import SettingsVoiceTab from './settings/SettingsVoiceTab.vue'
 import SettingsTranslationTab from './settings/SettingsTranslationTab.vue'
 import SettingsDisplayTab from './settings/SettingsDisplayTab.vue'
 import type { SkinId, SkinPreference } from '@/skins/skinRegistry'
+import type { TextDensity } from '@/skins/useTextDensity'
 import type { SessionSettingsPayload, SettingsTabId } from './settings/types'
 
 const props = defineProps<{
@@ -23,6 +24,7 @@ const props = defineProps<{
   initialLanguage?: string
   initialTab?: SettingsTabId
   initialSkin?: SkinPreference
+  initialDensity?: TextDensity
   autoSkin?: SkinId
   autoSkinReason?: string
   ttsAvailable?: boolean
@@ -49,6 +51,7 @@ const autoSpeakNarration = ref(props.initialAutoSpeakNarration ?? true)
 const autoSpeakDialogues = ref(props.initialAutoSpeakDialogues ?? true)
 const language = ref(props.initialLanguage ?? '')
 const skin = ref<SkinPreference>(props.initialSkin ?? 'auto')
+const density = ref<TextDensity>(props.initialDensity ?? 'comfortable')
 
 if (typeof props.initialTurns === 'number' && props.initialTurns >= 1) {
   turns.value = Math.min(100, Math.max(1, props.initialTurns))
@@ -62,7 +65,7 @@ function isTabActive(id: SettingsTabId): boolean {
     return !!language.value
   }
   if (id === 'display') {
-    return skin.value !== 'auto'
+    return skin.value !== 'auto' || density.value !== 'comfortable'
   }
   return false
 }
@@ -76,6 +79,7 @@ function save() {
     autoSpeakDialogues: autoSpeakDialogues.value,
     language: language.value,
     skin: skin.value,
+    density: density.value,
   })
 }
 
@@ -179,6 +183,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
         <SettingsDisplayTab
           v-else
           v-model:skin="skin"
+          v-model:density="density"
           :auto-skin="props.autoSkin ?? 'classic'"
           :auto-reason="props.autoSkinReason ?? 'no tone set, using the default look'"
         />

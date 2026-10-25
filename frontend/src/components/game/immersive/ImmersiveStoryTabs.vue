@@ -36,14 +36,21 @@ const tabs = computed<TabEntry[]>(() => {
   return entries.filter((tab) => tab.id === 'story' || tab.count > 0)
 })
 
+/** "Story" alone is not worth a tab bar: show tabs only when another section has entries. */
+const hasSectionTabs = computed(() => tabs.value.length > 1)
+const hasSwitches = computed(() => props.sceneSwitches.length > 0)
+
 function switchState(sw: any): string {
   return String(sw.switch_state || sw.metadata_json?.switch?.initial_state || '—').toUpperCase()
 }
 </script>
 
 <template>
-  <div class="relative z-30 shrink-0 mb-3 flex items-center gap-2 overflow-x-auto overflow-y-visible pt-1 pb-1 no-scrollbar">
-    <div role="tablist" aria-label="Story sections" class="flex items-center gap-2">
+  <div
+    v-if="hasSectionTabs || hasSwitches"
+    class="relative z-30 shrink-0 mb-3 flex items-center gap-2 overflow-x-auto overflow-y-visible pt-1 pb-1 no-scrollbar"
+  >
+    <div v-if="hasSectionTabs" role="tablist" aria-label="Story sections" class="flex items-center gap-2">
       <button
         v-for="tab in tabs"
         :key="tab.id"

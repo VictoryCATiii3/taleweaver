@@ -9,6 +9,9 @@
 @import '@fontsource/share-tech-mono/latin-400.css';
 
 @import './base.css';
+@import './overlays.css';
+@import './density.css';
+@import './sysnote.css';
 @import './chronicle.css';
 @import './noir.css';
 @import './terminal.css';

@@ -1,0 +1,179 @@
+/*
+ * Skinned full-area overlays: scene transition ("Traveling to") and sequence/chapter intro.
+ * Defaults reproduce the classic look; skins override the --tw-overlay-* tokens.
+ */
+
+.tw-skin {
+  --tw-overlay-bg: #020617;
+  --tw-overlay-ink: #ffffff;
+  --tw-overlay-muted: #94a3b8;
+  --tw-overlay-accent: var(--tw-accent-soft);
+  --tw-overlay-highlight: #fde68a;
+  --tw-font-overlay-title: 'Acme', sans-serif;
+  --tw-font-overlay-eyebrow: ui-monospace, monospace;
+  --tw-overlay-title-transform: uppercase;
+  --tw-overlay-wash:
+    radial-gradient(ellipse at 20% 15%, rgba(251, 191, 36, 0.45), transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.4), transparent 55%);
+  --tw-overlay-texture: none;
+  --tw-overlay-image-filter: saturate(1.15) brightness(0.75);
+}
+
+.tw-overlay {
+  background: var(--tw-overlay-bg);
+  color: var(--tw-overlay-ink);
+}
+
+.tw-overlay--translucent {
+  background: color-mix(in srgb, var(--tw-overlay-bg) 90%, transparent);
+}
+
+.tw-overlay-veil {
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--tw-overlay-bg) 30%, transparent),
+    color-mix(in srgb, var(--tw-overlay-bg) 70%, transparent) 55%,
+    var(--tw-overlay-bg)
+  );
+}
+
+.tw-overlay-letterbox {
+  background: linear-gradient(
+    180deg,
+    var(--tw-overlay-bg),
+    transparent 35%,
+    transparent 60%,
+    color-mix(in srgb, var(--tw-overlay-bg) 95%, transparent)
+  );
+}
+
+.tw-overlay-vignette {
+  box-shadow: inset 0 0 180px 60px color-mix(in srgb, var(--tw-overlay-bg) 95%, transparent);
+}
+
+.tw-overlay-wash {
+  background: var(--tw-overlay-wash);
+  mix-blend-mode: soft-light;
+}
+
+.tw-overlay-texture {
+  background: var(--tw-overlay-texture);
+}
+
+.tw-overlay-glow {
+  background: color-mix(in srgb, var(--tw-overlay-accent) 12%, transparent);
+}
+
+.tw-overlay-ring {
+  border: 1px dashed color-mix(in srgb, var(--tw-overlay-accent) 45%, transparent);
+}
+
+.tw-overlay-emblem {
+  border: 1px solid color-mix(in srgb, var(--tw-overlay-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--tw-overlay-accent) 10%, var(--tw-overlay-bg));
+  box-shadow: 0 0 30px color-mix(in srgb, var(--tw-overlay-accent) 25%, transparent);
+  color: var(--tw-overlay-accent);
+}
+
+.tw-overlay-accent {
+  color: var(--tw-overlay-accent);
+}
+
+.tw-overlay-eyebrow {
+  color: var(--tw-overlay-accent);
+  font-family: var(--tw-font-overlay-eyebrow);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--tw-overlay-accent) 55%, transparent);
+}
+
+.tw-overlay-title {
+  color: var(--tw-overlay-ink);
+  font-family: var(--tw-font-overlay-title);
+  text-shadow: 0 4px 22px rgba(0, 0, 0, 0.95);
+}
+
+.tw-overlay-title--chapter {
+  text-transform: var(--tw-overlay-title-transform);
+}
+
+.tw-overlay-muted {
+  color: var(--tw-overlay-muted);
+}
+
+.tw-overlay-highlight {
+  color: var(--tw-overlay-highlight);
+}
+
+.tw-overlay-rule {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--tw-overlay-accent) 70%, transparent), transparent);
+}
+
+.tw-overlay-diamond {
+  background: var(--tw-overlay-accent);
+  box-shadow: 0 0 8px var(--tw-overlay-accent);
+}
+
+.tw-overlay-progress {
+  background: color-mix(in srgb, var(--tw-overlay-muted) 20%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tw-overlay-progress-bar {
+  background: linear-gradient(90deg, transparent, var(--tw-overlay-accent), transparent);
+}
+
+/* ---------- Skin overrides ---------- */
+
+[data-skin='chronicle'] {
+  --tw-overlay-bg: #140c06;
+  --tw-overlay-ink: #f3e6c8;
+  --tw-overlay-muted: #c9b48a;
+  --tw-overlay-accent: var(--tw-accent-soft);
+  --tw-overlay-highlight: #f3d89a;
+  --tw-font-overlay-title: 'IM Fell English SC', Georgia, serif;
+  --tw-font-overlay-eyebrow: 'IM Fell English SC', Georgia, serif;
+  --tw-overlay-title-transform: none;
+  --tw-overlay-wash:
+    radial-gradient(ellipse at 25% 20%, rgba(224, 178, 92, 0.45), transparent 55%),
+    radial-gradient(ellipse at 80% 85%, rgba(138, 43, 26, 0.45), transparent 55%);
+  --tw-overlay-image-filter: sepia(0.35) saturate(0.9) brightness(0.7);
+}
+
+[data-skin='noir'] {
+  --tw-overlay-bg: #070708;
+  --tw-overlay-ink: #f1ece0;
+  --tw-overlay-muted: #a8a294;
+  --tw-overlay-accent: var(--tw-accent);
+  --tw-overlay-highlight: #e9d27a;
+  --tw-font-overlay-title: 'Special Elite', 'Courier New', monospace;
+  --tw-font-overlay-eyebrow: 'Courier Prime', 'Courier New', monospace;
+  --tw-overlay-wash: none;
+  --tw-overlay-texture: repeating-linear-gradient(-24deg, rgba(255, 250, 235, 0.06) 0 22px, transparent 22px 48px);
+  --tw-overlay-image-filter: grayscale(1) contrast(1.15) brightness(0.6);
+}
+
+[data-skin='terminal'] {
+  --tw-overlay-bg: #020b10;
+  --tw-overlay-ink: #e6fbff;
+  --tw-overlay-muted: #6fb7c4;
+  --tw-overlay-accent: var(--tw-accent);
+  --tw-overlay-highlight: #67e8f9;
+  --tw-font-overlay-title: 'Orbitron', ui-sans-serif, sans-serif;
+  --tw-font-overlay-eyebrow: 'Share Tech Mono', ui-monospace, monospace;
+  --tw-overlay-wash:
+    radial-gradient(ellipse at 20% 20%, rgba(34, 211, 238, 0.35), transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(244, 114, 182, 0.3), transparent 55%);
+  --tw-overlay-texture: repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.05) 0 1px, transparent 1px 4px);
+  --tw-overlay-image-filter: saturate(1.2) brightness(0.6) hue-rotate(-10deg);
+}
+
+[data-skin='grimoire'] {
+  --tw-overlay-bg: #0a0605;
+  --tw-overlay-ink: #f0e6d8;
+  --tw-overlay-muted: #a8998a;
+  --tw-overlay-accent: var(--tw-accent-soft);
+  --tw-overlay-highlight: #f87171;
+  --tw-font-overlay-title: 'Cinzel', Georgia, serif;
+  --tw-font-overlay-eyebrow: 'Cinzel', Georgia, serif;
+  --tw-overlay-wash: radial-gradient(ellipse at 50% 60%, rgba(127, 29, 29, 0.45), transparent 60%);
+  --tw-overlay-image-filter: saturate(0.5) brightness(0.55) contrast(1.1);
+}

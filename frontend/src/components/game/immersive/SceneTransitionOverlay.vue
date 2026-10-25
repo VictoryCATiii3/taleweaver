@@ -5,7 +5,8 @@
  * Displays a cinematic loading veil with rotating compass rose, destination banner,
  * and fantasy shimmer effect when traversing between scenes. When the destination
  * scene has an image, it is revealed behind the veil with a slow Ken Burns drift
- * and layered gradient vignettes.
+ * and layered gradient vignettes. Colors and fonts follow the active dialog skin
+ * (--tw-overlay-* tokens, see src/skins/overlays.css).
  */
 import { ref, watch } from 'vue'
 import { Compass, Sparkles } from 'lucide-vue-next'
@@ -46,7 +47,7 @@ function formatSceneTitle(name?: string | null): string {
   <Transition name="scene-veil">
     <div
       v-if="props.active"
-      class="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 select-none overflow-hidden bg-slate-950"
+      class="tw-overlay absolute inset-0 z-40 flex flex-col items-center justify-center p-6 select-none overflow-hidden"
     >
       <!-- Destination Scene Backdrop -->
       <div class="absolute inset-0 pointer-events-none">
@@ -61,55 +62,53 @@ function formatSceneTitle(name?: string | null): string {
         />
 
         <!-- Base radial veil (also the fallback when no image is available) -->
-        <div
-          class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/30 via-slate-950/70 to-slate-950"
-        ></div>
+        <div class="tw-overlay-veil absolute inset-0"></div>
 
         <!-- Cinematic letterbox gradients (top & bottom) -->
-        <div class="absolute inset-0 bg-gradient-to-b from-slate-950 via-transparent to-slate-950/95"></div>
-        <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent"></div>
+        <div class="tw-overlay-letterbox absolute inset-0"></div>
 
         <!-- Warm/cool color wash for a magical tint -->
-        <div class="absolute inset-0 color-wash mix-blend-soft-light"></div>
+        <div class="tw-overlay-wash absolute inset-0"></div>
+        <div class="tw-overlay-texture absolute inset-0"></div>
 
         <!-- Drifting light sweep -->
         <div class="absolute inset-0 light-sweep mix-blend-screen"></div>
 
         <!-- Soft edge vignette -->
-        <div class="absolute inset-0 shadow-[inset_0_0_180px_60px_rgba(2,6,23,0.95)]"></div>
+        <div class="tw-overlay-vignette absolute inset-0"></div>
       </div>
 
       <!-- Ambient Glow Orb -->
-      <div class="absolute w-72 h-72 rounded-full bg-amber-500/10 blur-3xl pointer-events-none animate-pulse"></div>
+      <div class="tw-overlay-glow absolute w-72 h-72 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
 
       <!-- Center Mystic Compass / Wayfinder Emblem -->
       <div class="relative flex items-center justify-center mb-6">
         <!-- Outer rotating rune ring -->
-        <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full border border-dashed border-amber-400/40 animate-spin-slow"></div>
+        <div class="tw-overlay-ring w-24 h-24 sm:w-28 sm:h-28 rounded-full animate-spin-slow"></div>
 
         <!-- Middle glowing ring -->
-        <div class="absolute w-18 h-18 sm:w-20 sm:h-20 rounded-full border border-amber-500/60 bg-amber-950/30 shadow-[0_0_30px_rgba(251,191,36,0.25)] backdrop-blur-sm flex items-center justify-center">
-          <Compass class="w-8 h-8 sm:w-9 sm:h-9 text-amber-400 animate-compass-breath drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]" />
+        <div class="tw-overlay-emblem absolute w-18 h-18 sm:w-20 sm:h-20 rounded-full backdrop-blur-sm flex items-center justify-center">
+          <Compass class="w-8 h-8 sm:w-9 sm:h-9 animate-compass-breath" />
         </div>
 
         <!-- Floating Sparkles -->
-        <Sparkles class="absolute -top-1 -right-1 w-4 h-4 text-amber-300 animate-pulse" />
-        <Sparkles class="absolute -bottom-2 -left-2 w-3.5 h-3.5 text-amber-400/70 animate-pulse delay-300" />
+        <Sparkles class="tw-overlay-accent absolute -top-1 -right-1 w-4 h-4 animate-pulse" />
+        <Sparkles class="tw-overlay-accent absolute -bottom-2 -left-2 w-3.5 h-3.5 opacity-70 animate-pulse delay-300" />
       </div>
 
       <!-- Destination Information -->
       <div class="flex flex-col items-center text-center max-w-md px-4 z-10">
-        <span class="text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] text-amber-400/90 mb-1.5 flex items-center gap-1.5 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
+        <span class="tw-overlay-eyebrow text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] mb-1.5 flex items-center gap-1.5">
           <span>Traveling to</span>
         </span>
 
-        <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
+        <h2 class="tw-overlay-title text-xl sm:text-3xl font-black tracking-wide">
           {{ formatSceneTitle(props.targetSceneName) || 'New Location' }}
         </h2>
 
-        <p class="text-xs sm:text-sm text-slate-300 italic mt-2 drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)]">
+        <p class="tw-overlay-muted text-xs sm:text-sm italic mt-2 drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)]">
           <template v-if="props.exitLabel">
-            Passing through <span class="text-amber-200/90 font-semibold not-italic">"{{ props.exitLabel }}"</span>...
+            Passing through <span class="tw-overlay-highlight font-semibold not-italic">"{{ props.exitLabel }}"</span>...
           </template>
           <template v-else>
             The path unfolds into the unknown...
@@ -117,12 +116,12 @@ function formatSceneTitle(name?: string | null): string {
         </p>
 
         <!-- Shimmering Progress Bar -->
-        <div class="w-44 sm:w-60 h-1 bg-slate-800/80 rounded-full overflow-hidden mt-6 relative border border-white/5">
-          <div class="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400 to-transparent w-full animate-shimmer-sweep"></div>
+        <div class="tw-overlay-progress w-44 sm:w-60 h-1 rounded-full overflow-hidden mt-6 relative">
+          <div class="tw-overlay-progress-bar absolute inset-0 w-full animate-shimmer-sweep"></div>
         </div>
 
         <!-- Subtext / Status Note -->
-        <span class="text-[10px] uppercase font-bold text-slate-400 tracking-widest mt-3 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
+        <span class="tw-overlay-muted text-[10px] uppercase font-bold tracking-widest mt-3 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
           {{ props.statusText || 'Weaving scene narrative...' }}
         </span>
       </div>
@@ -159,7 +158,7 @@ function formatSceneTitle(name?: string | null): string {
 
 .scene-backdrop.is-loaded {
   opacity: 0.85;
-  filter: blur(1.5px) saturate(1.15) brightness(0.75);
+  filter: blur(1.5px) var(--tw-overlay-image-filter);
   animation: kenBurns 14s ease-out forwards;
 }
 
@@ -170,12 +169,6 @@ function formatSceneTitle(name?: string | null): string {
   to {
     transform: scale(1.03) translate3d(-1%, -0.5%, 0);
   }
-}
-
-.color-wash {
-  background:
-    radial-gradient(ellipse at 20% 15%, rgba(251, 191, 36, 0.45), transparent 55%),
-    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.4), transparent 55%);
 }
 
 .light-sweep {

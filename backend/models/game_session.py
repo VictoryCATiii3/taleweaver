@@ -1,5 +1,5 @@
 import uuid6
-from sqlalchemy import Column, DateTime, ForeignKey, String
+from sqlalchemy import Column, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import relationship
 
 from backend.models.base import Base, TimestampMixin
@@ -7,6 +7,10 @@ from backend.models.base import Base, TimestampMixin
 
 class GameSession(Base, TimestampMixin):
     __tablename__ = "game_sessions"
+    __table_args__ = (
+        Index("ix_game_sessions_user_id_status", "user_id", "status"),
+        Index("ix_game_sessions_template_id", "template_id"),
+    )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid6.uuid7()))
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False)

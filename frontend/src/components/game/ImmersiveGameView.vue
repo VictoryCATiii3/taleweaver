@@ -29,6 +29,7 @@ import PlayAgentPanel from './immersive/PlayAgentPanel.vue'
 import type { SettingsTabId } from './settings/types'
 import { useStoryTabs } from './immersive/tabs/useStoryTabs'
 import { useUiSkin } from '@/skins/useUiSkin'
+import { useTextDensity } from '@/skins/useTextDensity'
 import { resolveAccent, resolveSkin } from '@/skins/skinRegistry'
 
 const props = defineProps<{
@@ -167,6 +168,7 @@ const {
 
 // --- Dialog skin ---
 const { skinPreference } = useUiSkin()
+const { textDensity } = useTextDensity()
 const activeSkin = computed(() =>
   resolveSkin(skinPreference.value, props.sheet?.ui_theme, props.sheet?.adventure_tone)
 )
@@ -241,6 +243,7 @@ defineExpose({
   <div
     class="tw-skin relative w-full h-full flex flex-col justify-between overflow-hidden select-none bg-slate-950 font-sans"
     :data-skin="activeSkin"
+    :data-density="textDensity"
     :style="skinStyle"
   >
     <!-- 1. FULL VIEW SCENE BACKGROUND -->

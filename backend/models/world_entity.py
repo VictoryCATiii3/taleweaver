@@ -1,5 +1,5 @@
 import uuid6
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import synonym
 
 from backend.models.base import Base, TimestampMixin
@@ -11,6 +11,10 @@ class WorldScene(Base, TimestampMixin):
     """
 
     __tablename__ = "world_scenes"
+    __table_args__ = (
+        Index("ix_world_scenes_session_id_id", "session_id", "id"),
+        Index("ix_world_scenes_template_id_id", "template_id", "id"),
+    )
 
     pk = Column(Integer, primary_key=True, autoincrement=True)
     id = Column(String(50), nullable=False)  # Unique within an adventure (e.g. "FOREST_START")
@@ -38,6 +42,10 @@ class WorldExit(Base, TimestampMixin):
     """
 
     __tablename__ = "world_exits"
+    __table_args__ = (
+        Index("ix_world_exits_session_id_from_scene_id", "session_id", "from_scene_id"),
+        Index("ix_world_exits_template_id_from_scene_id", "template_id", "from_scene_id"),
+    )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid6.uuid7()))
     template_id = Column(
@@ -77,6 +85,10 @@ class WorldEntity(Base, TimestampMixin):
     """
 
     __tablename__ = "world_entities"
+    __table_args__ = (
+        Index("ix_world_entities_session_id_id", "session_id", "id"),
+        Index("ix_world_entities_template_id_id", "template_id", "id"),
+    )
 
     pk = Column(Integer, primary_key=True, autoincrement=True)
     id = Column(String(50), nullable=False)  # e.g. "OLD_LIBRARIAN"

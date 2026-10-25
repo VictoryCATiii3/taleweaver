@@ -8,6 +8,8 @@ import { computed } from 'vue'
 import type { ChatMessage } from '@/types'
 import { renderFormattedHtml } from '@/composables/useComicTurns'
 import { cleanSystemContent, isDebugMessage, isTurnErrorMessage, type TurnError } from '../systemMessages'
+import DiceBadge from '../dice/DiceBadge.vue'
+import { parseDiceRoll } from '../dice/diceRolls'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -30,6 +32,7 @@ const entries = computed(() =>
       key: msg.id || `sys-${index}`,
       kind: kindOf(msg),
       html: renderFormattedHtml(cleanSystemContent(msg)),
+      roll: parseDiceRoll(cleanSystemContent(msg)),
       time: formatTime(msg.timestamp),
       isNew: index >= props.seenCount,
     }))
@@ -80,11 +83,21 @@ function formatTime(value: Date | string | undefined): string {
           <span v-if="entry.isNew" class="text-[9px] font-black uppercase tracking-wider" style="color: var(--tw-accent)">New</span>
           <span v-if="entry.time" class="tw-muted ml-auto text-[10px] tabular-nums">{{ entry.time }}</span>
         </div>
-        <p
-          class="whitespace-pre-wrap break-words"
-          :class="{ 'font-mono text-xs': entry.kind === 'debug' }"
-          v-html="entry.html"
-        ></p>
+        <div class="flex items-center gap-3">
+          <DiceBadge
+            v-if="entry.roll"
+            still
+            :value="entry.roll.value"
+            :sides="entry.roll.sides"
+            :is-crit="entry.roll.isCrit"
+            :is-fumble="entry.roll.isFumble"
+          />
+          <p
+            class="min-w-0 whitespace-pre-wrap break-words"
+            :class="{ 'font-mono text-xs': entry.kind === 'debug' }"
+            v-html="entry.html"
+          ></p>
+        </div>
       </li>
     </ol>
   </div>

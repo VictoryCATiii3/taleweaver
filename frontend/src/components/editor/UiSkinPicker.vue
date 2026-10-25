@@ -201,18 +201,18 @@ async function save() {
           <span class="tw-tab tw-tab--active">Story</span>
           <span class="tw-tab">Discoveries <span class="tw-tab-count">2</span><span class="tw-tab-dot"></span></span>
         </div>
-        <div class="tw-narration relative p-4">
-          <div class="text-sm leading-relaxed">
+        <div class="tw-narration relative">
+          <div>
             <span class="tw-narration-label">Game Master</span>
             <span class="tw-narration-text">The lantern sputters as you step inside. Dust drifts through a single beam of moonlight.</span>
           </div>
         </div>
-        <div class="tw-bubble relative p-3.5 ml-3">
+        <div class="tw-bubble relative ml-3">
           <svg class="tw-bubble-tail" viewBox="0 0 16 24" aria-hidden="true">
             <polygon points="16,0 0,12 16,24" />
             <rect x="14" y="1" width="4" height="22" />
           </svg>
-          <p class="tw-bubble-text text-sm leading-relaxed italic">
+          <p class="tw-bubble-text italic">
             <span class="tw-speaker tw-speaker--primary mr-1.5 font-black text-xs uppercase tracking-wider">Innkeeper</span>
             <span class="comic-voice-tag mr-1.5">[wary]</span>
             "We don't get many travellers this late."

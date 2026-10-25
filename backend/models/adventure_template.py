@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import uuid6
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.models.base import Base, TimestampMixin
@@ -17,6 +17,7 @@ GenerationCancelled = GenerationCancelledError
 
 class AdventureTemplate(Base, TimestampMixin):
     __tablename__ = "adventure_templates"
+    __table_args__ = (Index("ix_adventure_templates_owner_id", "owner_id"),)
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid6.uuid7())

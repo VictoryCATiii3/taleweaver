@@ -80,6 +80,9 @@
 /* ---------- GM narration ---------- */
 .tw-narration {
   position: relative;
+  padding: var(--tw-narration-pad-y) var(--tw-narration-pad-x);
+  font-size: var(--tw-text-size);
+  line-height: var(--tw-text-leading);
   background: var(--tw-narration-bg);
   color: var(--tw-narration-ink);
   border: var(--tw-narration-border);
@@ -134,6 +137,9 @@
 /* ---------- Dialogue bubbles ---------- */
 .tw-bubble {
   position: relative;
+  padding: var(--tw-bubble-pad-y) var(--tw-bubble-pad-x);
+  font-size: var(--tw-text-size);
+  line-height: var(--tw-text-leading);
   background: var(--tw-bubble-bg);
   color: var(--tw-bubble-ink);
   border: var(--tw-bubble-border-width) solid var(--tw-bubble-color);

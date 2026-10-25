@@ -1,4 +1,3 @@
-import io
 import json
 import logging
 import os
@@ -24,9 +23,20 @@ from backend.models.session_state import SessionState
 
 logger = logging.getLogger(__name__)
 
-# Cache scanned file entries for 5 seconds to prevent repeated disk/zip operations during batch requests
+# Cache scanned file entries for 5 seconds to prevent repeated directory walks during batch requests
 _SCAN_CACHE: dict[str, Any] = {"entries": [], "timestamp": 0.0}
 _CACHE_TTL_SECONDS = 5.0
+# data/adventures also holds the per-template asset store (library/) and session data with
+# thousands of folders; walking them made every library load take one to several seconds.
+_SKIPPED_DIR_NAMES = frozenset(
+    {"library", "sessions", "images", "assets", "thumbnails", "__pycache__"}
+)
+_ASSET_DIR_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
+)
+_MAX_SCAN_DEPTH = 3
+# Parsed entry per file path, keyed by (mtime_ns, size): unchanged archives are never reopened.
+_FILE_CACHE: dict[str, tuple[tuple[int, int], Optional[dict[str, Any]]]] = {}
 _ADVENTURE_FILE_EXTENSIONS = (".adz", ".adv")
 
 
@@ -105,11 +115,15 @@ def _adventure_directories() -> list[str]:
 
 
 def _read_manifest(file_path: str, ext: str) -> Optional[dict[str, Any]]:
-    """Loads the adventure manifest from an .adv file or the adventure.adv inside an .adz."""
+    """Loads the adventure manifest from an .adv file or the adventure.adv inside an .adz.
+
+    The archive is opened from disk so only its directory and the manifest member are read,
+    not the bundled images.
+    """
     if ext != ".adz":
         with open(file_path, encoding="utf-8") as f:
             return json.load(f)
-    with open(file_path, "rb") as f, zipfile.ZipFile(io.BytesIO(f.read()), "r") as zf:
+    with zipfile.ZipFile(file_path, "r") as zf:
         if "adventure.adv" not in zf.namelist():
             return None
         return json.loads(zf.read("adventure.adv").decode("utf-8"))
@@ -142,11 +156,7 @@ def _scan_entry(
     }
 
 
-def _scan_file(root: str, filename: str) -> Optional[dict[str, Any]]:
-    ext = os.path.splitext(filename)[1].lower()
-    if ext not in _ADVENTURE_FILE_EXTENSIONS:
-        return None
-    file_path = os.path.abspath(os.path.join(root, filename))
+def _parse_file(file_path: str, filename: str, ext: str) -> Optional[dict[str, Any]]:
     try:
         manifest = _read_manifest(file_path, ext)
         return _scan_entry(file_path, filename, manifest) if manifest else None
@@ -155,8 +165,40 @@ def _scan_file(root: str, filename: str) -> Optional[dict[str, Any]]:
         return None
 
 
+def _scan_file(root: str, filename: str) -> Optional[dict[str, Any]]:
+    """Scan entry for one adventure file, re-parsed only when its mtime or size changed."""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in _ADVENTURE_FILE_EXTENSIONS:
+        return None
+    file_path = os.path.abspath(os.path.join(root, filename))
+    try:
+        stat = os.stat(file_path)
+    except OSError:
+        return None
+    signature = (stat.st_mtime_ns, stat.st_size)
+    cached = _FILE_CACHE.get(file_path)
+    if cached and cached[0] == signature:
+        return cached[1]
+    entry = _parse_file(file_path, filename, ext)
+    _FILE_CACHE[file_path] = (signature, entry)
+    return entry
+
+
+def _is_scannable_dir(name: str) -> bool:
+    """Skips session data and per-template asset folders, which never hold adventure files."""
+    return name.lower() not in _SKIPPED_DIR_NAMES and not _ASSET_DIR_PATTERN.match(name)
+
+
+def _walk_adventure_dirs(base_dir: str):
+    """os.walk limited to _MAX_SCAN_DEPTH levels below base_dir, pruning asset/session folders."""
+    for root, dirs, files in os.walk(base_dir):
+        depth = os.path.relpath(root, base_dir).count(os.sep) + (root != base_dir)
+        dirs[:] = [] if depth >= _MAX_SCAN_DEPTH else [d for d in dirs if _is_scannable_dir(d)]
+        yield root, files
+
+
 def scan_available_adventure_files(force_refresh: bool = False) -> list[dict[str, Any]]:
-    """Recursively scans /adventures and /presets directories for .adz and .adv files."""
+    """Scans the /adventures and /presets directories for .adz and .adv files."""
     now = time.time()
     cached = _SCAN_CACHE["entries"]
     if not force_refresh and cached and (now - _SCAN_CACHE["timestamp"]) < _CACHE_TTL_SECONDS:
@@ -164,7 +206,7 @@ def scan_available_adventure_files(force_refresh: bool = False) -> list[dict[str
 
     scanned: list[dict[str, Any]] = []
     for base_dir in _adventure_directories():
-        for root, _, files in os.walk(base_dir):
+        for root, files in _walk_adventure_dirs(base_dir):
             entries = (_scan_file(root, filename) for filename in files)
             scanned.extend(entry for entry in entries if entry)
 

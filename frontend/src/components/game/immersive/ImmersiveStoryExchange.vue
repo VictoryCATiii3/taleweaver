@@ -4,7 +4,8 @@
  * GM narration caption boxes, NPC dialogue bubbles, and item discovery cards.
  *
  * Colors, fonts and shapes come from the active dialog skin (tw-* classes, see src/skins).
- * Engine events are listed in the System tab; only failed-turn notices stay inline.
+ * Engine events appear inline as compact skinned notes (full list in the System tab);
+ * failed-turn notices keep their Retry/Cancel actions.
  */
 import { ref, computed } from 'vue'
 import { configState } from '@/store/config'
@@ -14,7 +15,9 @@ import type { ComicExchange, DialogueSegment } from '@/composables/useComicTurns
 import { renderDialogueHtml, renderFormattedHtml, resolveNpc } from '@/composables/useComicTurns'
 import { useStoryBubbleAudio } from '@/composables/useStoryBubbleAudio'
 import ImmersiveSystemMessage from '@/components/game/immersive/ImmersiveSystemMessage.vue'
-import { isTurnErrorMessage } from './systemMessages'
+import ImmersiveSystemNote from './ImmersiveSystemNote.vue'
+import { isDebugMessage, isTurnErrorMessage } from './systemMessages'
+import type { ChatMessage } from '@/types'
 import { Volume2, VolumeX, Brain } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -51,12 +54,15 @@ const userSpeech = computed(
   () => props.exchange.userSpeechText || props.exchange.userMessage?.content || ''
 )
 
-const leadingErrors = computed(() =>
-  props.exchange.systemMessages.filter((msg) => isTurnErrorMessage(msg, props.turnError))
-)
-const trailingErrors = computed(() =>
-  props.exchange.trailingSystemMessages.filter((msg) => isTurnErrorMessage(msg, props.turnError))
-)
+/** Engine events shown inline: failed turns as full notices, the rest as compact notes (no debug output). */
+function storyEvents(messages: ChatMessage[]) {
+  return messages
+    .map((msg) => ({ msg, isError: isTurnErrorMessage(msg, props.turnError) }))
+    .filter((event) => event.isError || !isDebugMessage(event.msg))
+}
+
+const leadingEvents = computed(() => storyEvents(props.exchange.systemMessages))
+const trailingEvents = computed(() => storyEvents(props.exchange.trailingSystemMessages))
 
 const revealedItems = computed(() =>
   props.exchange.revealedItemIds
@@ -115,7 +121,7 @@ function getEntityForHover(nameOrEntity: any) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="tw-exchange flex flex-col">
     <!-- 1) PROTAGONIST / USER SPEECH OR ACTION BUBBLE -->
     <div
       v-if="props.exchange.userMessage"
@@ -135,7 +141,7 @@ function getEntityForHover(nameOrEntity: any) {
           <span>{{ isSpeakingBubble(userSpeech, playerName) ? 'Stop' : 'Audio' }}</span>
         </button>
 
-        <div class="tw-bubble tw-bubble--player p-3.5 sm:p-4.5">
+        <div class="tw-bubble tw-bubble--player">
           <!-- Speech tail pointing to the speaker on the left -->
           <svg class="tw-bubble-tail" viewBox="0 0 16 24" aria-hidden="true">
             <polygon points="16,0 0,12 16,24" />
@@ -143,7 +149,7 @@ function getEntityForHover(nameOrEntity: any) {
           </svg>
 
           <p
-            class="tw-bubble-text text-sm sm:text-base leading-relaxed font-semibold"
+            class="tw-bubble-text font-semibold"
             :class="{ italic: props.exchange.userIsDialogue }"
           >
             <span
@@ -204,19 +210,21 @@ function getEntityForHover(nameOrEntity: any) {
       </span>
     </div>
 
-    <!-- 2) FAILED-TURN NOTICES BEFORE THE NARRATION -->
-    <ImmersiveSystemMessage
-      v-for="(sysMsg, sysIdx) in leadingErrors"
-      :key="sysMsg.id || `pre-${sysIdx}`"
-      :msg="sysMsg"
-      :turn-error="props.turnError"
-      :sheet="props.sheet"
-      :game-id="props.gameId"
-      :current-scene-description="props.currentSceneDescription"
-      :npc-metadata="props.npcMetadata"
-      @retry-turn="emit('retryTurn')"
-      @cancel-turn-error="emit('cancelTurnError')"
-    />
+    <!-- 2) ENGINE EVENTS BEFORE THE NARRATION (compact notes; failed turns keep Retry/Cancel) -->
+    <template v-for="(event, sysIdx) in leadingEvents" :key="event.msg.id || `leading-${sysIdx}`">
+      <ImmersiveSystemMessage
+        v-if="event.isError"
+        :msg="event.msg"
+        :turn-error="props.turnError"
+        :sheet="props.sheet"
+        :game-id="props.gameId"
+        :current-scene-description="props.currentSceneDescription"
+        :npc-metadata="props.npcMetadata"
+        @retry-turn="emit('retryTurn')"
+        @cancel-turn-error="emit('cancelTurnError')"
+      />
+      <ImmersiveSystemNote v-else :msg="event.msg" />
+    </template>
 
     <!-- 3) COMBINED GM NARRATION & NPC DIALOGUE BUBBLES -->
     <div
@@ -226,7 +234,7 @@ function getEntityForHover(nameOrEntity: any) {
     >
       <!-- GM NARRATION BOX -->
       <div v-if="dlg.isNarration" class="relative group shrink-0 w-full max-w-2xl">
-        <div class="tw-narration p-4 sm:p-5" :class="{ 'is-speaking': isSpeakingBubble(dlg.text) }">
+        <div class="tw-narration" :class="{ 'is-speaking': isSpeakingBubble(dlg.text) }">
           <!-- Overlay TTS Button -->
           <button
             v-if="configState.isTtsEnabled && !audioService.autoSpeechEnabled.value"
@@ -240,7 +248,7 @@ function getEntityForHover(nameOrEntity: any) {
             <span>{{ isSpeakingBubble(dlg.text) ? 'Stop' : 'Audio' }}</span>
           </button>
 
-          <div class="text-sm sm:text-base leading-relaxed">
+          <div>
             <span class="tw-narration-label">Game Master</span>
             <span class="tw-narration-text" v-html="renderFormattedHtml(dlg.text)"></span>
           </div>
@@ -264,7 +272,7 @@ function getEntityForHover(nameOrEntity: any) {
         </button>
 
         <div
-          class="tw-bubble p-3.5 sm:p-4.5"
+          class="tw-bubble"
           :class="{
             'tw-bubble--player': dlg.isPlayer,
             'is-speaking': isSpeakingBubble(dialogueSpeech(dlg), dlg.speaker),
@@ -276,7 +284,7 @@ function getEntityForHover(nameOrEntity: any) {
             <rect x="14" y="1" width="4" height="22" />
           </svg>
 
-          <p class="tw-bubble-text text-sm sm:text-base leading-relaxed font-medium italic">
+          <p class="tw-bubble-text font-medium italic">
             <span
               class="tw-speaker tw-speaker--primary mr-1.5 font-black text-xs sm:text-sm uppercase tracking-wider"
               :class="{ 'tw-speaker--player': dlg.isPlayer }"
@@ -313,19 +321,21 @@ function getEntityForHover(nameOrEntity: any) {
       </div>
     </div>
 
-    <!-- 4) FAILED-TURN NOTICES AFTER THE NARRATION -->
-    <ImmersiveSystemMessage
-      v-for="(sysMsg, sysIdx) in trailingErrors"
-      :key="sysMsg.id || `post-${sysIdx}`"
-      :msg="sysMsg"
-      :turn-error="props.turnError"
-      :sheet="props.sheet"
-      :game-id="props.gameId"
-      :current-scene-description="props.currentSceneDescription"
-      :npc-metadata="props.npcMetadata"
-      @retry-turn="emit('retryTurn')"
-      @cancel-turn-error="emit('cancelTurnError')"
-    />
+    <!-- 4) ENGINE EVENTS AFTER THE NARRATION (items added, stat changes) -->
+    <template v-for="(event, sysIdx) in trailingEvents" :key="event.msg.id || `trailing-${sysIdx}`">
+      <ImmersiveSystemMessage
+        v-if="event.isError"
+        :msg="event.msg"
+        :turn-error="props.turnError"
+        :sheet="props.sheet"
+        :game-id="props.gameId"
+        :current-scene-description="props.currentSceneDescription"
+        :npc-metadata="props.npcMetadata"
+        @retry-turn="emit('retryTurn')"
+        @cancel-turn-error="emit('cancelTurnError')"
+      />
+      <ImmersiveSystemNote v-else :msg="event.msg" />
+    </template>
 
     <!-- 5) REVEALED ITEMS DISCOVERY CARDS -->
     <div v-if="revealedItems.length" class="flex flex-wrap gap-3 my-2 shrink-0">

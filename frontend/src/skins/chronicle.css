@@ -71,14 +71,13 @@
 [data-skin='chronicle'] .tw-narration-text {
   display: flow-root;
   font-size: 1.08em;
-  line-height: 1.65;
   letter-spacing: 0;
 }
 
 /* Dialogue: scroll with a ribbon banner for the speaker. */
 [data-skin='chronicle'] .tw-bubble {
   margin-top: 0.875rem;
-  padding-top: 1.75rem;
+  padding-top: calc(var(--tw-bubble-pad-y) + 1rem);
 }
 
 [data-skin='chronicle'] .tw-bubble-tail {
