@@ -90,6 +90,10 @@ def evaluate_sequence_progress(
     If conditions are met, awards XP to the avatar, advances state.active_sequence_id,
     and returns descriptive system messages.
     """
+    # The final sequence stays active after it completed; evaluating it again would repeat its
+    # completion message and XP on every snapshot load.
+    if getattr(state, "is_completed", False) is True:
+        return []
     sequences = _ordered_sequences(adventure)
     index = _active_index(sequences, getattr(state, "active_sequence_id", None))
     if index < 0:

@@ -10,6 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.routes.adventures.gameplay_logic import GameTurnManager
 from backend.api.routes.adventures.logic import AdventureLogic
+from backend.api.routes.adventures.out_of_turn_progress import (
+    FINAL_SEQUENCE_NOTE,
+    TERMINAL_STATUSES,
+)
 from backend.core.config import settings
 from backend.engine.map_engine import MapEngine
 from backend.models.adventure_template import AdventureTemplate
@@ -45,10 +49,14 @@ async def build_session_map(db: AsyncSession, state: SessionState) -> dict[str, 
 
     exits_res = await db.execute(
         select(WorldExit).where(
-            or_(WorldExit.session_id == state.session_id, WorldExit.template_id == state.template_id)
+            or_(
+                WorldExit.session_id == state.session_id, WorldExit.template_id == state.template_id
+            )
         )
     )
-    return MapEngine.augment_map_data(map_dict, list(exits_res.scalars().all()), state.current_scene_id)
+    return MapEngine.augment_map_data(
+        map_dict, list(exits_res.scalars().all()), state.current_scene_id
+    )
 
 
 async def load_full_world_debug(db: AsyncSession, state: SessionState, requested: bool) -> Any:
@@ -93,8 +101,12 @@ async def apply_pending_sequence_progress(
     state: SessionState,
     adventure: AdventureTemplate | None,
     avatar: Avatar | None,
+    user: User,
 ) -> bool:
-    """Evaluates sequence progress on load; returns True when new system messages were saved."""
+    """Evaluates sequence progress on load; returns True when new system messages were saved.
+
+    Completing the final sequence here also ends the adventure, like it does during a turn.
+    """
     if not (adventure and avatar):
         return False
     seq_messages = AdventureLogic.evaluate_sequence_progress(
@@ -104,6 +116,12 @@ async def apply_pending_sequence_progress(
         return False
     for seq_msg in seq_messages:
         db.add(ChatMessage(session_id=state.session_id, role="system", content=seq_msg))
+    session_status = state.session.status if state.session else None
+    if state.is_completed is True and session_status not in TERMINAL_STATUSES:
+        manager = GameTurnManager(
+            db, state.session_id, user, state=state, adventure=adventure, avatar=avatar
+        )
+        await manager._finalize_session("completed", FINAL_SEQUENCE_NOTE)
     await db.commit()
     return True
 

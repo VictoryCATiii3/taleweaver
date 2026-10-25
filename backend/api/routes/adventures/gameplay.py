@@ -169,13 +169,14 @@ async def get_chat_history(
     cv_res = await db.execute(select(Avatar).where(Avatar.id == state.avatar_id))
     avatar = cv_res.scalars().first()
 
+    # Before the terminal flags: completing the final sequence here ends the adventure.
+    await apply_pending_sequence_progress(db, state, adventure, avatar, current_user)
     map_dict = await build_session_map(db, state)
     entities = await AdventureLogic.build_session_entities(db, state)
     scene_image = await AdventureLogic.resolve_scene_image(db, state, state.current_scene_id)
     pending_terminal_epilogue, input_locked = _terminal_flags_from_state(state)
     full_world_debug = await load_full_world_debug(db, state, include_full_world)
     prompt_suggestions = await resolve_prompt_suggestions(db, state, current_user)
-    await apply_pending_sequence_progress(db, state, adventure, avatar)
     history = await load_chat_history(db, state.session_id)
     session_status = state.session.status if state.session else None
     await mark_session_played(db, state.session_id)

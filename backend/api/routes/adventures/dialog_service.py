@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
 
 from backend.api.routes.adventures.gameplay_logic import GameTurnManager
+from backend.api.routes.adventures.out_of_turn_progress import apply_out_of_turn_progress
 from backend.api.routes.adventures.post_turn_hooks import PostTurnHooks
 from backend.core.llm_router import GameMasterLLM
 from backend.engine.rule_engine import GameOverError
@@ -67,14 +68,32 @@ class DialogChoiceResolver:
         await self.manager._save_chat_message("user", f"{CHOICE_MESSAGE_PREFIX} {option['label']}")
         messages, ended = await self._run_handler(dialog, option)
         if not ended:
-            messages.extend(await PostTurnHooks(self.manager).run_checks())
-        if dialog.get("narrate") and not ended:
+            ended = await self._apply_follow_ups(messages)
+        if ended:
+            messages.extend(await self._announce_ending())
+        elif dialog.get("narrate"):
             narration = await self._narrate(dialog, option, messages, language)
             if narration:
                 await self.manager._save_chat_message("assistant", narration)
                 messages.append(narration)
         await self.manager.db.commit()
         return {"status": "ok", "messages": [str(m) for m in messages]}
+
+    async def _apply_follow_ups(self, messages: list[Any]) -> bool:
+        """What a turn would do after state changes; returns True when the adventure ended."""
+        messages.extend(await PostTurnHooks(self.manager).run_checks())
+        progress, terminal_status = await apply_out_of_turn_progress(self.manager)
+        messages.extend(progress)
+        return terminal_status is not None
+
+    async def _announce_ending(self) -> list[str]:
+        """Tells the outcome in the story; the end screen and final report follow on the client."""
+        session = self.manager.state.session
+        note = str(getattr(session, "status_note", "") or "").strip()
+        if not note:
+            return []
+        await self.manager._save_chat_message("assistant", note)
+        return [note]
 
     def _clear_dialog(self) -> None:
         state = self.manager.state

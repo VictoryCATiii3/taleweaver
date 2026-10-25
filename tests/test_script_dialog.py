@@ -287,3 +287,93 @@ async def test_agent_turn_answers_open_dialog_instead_of_playing(monkeypatch):
         assert any(e.startswith("event: final") for e in events)
         assert _dialog(manager) is None
         assert manager.state.entity_states["__script_vars__"]["bomb_disarmed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_win_guard_after_choice_completes_adventure():
+    async with TestSessionLocal() as db:
+        # Arrange
+        manager = await _manager(db)
+        manager.adventure.completed_guard_expression = "tw.vars.get('bomb_disarmed') == 1"
+        await db.commit()
+
+        # Act
+        await DialogChoiceResolver(manager).resolve(_dialog(manager)["id"], 0, None)
+
+        # Assert
+        assert manager.state.session.status == "completed"
+        assert manager.state.is_completed is True
+
+
+@pytest.mark.asyncio
+async def test_game_over_choice_tells_the_outcome_in_the_story():
+    async with TestSessionLocal() as db:
+        # Arrange
+        manager = await _manager(db)
+
+        # Act
+        result = await DialogChoiceResolver(manager).resolve(_dialog(manager)["id"], 1, None)
+
+        # Assert
+        assert result["messages"][-1] == "The bomb exploded."
+        rows = (await db.execute(select(ChatMessage.role, ChatMessage.content))).all()
+        assert ("assistant", "The bomb exploded.") in [tuple(r) for r in rows]
+
+
+@pytest.mark.asyncio
+async def test_final_sequence_completes_once_and_ends_adventure():
+    from backend.api.routes.adventures.chat_snapshot import apply_pending_sequence_progress
+
+    async with TestSessionLocal() as db:
+        # Arrange
+        manager = await _manager(db)
+        manager.adventure.sequences = [
+            {"id": "SEQ_1", "order": 1, "title": "Sixty Seconds", "exp_reward": 100,
+             "completion_guard_expression": "tw.vars.get('bomb_disarmed') == 1"}
+        ]  # fmt: skip
+        await DialogChoiceResolver(manager).resolve(_dialog(manager)["id"], 0, None)
+        exp_after_choice = manager.avatar.exp
+
+        # Act: snapshot reloads (the client polls GET /chat every few seconds)
+        reloaded = [
+            await apply_pending_sequence_progress(
+                db, manager.state, manager.adventure, manager.avatar, manager.user
+            )
+            for _ in range(3)
+        ]
+
+        # Assert
+        assert reloaded == [False, False, False]
+        assert manager.avatar.exp == exp_after_choice
+        assert manager.state.session.status == "completed"
+        rows = (await db.execute(select(ChatMessage.content))).scalars().all()
+        assert sum(1 for r in rows if r.startswith("Sequence completed")) == 1
+
+
+@pytest.mark.asyncio
+async def test_snapshot_completing_final_sequence_ends_adventure():
+    from backend.api.routes.adventures.chat_snapshot import apply_pending_sequence_progress
+
+    async with TestSessionLocal() as db:
+        # Arrange: the guard already holds, e.g. set by a script in chat mode
+        manager = await _manager(db)
+        manager.adventure.sequences = [
+            {"id": "SEQ_1", "order": 1, "title": "Sixty Seconds", "exp_reward": 100,
+             "completion_guard_expression": "tw.vars.get('bomb_disarmed') == 1"}
+        ]  # fmt: skip
+        manager.state.entity_states = {
+            **manager.state.entity_states,
+            "__script_vars__": {"bomb_disarmed": 1},
+        }
+        await db.commit()
+        args = (db, manager.state, manager.adventure, manager.avatar, manager.user)
+
+        # Act
+        first, second = (
+            await apply_pending_sequence_progress(*args),
+            await apply_pending_sequence_progress(*args),
+        )
+
+        # Assert
+        assert (first, second) == (True, False)
+        assert manager.state.session.status == "completed"
