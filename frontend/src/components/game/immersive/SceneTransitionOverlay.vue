@@ -2,14 +2,12 @@
 /**
  * SceneTransitionOverlay — Atmospheric scene transition curtain
  *
- * Displays a cinematic loading veil with rotating compass rose, destination banner,
- * and fantasy shimmer effect when traversing between scenes. When the destination
+ * Displays a cinematic loading veil with destination banner and shimmer effect when traversing between scenes. When the destination
  * scene has an image, it is revealed behind the veil with a slow Ken Burns drift
  * and layered gradient vignettes. Colors and fonts follow the active dialog skin
  * (--tw-overlay-* tokens, see src/skins/overlays.css).
  */
 import { ref, watch } from 'vue'
-import { Compass, Sparkles } from 'lucide-vue-next'
 
 const props = defineProps<{
   active: boolean
@@ -80,21 +78,6 @@ function formatSceneTitle(name?: string | null): string {
 
       <!-- Ambient Glow Orb -->
       <div class="tw-overlay-glow absolute w-72 h-72 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
-
-      <!-- Center Mystic Compass / Wayfinder Emblem -->
-      <div class="relative flex items-center justify-center mb-6">
-        <!-- Outer rotating rune ring -->
-        <div class="tw-overlay-ring w-24 h-24 sm:w-28 sm:h-28 rounded-full animate-spin-slow"></div>
-
-        <!-- Middle glowing ring -->
-        <div class="tw-overlay-emblem absolute w-18 h-18 sm:w-20 sm:h-20 rounded-full backdrop-blur-sm flex items-center justify-center">
-          <Compass class="w-8 h-8 sm:w-9 sm:h-9 animate-compass-breath" />
-        </div>
-
-        <!-- Floating Sparkles -->
-        <Sparkles class="tw-overlay-accent absolute -top-1 -right-1 w-4 h-4 animate-pulse" />
-        <Sparkles class="tw-overlay-accent absolute -bottom-2 -left-2 w-3.5 h-3.5 opacity-70 animate-pulse delay-300" />
-      </div>
 
       <!-- Destination Information -->
       <div class="flex flex-col items-center text-center max-w-md px-4 z-10">
@@ -191,33 +174,6 @@ function formatSceneTitle(name?: string | null): string {
   100% {
     background-position: -100% 0;
   }
-}
-
-/* Custom animations */
-@keyframes spinSlow {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-spin-slow {
-  animation: spinSlow 18s linear infinite;
-}
-
-@keyframes compassBreath {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
-}
-
-.animate-compass-breath {
-  animation: compassBreath 2.8s ease-in-out infinite;
 }
 
 @keyframes shimmerSweep {

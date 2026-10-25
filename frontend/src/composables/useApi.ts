@@ -446,6 +446,14 @@ export const api = {
     })
   },
 
+  /** Rolls one die instantly (`/roll [sides]`); the result is stored as a system message. */
+  rollDie(gameId: string, args: string): Promise<{ id: string; role: 'system'; content: string; scene_id?: string | null; sequence_id?: string | null }> {
+    return request(`/adventures/${gameId}/roll`, {
+      method: 'POST',
+      body: JSON.stringify({ args }),
+    })
+  },
+
   /** Attempts to unlock one container using a key item from inventory. */
   unlockContainerWithItem(gameId: string, entityId: string, itemId: string): Promise<{ status: string; entity_id: string; locked: boolean }> {
     return request(`/adventures/${gameId}/containers/${encodeURIComponent(entityId)}/unlock-item`, {

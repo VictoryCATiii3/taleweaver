@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from backend.api.routes.adventures.agent_routes import router as agent_router
 from backend.api.routes.adventures.assets import router as assets_router
 from backend.api.routes.adventures.cloning import router as cloning_router
+from backend.api.routes.adventures.dice_routes import router as dice_router
 from backend.api.routes.adventures.editor import router as editor_router
 from backend.api.routes.adventures.editor_entity_transfer import (
     router as editor_entity_transfer_router,
@@ -46,4 +47,5 @@ router.include_router(templates_router)
 
 # 7. Gameplay (parameterized paths like /{game_id}/chat)
 router.include_router(gameplay_router)
+router.include_router(dice_router)
 router.include_router(agent_router)

@@ -9,7 +9,7 @@ import type { ChatMessage } from '@/types'
 import { renderFormattedHtml } from '@/composables/useComicTurns'
 import { cleanSystemContent, isDebugMessage, isTurnErrorMessage, type TurnError } from '../systemMessages'
 import DiceBadge from '../dice/DiceBadge.vue'
-import { parseDiceRoll } from '../dice/diceRolls'
+import { parseDiceRoll, stripDiceEmoji } from '../dice/diceRolls'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -31,7 +31,7 @@ const entries = computed(() =>
     .map((msg, index) => ({
       key: msg.id || `sys-${index}`,
       kind: kindOf(msg),
-      html: renderFormattedHtml(cleanSystemContent(msg)),
+      html: renderFormattedHtml(stripDiceEmoji(cleanSystemContent(msg))),
       roll: parseDiceRoll(cleanSystemContent(msg)),
       time: formatTime(msg.timestamp),
       isNew: index >= props.seenCount,

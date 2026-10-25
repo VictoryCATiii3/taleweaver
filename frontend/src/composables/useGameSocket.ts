@@ -7,6 +7,7 @@
 import { ref, watch, type Ref } from 'vue'
 import { useNotifications } from '@/composables/useNotifications'
 import { authState } from '@/store/auth'
+import { api } from '@/composables/useApi'
 import type { ChatMessage, CharacterSheet, CombatState } from '@/types'
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'game_over' | 'loading' | 'completed'
@@ -432,8 +433,24 @@ export function useGameSocket(): UseGameSocket {
   /**
    * Posts a player message and processes the GM response.
    */
+  /** `/roll` is deterministic: it bypasses the turn pipeline and never interrupts a running turn. */
+  async function runRollCommand(args: string): Promise<void> {
+    if (!currentGameId) return
+    try {
+      const result = await api.rollDie(currentGameId, args)
+      _pushMessage('system', result.content)
+    } catch (err: any) {
+      _pushMessage('system', err?.message || 'The die slipped off the table. Try again.')
+    }
+  }
+
   async function sendMessage(content: string, isRetry: boolean = false): Promise<void> {
     const normalizedContent = normalizeUiActionInput(content)
+    const rollMatch = /^\/roll(?:\s+(.*))?$/i.exec(normalizedContent.trim())
+    if (rollMatch) {
+      await runRollCommand(rollMatch[1] ?? '')
+      return
+    }
     const isAgentOff = ['/playagent off', '/play-agent off'].includes(normalizedContent.trim().toLowerCase())
     const hadActiveChat = !!activeChatController
 
@@ -475,7 +492,7 @@ export function useGameSocket(): UseGameSocket {
       return
     }
 
-    const silentCommands = ['/take_direct', '/rule-pass', '/equip', '/unequip', '/consume', '/shuffle', '/suggest', '/suggestions', '/traverse_exit', '/roll']
+    const silentCommands = ['/take_direct', '/rule-pass', '/equip', '/unequip', '/consume', '/shuffle', '/suggest', '/suggestions', '/traverse_exit']
     const isSilent = silentCommands.some(cmd => normalizedContent.toLowerCase().startsWith(cmd))
 
     if (normalizedContent && !isSilent) {

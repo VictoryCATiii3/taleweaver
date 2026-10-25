@@ -64,21 +64,6 @@
   background: color-mix(in srgb, var(--tw-overlay-accent) 12%, transparent);
 }
 
-.tw-overlay-ring {
-  border: 1px dashed color-mix(in srgb, var(--tw-overlay-accent) 45%, transparent);
-}
-
-.tw-overlay-emblem {
-  border: 1px solid color-mix(in srgb, var(--tw-overlay-accent) 60%, transparent);
-  background: color-mix(in srgb, var(--tw-overlay-accent) 10%, var(--tw-overlay-bg));
-  box-shadow: 0 0 30px color-mix(in srgb, var(--tw-overlay-accent) 25%, transparent);
-  color: var(--tw-overlay-accent);
-}
-
-.tw-overlay-accent {
-  color: var(--tw-overlay-accent);
-}
-
 .tw-overlay-eyebrow {
   color: var(--tw-overlay-accent);
   font-family: var(--tw-font-overlay-eyebrow);

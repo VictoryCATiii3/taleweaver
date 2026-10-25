@@ -130,3 +130,43 @@ def test_roll_die_stays_within_bounds():
     assert results <= set(range(1, 7))
     assert min(results) == 1
     assert max(results) == 6
+
+
+async def test_roll_endpoint_returns_and_stores_result_instantly(auth_client, monkeypatch):
+    # Arrange
+    from sqlalchemy import select
+
+    from backend.models.chat import ChatMessage
+    from tests.conftest import TestSessionLocal
+    from tests.test_adventures_api import _create_adventure
+
+    monkeypatch.setattr(dice_command, "roll_die", lambda sides: sides)
+    ids = await _create_adventure(auth_client, "Dice Endpoint Quest")
+
+    # Act
+    resp = await auth_client.post(f"/api/adventures/{ids['game_id']}/roll", json={"args": "d20"})
+
+    # Assert
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["content"] == format_roll_message(20, 20)
+    async with TestSessionLocal() as db:
+        stored = (
+            (await db.execute(select(ChatMessage).where(ChatMessage.session_id == ids["game_id"])))
+            .scalars()
+            .all()
+        )
+    assert [m.content for m in stored if m.role == "system"][-1] == format_roll_message(20, 20)
+
+
+async def test_roll_endpoint_rejects_invalid_sides(auth_client):
+    # Arrange
+    from tests.test_adventures_api import _create_adventure
+
+    ids = await _create_adventure(auth_client, "Dice Error Quest")
+
+    # Act
+    resp = await auth_client.post(f"/api/adventures/{ids['game_id']}/roll", json={"args": "99"})
+
+    # Assert
+    assert resp.status_code == 422
+    assert "between 2 and 30" in resp.json()["detail"]

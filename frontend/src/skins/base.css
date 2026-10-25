@@ -376,6 +376,21 @@
   color: var(--tw-card-muted);
 }
 
+/* Inline markup from renderFormattedHtml carries fixed colors meant for dark bubbles;
+   on cards (e.g. light case files in the System log) it takes the card's ink instead. */
+.tw-skin .tw-card strong {
+  color: inherit;
+}
+
+.tw-skin .tw-card .comic-voice-tag {
+  border-color: color-mix(in srgb, var(--tw-card-ink) 25%, transparent);
+  background: color-mix(in srgb, var(--tw-card-ink) 8%, transparent);
+  color: var(--tw-card-ink);
+  font-family: inherit;
+  font-size: 0.85em;
+  transform: none;
+}
+
 .tw-card--interactive {
   cursor: pointer;
 }

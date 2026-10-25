@@ -33,7 +33,7 @@ def parse_roll_sides(user_msg: str) -> int:
         return DEFAULT_SIDES
     raw = parts[1].strip().lower().removeprefix("d")
     if not raw.isdigit():
-        raise RollCommandError(f"Usage: /roll [{MIN_SIDES}-{MAX_SIDES}], e.g. /roll 20.")
+        raise RollCommandError(f"Usage: /roll {MIN_SIDES}-{MAX_SIDES} (sides), e.g. /roll 20.")
     sides = int(raw)
     if not MIN_SIDES <= sides <= MAX_SIDES:
         raise RollCommandError(f"A die needs between {MIN_SIDES} and {MAX_SIDES} sides.")
@@ -42,6 +42,12 @@ def parse_roll_sides(user_msg: str) -> int:
 
 def roll_die(sides: int) -> int:
     return secrets.randbelow(sides) + 1
+
+
+def roll_from_args(args: str) -> str:
+    """Parses the ``/roll`` arguments, rolls and returns the system message text."""
+    sides = parse_roll_sides(f"{ROLL_COMMAND} {args}".strip())
+    return format_roll_message(sides, roll_die(sides))
 
 
 def format_roll_message(sides: int, value: int) -> str:

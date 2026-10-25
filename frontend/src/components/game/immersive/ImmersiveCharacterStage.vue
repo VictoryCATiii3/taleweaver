@@ -3,7 +3,8 @@
  * ImmersiveCharacterStage — Left-side 2:3 vertical character cards
  *
  * Displays portraits of the protagonist and scene NPCs with active speaker auras,
- * health status, defeat tags, and quick click/hover interactions.
+ * health status, defeat tags, and quick click/hover interactions. Characters joining the scene
+ * get a skin-specific entrance (see src/skins/entrances.css).
  */
 import { ref, watch, nextTick, computed } from 'vue'
 import { getImageUrl, getOriginalImageUrl } from '@/utils/game_icons'
@@ -72,6 +73,41 @@ function showImage(path?: string | null) {
   return !!path && !brokenImages.value[path]
 }
 
+// --- Entrances: characters that join the scene after the stage was first filled ---
+const ARRIVAL_HIGHLIGHT_MS = 2600
+const recentArrivals = ref<Set<string>>(new Set())
+/** Entrance transitions start only after the first cast has rendered (no animation on load). */
+const stageReady = ref(false)
+
+watch(
+  () => (props.npcs || []).map((npc) => String(npc.id)),
+  (ids, previousIds) => {
+    if (!stageReady.value) {
+      if (ids.length) {
+        nextTick(() => {
+          stageReady.value = true
+        })
+      }
+      return
+    }
+    const known = new Set(previousIds ?? [])
+    const arrivals = ids.filter((id) => id !== 'PLAYER' && !known.has(id))
+    if (!arrivals.length) {
+      return
+    }
+    recentArrivals.value = new Set([...recentArrivals.value, ...arrivals])
+    window.setTimeout(() => {
+      const remaining = new Set(recentArrivals.value)
+      arrivals.forEach((id) => remaining.delete(id))
+      recentArrivals.value = remaining
+    }, ARRIVAL_HIGHLIGHT_MS)
+  }
+)
+
+function hasJustArrived(npc: any): boolean {
+  return recentArrivals.value.has(String(npc.id))
+}
+
 function isNpcSpeaking(npc: any): boolean {
   if (!npc || !props.activeSpeakers) return false
   const nameMatch = npc.name && props.activeSpeakers.has(npc.name.toLowerCase())
@@ -85,12 +121,13 @@ function isNpcSpeaking(npc: any): boolean {
     ref="stageContainerRef"
     class="flex flex-col gap-2 shrink-0 overflow-y-auto w-20 sm:w-28 md:w-36 lg:w-44 custom-scrollbar pr-1 py-1 max-h-full"
   >
-    <TransitionGroup name="npc-stage" tag="div" class="flex flex-col gap-2 w-full">
+    <TransitionGroup :name="stageReady ? 'tw-npc' : 'tw-npc-initial'" tag="div" class="flex flex-col gap-2 w-full">
       <div
         v-for="npc in props.npcs"
         :key="npc.id"
         class="relative group flex flex-col items-center bg-slate-950 rounded-xl border-2 transition-all duration-300 shrink-0 w-full aspect-[2/3] overflow-hidden cursor-pointer shadow-[0_6px_20px_rgba(0,0,0,0.7)] active:scale-98"
         :class="[
+          { 'tw-npc-arrived': hasJustArrived(npc) },
           isNpcSpeaking(npc)
             ? 'border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.6)] ring-2 ring-amber-400/60'
             : npc.id === 'PLAYER'
@@ -115,6 +152,10 @@ function isNpcSpeaking(npc: any): boolean {
         <div v-else class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 to-slate-950 text-slate-600">
           <i :class="['ra text-4xl mb-1', npc.id === 'PLAYER' ? 'ra-player text-emerald-400' : 'ra-helmet text-cyan-400']"></i>
         </div>
+
+        <!-- Entrance: one-off light sweep and a short "Enters" tag -->
+        <div v-if="hasJustArrived(npc)" class="tw-npc-sweep" aria-hidden="true"></div>
+        <div v-if="hasJustArrived(npc)" class="tw-npc-arrival-tag">Enters</div>
 
         <!-- Active Speaker Badge -->
         <div v-if="isNpcSpeaking(npc)" class="absolute top-2 right-2 z-20 px-1.5 py-0.5 rounded-full bg-amber-500 text-black text-[8px] font-black uppercase tracking-wider shadow-md animate-bounce">
@@ -150,17 +191,6 @@ function isNpcSpeaking(npc: any): boolean {
 .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.1); }
-
-.npc-stage-move,
-.npc-stage-enter-active,
-.npc-stage-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.npc-stage-enter-from,
-.npc-stage-leave-to {
-  opacity: 0;
-  transform: scale(0.92);
-}
 
 .ra {
   font-family: 'rpgawesome' !important;
