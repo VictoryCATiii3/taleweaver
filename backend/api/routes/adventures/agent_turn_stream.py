@@ -14,11 +14,17 @@ from sqlalchemy import select
 
 from backend.api.routes.adventures.agent_actions import execute_agent_action
 from backend.api.routes.adventures.agent_combat import decide_combat_turn
+from backend.api.routes.adventures.agent_dialog import decide_dialog_option
 from backend.api.routes.adventures.agent_logic import AgentService
 from backend.api.routes.adventures.agent_settings import build_agent_snapshot
+from backend.api.routes.adventures.dialog_service import (
+    CHOICE_MESSAGE_PREFIX,
+    DialogChoiceResolver,
+)
 from backend.api.routes.adventures.gameplay_logic import GameTurnManager
 from backend.api.routes.adventures.logic import AdventureLogic
 from backend.core import database as core_database
+from backend.engine.scripting.dialog import pending_dialog
 from backend.models.chat import ChatMessage
 from backend.models.user import User
 
@@ -157,6 +163,26 @@ async def _agent_action_events(
         yield event
 
 
+async def _agent_dialog_events(
+    db, manager: GameTurnManager, dialog: dict[str, Any]
+) -> AsyncGenerator[str, None]:
+    """Answers an open choice dialog instead of playing a free-text turn."""
+    thoughts, option = await decide_dialog_option(manager, dialog)
+    yield _sse("thought", {"content": thoughts})
+    yield _sse("player_action", {"content": f"{CHOICE_MESSAGE_PREFIX} {option['label']}"})
+    AgentService.reset_failures(manager.state)
+    try:
+        result = await DialogChoiceResolver(manager).resolve(dialog["id"], option["index"], None)
+        messages = result["messages"]
+    except HTTPException as exc:
+        messages = [f"Choice failed: {exc.detail}"]
+    for msg in messages:
+        yield _sse("system", {"role": "system", "content": msg})
+    yield await _final_event(db, manager)
+    async for event in _agent_finish_events(db, manager):
+        yield event
+
+
 async def _agent_finish_events(db, manager: GameTurnManager) -> AsyncGenerator[str, None]:
     """Deactivates the agent once the adventure has been won or lost."""
     flags = manager._build_terminal_flags_payload()
@@ -179,6 +205,11 @@ async def stream_agent_turn(game_id: str, current_user: User) -> AsyncGenerator[
         manager = GameTurnManager(db, game_id, current_user)
         await manager.initialize()
         try:
+            dialog = pending_dialog(manager.state.entity_states)
+            if dialog is not None:
+                async for event in _agent_dialog_events(db, manager, dialog):
+                    yield event
+                return
             decision, decision_failed = await _decide(db, game_id, current_user, manager)
             if not decision or decision.is_stuck_or_bug:
                 events = _agent_issue_events(db, game_id, manager, decision, decision_failed)

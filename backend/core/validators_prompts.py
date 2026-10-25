@@ -186,7 +186,10 @@ RULES
     - sequence: title, description, walkthrough, end_condition, required_item_id,
       required_scene_id, required_defeated_npc_id, guard_expression,
       completion_guard_expression, on_start_sequence_text, on_end_sequence_text,
-      on_start_sequence_script, on_end_sequence_script
+      on_start_sequence_script, on_end_sequence_script,
+      soft_rules.<RULE_ID>.<field> where <field> is condition, script, text, guard_expression
+      or max_triggers (only for rule ids listed in the sequence's `soft_rules`; an empty
+      string removes script/text/guard, max_triggers 0 removes the limit)
 - Sequence findings (location `sequence:<id>`): target the sequence itself with its id.
   `guard_expression` gates when the chapter may START, so it must only reference state
   that earlier chapters establish, never flags the chapter's own walkthrough sets.

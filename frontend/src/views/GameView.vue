@@ -1942,7 +1942,7 @@ usePlayAgentAutoLoop()
     />
 
     <DialogChoiceModal
-      :open="isDialogOpen && !isPassRunning"
+      :open="isDialogOpen && !isPassRunning && !sheet?.agent_active"
       :dialog="pendingDialog"
       :busy="dialogChoiceBusy"
       :error-message="dialogChoiceError"

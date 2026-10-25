@@ -15,12 +15,14 @@ from backend.api.routes.adventures.editing.ai_fix_limits import (
     length_violations,
 )
 from backend.api.routes.adventures.editing.ai_fix_sequences import patch_sequence
+from backend.api.routes.adventures.editing.ai_fix_soft_rules import is_clearable_soft_rule_key
 from backend.api.routes.adventures.editing.ai_fix_targets import (
     _allowed_fields_for,
     _normalize_field_value,
     _resolve_entity_target,
     _resolve_exit_target,
     _resolve_scene_target,
+    is_allowed_field,
 )
 from backend.api.routes.adventures.editing.common import (
     _ensure_template_scene_exists,
@@ -55,16 +57,17 @@ def _keeps_value(target_type: str, field: str, value: Any) -> bool:
         return False
     if not isinstance(value, str) or value.strip():
         return True
-    return target_type == "sequence" and field in _CLEARABLE_SEQUENCE_FIELDS
+    return target_type == "sequence" and (
+        field in _CLEARABLE_SEQUENCE_FIELDS or is_clearable_soft_rule_key(field)
+    )
 
 
 def _clean_updates(target_type: str, field_updates: Optional[dict[str, Any]]) -> dict[str, Any]:
     """Keep only allowlisted, non-empty (or explicitly clearable) field updates."""
-    allowed = _allowed_fields_for(target_type)
     return {
         field: value
         for field, value in (field_updates or {}).items()
-        if field in allowed and _keeps_value(target_type, field, value)
+        if is_allowed_field(target_type, field) and _keeps_value(target_type, field, value)
     }
 
 

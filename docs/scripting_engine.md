@@ -379,8 +379,8 @@ Directly writes into the avatar's episodic memory bank:
 
 ### `tw.game`
 Controls session outcome conditions:
-- `tw.game.set_victory(message: str)`: Ends the adventure in victory and displays `message`.
-- `tw.game.set_game_over(reason: str)`: Ends the adventure in defeat with `reason`.
+- `tw.game.win(message: str)`: Ends the adventure in victory and displays `message`.
+- `tw.game.game_over(reason: str)`: Ends the adventure in defeat with `reason`.
 
 ### `tw.quests`
 Directly manipulates adventure quest entries:
@@ -530,7 +530,7 @@ if tw.player.has_item("RELIC_SUNSTONE"):
     )
     tw.quests.complete("MAIN_QUEST_SLAY_SHADOWS")
     tw.awards.grant("SAVIOR_OF_THE_REALM")
-    tw.game.set_victory("The realm is saved! The eternal darkness has been banished forever.")
+    tw.game.win("The realm is saved! The eternal darkness has been banished forever.")
 else:
     tw.player.damage(25)
     tw.story.show_message("The Shadow Lord's aura lashes out in icy tendrils (-25 HP). You need a source of holy light!")
@@ -553,7 +553,7 @@ remaining = 6 - turn
 if remaining > 0:
     tw.story.show_message("The cavern tremors intensify! " + str(remaining) + " turn(s) before total collapse.")
 else:
-    tw.game.set_game_over("The cavern roof collapsed, burying all beneath tons of solid rock.")
+    tw.game.game_over("The cavern roof collapsed, burying all beneath tons of solid rock.")
 ```
 
 ---

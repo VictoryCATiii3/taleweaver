@@ -4,7 +4,8 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from backend.api.routes.adventures import dialog_service
+from backend.api.routes.adventures import agent_dialog, dialog_service
+from backend.api.routes.adventures.agent_turn_stream import _agent_dialog_events
 from backend.api.routes.adventures.dialog_service import DialogChoiceResolver
 from backend.api.routes.adventures.gameplay_logic import GameTurnManager
 from backend.core.script_validator import check_scripts_and_guards
@@ -228,3 +229,61 @@ def test_validator_flags_handler_missing_from_init_script():
     # Assert
     missing = [f for f in findings if f.code == "dialog_handler_missing"]
     assert [f.context["handler"] for f in missing] == ["nowhere"]
+
+
+def _fake_agent_llm(option_number: int):
+    class FakeAgentLLM:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def aexecute_complex_task(self, *, user_prompt, response_model, **_kwargs):
+            assert "3. Scream like a baby" in user_prompt
+            return response_model(thoughts="Red feels right.", option_number=option_number)
+
+    return FakeAgentLLM
+
+
+@pytest.mark.asyncio
+async def test_agent_picks_option_chosen_by_model(monkeypatch):
+    async with TestSessionLocal() as db:
+        # Arrange
+        monkeypatch.setattr(agent_dialog, "GameMasterLLM", _fake_agent_llm(1))
+        manager = await _manager(db)
+
+        # Act
+        thoughts, option = await agent_dialog.decide_dialog_option(manager, _dialog(manager))
+
+        # Assert
+        assert thoughts == "Red feels right."
+        assert option == {"index": 0, "label": "Cut the red wire"}
+
+
+@pytest.mark.asyncio
+async def test_agent_falls_back_to_first_option_on_invalid_answer(monkeypatch):
+    async with TestSessionLocal() as db:
+        # Arrange
+        monkeypatch.setattr(agent_dialog, "GameMasterLLM", _fake_agent_llm(9))
+        manager = await _manager(db)
+
+        # Act
+        _thoughts, option = await agent_dialog.decide_dialog_option(manager, _dialog(manager))
+
+        # Assert
+        assert option["index"] == 0
+
+
+@pytest.mark.asyncio
+async def test_agent_turn_answers_open_dialog_instead_of_playing(monkeypatch):
+    async with TestSessionLocal() as db:
+        # Arrange
+        monkeypatch.setattr(agent_dialog, "GameMasterLLM", _fake_agent_llm(1))
+        manager = await _manager(db)
+
+        # Act
+        events = [e async for e in _agent_dialog_events(db, manager, _dialog(manager))]
+
+        # Assert
+        assert any("[Choice] Cut the red wire" in e for e in events)
+        assert any(e.startswith("event: final") for e in events)
+        assert _dialog(manager) is None
+        assert manager.state.entity_states["__script_vars__"]["bomb_disarmed"] == 1

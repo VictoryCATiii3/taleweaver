@@ -322,7 +322,7 @@ const SNIPPET_TEMPLATES = [
   },
   {
     label: 'Victory / Game Over',
-    code: '# Trigger victory or defeat\ntw.game.set_victory("You have retrieved the lost relic and saved the realm!")\n# tw.game.set_game_over("The ancient darkness completely consumed your spirit.")\n',
+    code: '# Trigger victory or defeat\ntw.game.win("You have retrieved the lost relic and saved the realm!")\n# tw.game.game_over("The ancient darkness completely consumed your spirit.")\n',
   },
   {
     label: 'Choice Dialog',
@@ -800,7 +800,7 @@ function handleTabKey(e: KeyboardEvent) {
                 <div class="bg-slate-900/60 p-2.5 rounded-lg border border-white/5">
                   <span class="font-bold text-emerald-400">tw.story & tw.game</span>
                   <p class="text-[11px] text-slate-400 font-sans mt-0.5">
-                    <code>tw.story.show_message(text)</code>, <code>tw.game.set_victory(msg)</code>, <code>tw.game.set_game_over(msg)</code>
+                    <code>tw.story.show_message(text)</code>, <code>tw.game.win(msg)</code>, <code>tw.game.game_over(msg)</code>
                   </p>
                 </div>
 

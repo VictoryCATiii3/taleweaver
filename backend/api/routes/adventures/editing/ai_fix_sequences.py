@@ -10,6 +10,11 @@ from typing import Any, Optional
 
 from fastapi import HTTPException
 
+from backend.api.routes.adventures.editing.ai_fix_soft_rules import (
+    apply_soft_rule_updates,
+    parse_soft_rule_key,
+    soft_rules_context,
+)
 from backend.api.routes.adventures.templates import _apply_sequences_update
 from backend.engine.scripting.sandbox import SafeAstInterpreter
 from backend.models.adventure_template import AdventureTemplate
@@ -59,6 +64,7 @@ def sequence_detail(seq: dict[str, Any]) -> dict[str, Any]:
         on_end_sequence_script=_short(seq.get("on_end_sequence_script"), _OUTLINE_TEXT_LIMIT),
     )
     detail.update({field: seq.get(field) or "" for field in _REQUIREMENT_FIELDS})
+    detail["soft_rules"] = soft_rules_context(seq.get("soft_rules"))
     return detail
 
 
@@ -122,8 +128,10 @@ def patch_sequence(adv: AdventureTemplate, raw_target_id: str, updates: dict[str
                 "The AI reference is stale; please retry."
             ),
         )
-    updated = dict(sequences[idx])
-    updated.update({field: _validated_value(field, value) for field, value in updates.items()})
+    plain = {f: v for f, v in updates.items() if parse_soft_rule_key(f) is None}
+    soft_rule_updates = {f: v for f, v in updates.items() if f not in plain}
+    updated = apply_soft_rule_updates(dict(sequences[idx]), soft_rule_updates)
+    updated.update({field: _validated_value(field, value) for field, value in plain.items()})
     sequences[idx] = updated
     _apply_sequences_update(adv, sequences)
     return f"sequence:{updated.get('id')}"

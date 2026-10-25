@@ -6,6 +6,7 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.api.routes.adventures.editing.ai_fix_soft_rules import parse_soft_rule_key
 from backend.models.world_entity import WorldEntity, WorldExit, WorldScene
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,13 @@ _FIX_SEQUENCE_FIELDS = frozenset(
         "on_end_sequence_text",
     }
 )
+
+
+def is_allowed_field(target_type: str, field: str) -> bool:
+    """Allowlist check; sequences also accept ``soft_rules.<RULE_ID>.<field>`` keys."""
+    if field in _allowed_fields_for(target_type):
+        return True
+    return target_type == "sequence" and parse_soft_rule_key(field) is not None
 
 
 def _allowed_fields_for(target_type: str) -> frozenset[str]:

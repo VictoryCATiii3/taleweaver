@@ -22,6 +22,14 @@ _SEQUENCES = [
         "title": "Escape",
         "walkthrough": "Enter the cryo pod to win.",
         "guard_expression": "parasite_extracted and entered_cryo",
+        "soft_rules": [
+            {
+                "id": "BRIBE_GUARD",
+                "condition": "The player bribes the pod guard",
+                "script": "tw.vars.set('guard_bribed', True)",
+                "max_triggers": 1,
+            }
+        ],
     },
     {
         "id": "SEQ_1_WAKE",
@@ -225,3 +233,75 @@ async def test_apply_fix_rejects_invalid_sequence_guard(client, setup_test_db):
 
     assert resp.status_code == 400
     assert "guard_expression" in resp.json()["detail"]
+
+
+def test_focused_prompt_includes_sequence_soft_rules():
+    payload = SimpleNamespace(adventure={"title": "T", "sequences": _SEQUENCES})
+
+    block = _format_focused_world_block(
+        _summarize_world_for_fix(payload), location="sequence:SEQ_2_ESCAPE"
+    )
+
+    assert "BRIBE_GUARD" in block
+    assert "The player bribes the pod guard" in block
+
+
+def _soft_rule_proposal(field_updates: dict) -> dict:
+    return {
+        "title": "Tune soft rule",
+        "summary": "Fix the bribe rule.",
+        "rationale": None,
+        "patches": [
+            {
+                "target_type": "sequence",
+                "target_id": "SEQ_2_ESCAPE",
+                "description": "Adjust the bribe soft rule.",
+                "field_updates": field_updates,
+            }
+        ],
+    }
+
+
+async def test_apply_fix_patches_existing_soft_rule(client, setup_test_db):
+    tpl_id = await _seed_with_sequences("seq_fix_soft_rule")
+    updates = {
+        "soft_rules.BRIBE_GUARD.guard_expression": "tw.player.has_item('GOLD')",
+        "soft_rules.BRIBE_GUARD.max_triggers": 0,
+        "soft_rules.BRIBE_GUARD.text": "",
+    }
+
+    resp = await client.post(
+        f"/api/adventures/{tpl_id}/editor/validate/findings/apply-fix",
+        headers=_auth_headers("seq_fix_soft_rule"),
+        json={"finding_signature": "warn|x|y|z", "proposal": _soft_rule_proposal(updates)},
+    )
+
+    assert resp.status_code == 200, resp.text
+    async with TestSessionLocal() as db:
+        tpl = await db.get(AdventureTemplate, tpl_id)
+        assert tpl is not None
+        seq = next(s for s in tpl.sequences if s["id"] == "SEQ_2_ESCAPE")
+        rule = seq["soft_rules"][0]
+        assert rule["guard_expression"] == "tw.player.has_item('GOLD')"
+        assert rule["max_triggers"] is None
+        assert rule["script"] == "tw.vars.set('guard_bribed', True)"
+
+
+async def test_apply_fix_rejects_unknown_soft_rule(client, setup_test_db):
+    tpl_id = await _seed_with_sequences("seq_fix_soft_rule_unknown")
+    updates = {"soft_rules.INVENTED_RULE.condition": "Something new"}
+
+    resp = await client.post(
+        f"/api/adventures/{tpl_id}/editor/validate/findings/apply-fix",
+        headers=_auth_headers("seq_fix_soft_rule_unknown"),
+        json={"finding_signature": "warn|x|y|z", "proposal": _soft_rule_proposal(updates)},
+    )
+
+    # Unknown rule ids are treated like any stale AI reference: nothing is applied.
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["applied_targets"] == []
+    async with TestSessionLocal() as db:
+        tpl = await db.get(AdventureTemplate, tpl_id)
+        assert tpl is not None
+        seq = next(s for s in tpl.sequences if s["id"] == "SEQ_2_ESCAPE")
+        assert [r["id"] for r in seq["soft_rules"]] == ["BRIBE_GUARD"]

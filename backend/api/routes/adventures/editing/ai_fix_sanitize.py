@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, get_args
 
 from backend.api.routes.adventures.editing.ai_fix_limits import length_violations
-from backend.api.routes.adventures.editing.ai_fix_targets import _allowed_fields_for
+from backend.api.routes.adventures.editing.ai_fix_targets import is_allowed_field
 from backend.schemas.validation import FixProposal, FixProposalEntityPatch, FixTargetType
 
 _PATCH_TARGET_TYPES = frozenset(get_args(FixTargetType))
@@ -88,7 +88,7 @@ class _Sanitizer:
         if target_type not in _PATCH_TARGET_TYPES or not isinstance(field_updates, dict):
             self._reject([target_type or "?"])
             return None
-        allowed = _allowed_fields_for(target_type)
+        allowed = {str(k) for k in field_updates if is_allowed_field(target_type, str(k))}
         self._reject([f"{target_type}.{k}" for k in field_updates if k not in allowed])
         kept_updates = {str(k): v for k, v in field_updates.items() if k in allowed}
         if not kept_updates:
