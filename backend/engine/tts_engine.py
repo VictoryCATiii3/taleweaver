@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "TTSEngine",
     "TTSModelSwitchSuggestionError",
+    "TTSProviderError",
     "TTSRateLimitError",
     "TTSTimeoutError",
     "_build_audio_output_path",
@@ -32,6 +33,10 @@ __all__ = [
 ]
 
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+
+class TTSProviderError(RuntimeError):
+    """Raised when upstream TTS provider returns an error (4xx/5xx)."""
 
 
 class TTSTimeoutError(RuntimeError):
@@ -65,6 +70,23 @@ def _parse_sse_audio_response(response: httpx.Response) -> dict:
         if candidates:
             parts.extend((candidates[0].get("content") or {}).get("parts", []))
     return {"candidates": [{"content": {"parts": parts}}]}
+
+
+def _extract_error_detail(response: httpx.Response, default: str) -> str:
+    """Extract a human-readable error message from a provider's JSON response."""
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            detail = data.get("detail") or (
+                data.get("error") if isinstance(data.get("error"), dict) else None
+            )
+            if isinstance(detail, dict):
+                return detail.get("message") or default
+            if isinstance(detail, str):
+                return detail
+    except Exception as exc:
+        logger.debug("Could not parse error JSON from response: %s", exc)
+    return default
 
 
 class TTSEngine:
@@ -187,7 +209,10 @@ class TTSEngine:
             )
         if response.status_code != 200:
             logger.error("ElevenLabs TTS Error %s: %s", response.status_code, response.text)
-            return None
+            err_msg = _extract_error_detail(
+                response, f"ElevenLabs TTS request failed with status {response.status_code}"
+            )
+            raise TTSProviderError(err_msg)
         if not response.content:
             logger.error("ElevenLabs TTS returned zero audio bytes.")
             return None
@@ -199,25 +224,15 @@ class TTSEngine:
             return None
 
     @staticmethod
-    def _build_google_payload(text: str, voice: str, language: Optional[str]) -> dict:
-        payload: dict = {
+    def _build_google_payload(text: str, voice: str, language: Optional[str] = None) -> dict:
+        _ = language
+        return {
             "contents": [{"role": "user", "parts": [{"text": text}]}],
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}},
             },
         }
-        # System instruction fixes accent issues when English vocal tags are used.
-        if language:
-            payload["systemInstruction"] = {
-                "parts": [
-                    {
-                        "text": f"Speak strictly in the following language: {language}. "
-                        f"Ensure native pronunciation and accent for {language}."
-                    }
-                ]
-            }
-        return payload
 
     @staticmethod
     async def _post_google_with_retries(
@@ -309,7 +324,10 @@ class TTSEngine:
                 )
                 if response.status_code != 200:
                     logger.error("Gemini TTS Error %s: %s", response.status_code, response.text)
-                response.raise_for_status()
+                    err_msg = _extract_error_detail(
+                        response, f"Gemini TTS request failed with status {response.status_code}"
+                    )
+                    raise TTSProviderError(err_msg)
                 data = _parse_sse_audio_response(response) if use_streaming else response.json()
 
             decoded = _extract_gemini_audio(data)
@@ -318,6 +336,13 @@ class TTSEngine:
             audio_bytes, ext = decoded
             return _write_audio_file(audio_bytes, adventure_id, session_id, ext)
 
+        except (
+            TTSTimeoutError,
+            TTSRateLimitError,
+            TTSModelSwitchSuggestionError,
+            TTSProviderError,
+        ):
+            raise
         except httpx.ReadTimeout as exc:
             logger.warning(
                 "Gemini TTS timed out after %.1fs for %d chars using model '%s'.",

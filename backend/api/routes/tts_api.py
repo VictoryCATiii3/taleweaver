@@ -16,6 +16,7 @@ from backend.core.tts_voices import GOOGLE_TTS_VOICE_NAMES
 from backend.engine.tts_engine import (
     TTSEngine,
     TTSModelSwitchSuggestionError,
+    TTSProviderError,
     TTSRateLimitError,
     TTSTimeoutError,
 )
@@ -279,6 +280,8 @@ async def generate_tts(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except TTSRateLimitError as exc:
         raise _rate_limit_http_exception(exc) from exc
+    except TTSProviderError as exc:
+        raise HTTPException(status_code=502, detail=f"TTS Provider error: {exc}") from exc
 
     if not audio_url:
         raise HTTPException(status_code=500, detail="Failed to generate speech.")
@@ -316,6 +319,8 @@ async def test_tts_connection_v2(
         return {"status": "error", "message": "TTS rate limit reached. Please retry in a moment."}
     except TTSTimeoutError:
         return {"status": "error", "message": "TTS request timed out. Please retry."}
+    except TTSProviderError as exc:
+        return {"status": "error", "message": f"TTS provider error: {exc}"}
     if not audio_url:
         return {"status": "error", "message": "Failed to generate test audio."}
     return {"status": "success", "audio_url": audio_url}

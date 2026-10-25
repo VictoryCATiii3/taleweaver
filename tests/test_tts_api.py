@@ -379,3 +379,32 @@ async def test_elevenlabs_rate_limit_raises_rate_limit_error(monkeypatch):
                 elevenlabs_voice_id="voice-1",
                 api_key="el-key",
             )
+
+
+@pytest.mark.asyncio
+async def test_google_payload_does_not_use_system_instruction():
+    """Gemini TTS endpoints reject systemInstruction with 400; ensure it is never set."""
+    from backend.engine.tts_engine import TTSEngine
+
+    payload = TTSEngine._build_google_payload("Guten Morgen", voice="Puck", language="de")
+    assert "systemInstruction" not in payload
+    assert payload["contents"][0]["parts"][0]["text"] == "Guten Morgen"
+
+
+@pytest.mark.asyncio
+async def test_tts_provider_error_propagates_to_http_502(auth_client: AsyncClient, monkeypatch):
+    """When the upstream TTS provider returns an error, the endpoint should return 502 with the message."""
+    from backend.engine.tts_engine import TTSProviderError
+
+    await _enable_tts_for_test_user()
+
+    async def fake_generate_speech(**kwargs):
+        raise TTSProviderError("Google TTS error: Developer instruction is not enabled")
+
+    monkeypatch.setattr(
+        "backend.api.routes.tts_api.TTSEngine.generate_speech", fake_generate_speech
+    )
+
+    resp = await auth_client.post("/api/tts/generate", json={"text": "Fail test", "language": "de"})
+    assert resp.status_code == 502
+    assert "Google TTS error" in resp.json()["detail"]
