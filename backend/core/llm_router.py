@@ -391,13 +391,13 @@ class GameMasterLLM:
         if m:
             tag = GameMasterLLM._to_canonical_voice_tag(m.group("tag"))
             rest = m.group("rest")
-            text = f"[{tag}] {rest.lstrip()}".strip()
+            text = f"[{tag}] {rest.lstrip()}" if rest.strip() else f"[{tag}]"
         else:
             m = UNBRACKETED_RE.match(text)
             if m:
                 tag = GameMasterLLM._to_canonical_voice_tag(m.group("tag"))
                 rest = m.group("rest")
-                text = f"[{tag}] {rest.lstrip()}".strip()
+                text = f"[{tag}] {rest.lstrip()}" if rest.strip() else f"[{tag}]"
 
         # 2. Line-by-line normalization for dialogue and paragraph voice tags
         lines = text.split("\n")

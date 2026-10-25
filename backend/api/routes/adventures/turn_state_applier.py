@@ -1,34 +1,25 @@
 from __future__ import annotations
 
-import asyncio
-import copy
-import json
 import logging
 import re
-import uuid
-import os
 from copy import deepcopy
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from backend.api.routes.adventures.logic import AdventureLogic
-from backend.core import prompts
-from backend.core.config import settings
 from backend.engine.map_engine import MapEngine
 from backend.engine.quest_manager import QuestManager
 from backend.engine.rule_engine import (
     EntityMovement,
     GameEvent,
-    GameOverException,
     RuleEngine,
     WorldEntityUpdate,
 )
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.chat import ChatMessage
-from backend.models.user import User
 from backend.models.world_entity import WorldEntity, WorldExit, WorldScene
 from backend.utils.path_security import ensure_within_data_dir as _ensure_within_data_dir
 from backend.utils.path_security import sanitize_path_component as _sanitize_path_component
@@ -59,7 +50,7 @@ class TurnStateApplier:
 
     @property
     def user(self):
-        return self.manager.user
+        return getattr(self.manager, "user", None)
 
     @property
     def state(self):
@@ -71,7 +62,7 @@ class TurnStateApplier:
 
     @property
     def adventure(self):
-        return self.manager.adventure
+        return getattr(self.manager, "adventure", None)
 
     def _queue_checkpoint(self, *args, **kwargs):
         return self.manager._queue_checkpoint(*args, **kwargs)
@@ -119,7 +110,6 @@ class TurnStateApplier:
                 return
         event.moved_entities.append(EntityMovement(entity_id=entity_id, to_scene_id=to_scene_id))
 
-
     async def _build_map_payload(self) -> dict:
         """Helper to build the augmented map payload for the frontend."""
         world_map = await AdventureLogic.get_or_create_map(self.db, self.state.template_id)
@@ -131,14 +121,16 @@ class TurnStateApplier:
         # Heal stale image_url values (e.g. from deleted sessions) in the map nodes
         for node in map_dict.get("nodes", {}).values():
             if isinstance(node, dict) and node.get("image_url"):
-                node["image_url"] = AdventureLogic.resolve_existing_data_asset_url(node["image_url"])
-        
+                node["image_url"] = AdventureLogic.resolve_existing_data_asset_url(
+                    node["image_url"]
+                )
+
         # Augment with adjacent unvisited scenes
         # Fetch exits for this session or template
         exit_query = select(WorldExit).where(
             or_(
                 WorldExit.session_id == self.state.session_id,
-                WorldExit.template_id == self.state.template_id
+                WorldExit.template_id == self.state.template_id,
             )
         )
         exits_res = await self.db.execute(exit_query)
@@ -153,7 +145,13 @@ class TurnStateApplier:
             return []
 
         adv_id = adventure.id if adventure else (self.state.template_id if self.state else None)
-        awards_list = (adventure.awards if adventure else (AdventureLogic.extract_manifest_snapshot(self.state).get("adventure") or {}).get("awards")) or []
+        awards_list = (
+            adventure.awards
+            if adventure
+            else (AdventureLogic.extract_manifest_snapshot(self.state).get("adventure") or {}).get(
+                "awards"
+            )
+        ) or []
         session_id = self.state.session_id if self.state else None
 
         return AdventureLogic.build_awards_payload(
@@ -237,7 +235,6 @@ class TurnStateApplier:
         states = dict(self.state.entity_states or {})
         existing_item_ids = await self._collect_existing_item_ids()
 
-
         def _is_consumable(item: Any) -> bool:
             return str(getattr(item, "item_type", "") or "").upper() == "CONSUMABLE"
 
@@ -249,14 +246,22 @@ class TurnStateApplier:
                 counter += 1
                 candidate = f"{base}_COPY_{counter}"
             return candidate
-        
+
         # If we are removing items in this event, they don't count as "existing" for duplicate checks
         # if the LLM wants to replace them with an updated version using the same ID.
         if event.removed_inventory_item_ids:
-            logger.info("[Turn %s] Removing from duplicate check: %s", self.game_id, event.removed_inventory_item_ids)
+            logger.info(
+                "[Turn %s] Removing from duplicate check: %s",
+                self.game_id,
+                event.removed_inventory_item_ids,
+            )
             existing_item_ids -= set(event.removed_inventory_item_ids)
 
-        logger.info("[Turn %s] Existing inventory IDs after removals: %s", self.game_id, list(existing_item_ids))
+        logger.info(
+            "[Turn %s] Existing inventory IDs after removals: %s",
+            self.game_id,
+            list(existing_item_ids),
+        )
 
         if event.new_inventory_items:
             filtered_inventory_items = []
@@ -292,18 +297,28 @@ class TurnStateApplier:
                         from backend.core.config import settings
                         import os
                         import uuid
-                        
+
                         item_type = item.item_type or "PICKABLE"
-                        safe_id = re.sub(r"[^A-Za-z0-9_\-]", "_", item.id or f"LOOT_{uuid.uuid4().hex[:8]}")[:50]
-                        safe_adventure_id = _sanitize_path_component(self.adventure.id) or "adventure"
+                        safe_id = re.sub(
+                            r"[^A-Za-z0-9_\-]", "_", item.id or f"LOOT_{uuid.uuid4().hex[:8]}"
+                        )[:50]
+                        safe_adventure_id = (
+                            _sanitize_path_component(self.adventure.id) or "adventure"
+                        )
                         target_dir = _ensure_within_data_dir(
-                            os.path.join(settings.DATA_DIR, "adventures", "library", safe_adventure_id, "entities")
+                            os.path.join(
+                                settings.DATA_DIR,
+                                "adventures",
+                                "library",
+                                safe_adventure_id,
+                                "entities",
+                            )
                         )
                         item.image_url = await MediaEngine.generate_placeholder(
                             adventure_id=self.adventure.id,
                             entity_id=safe_id,
                             target_dir=target_dir,
-                            category=f"ITEM_{item_type.upper()}"
+                            category=f"ITEM_{item_type.upper()}",
                         )
                     except Exception as e:
                         logger.error("Failed to generate new inventory item placeholder: %s", e)
@@ -324,7 +339,7 @@ class TurnStateApplier:
                                 self.game_id,
                                 item.id,
                                 match.get("name"),
-                                item.name
+                                item.name,
                             )
                     else:
                         logger.info(
@@ -332,7 +347,7 @@ class TurnStateApplier:
                             self.game_id,
                             item.id,
                         )
-                
+
                 filtered_inventory_items.append(item)
                 if item.id:
                     existing_item_ids.add(item.id)
@@ -354,8 +369,15 @@ class TurnStateApplier:
                     else None
                 )
                 # Allow if it's a replacement for an item being removed
-                is_replacement = event.removed_inventory_item_ids and item.id in event.removed_inventory_item_ids
-                if item.id and item.id in existing_item_ids and not is_replacement and _is_consumable(item):
+                is_replacement = (
+                    event.removed_inventory_item_ids and item.id in event.removed_inventory_item_ids
+                )
+                if (
+                    item.id
+                    and item.id in existing_item_ids
+                    and not is_replacement
+                    and _is_consumable(item)
+                ):
                     if not item.image_url and isinstance(match, dict) and match.get("image_url"):
                         item.image_url = match.get("image_url")
                     source_id = item.id
@@ -367,16 +389,20 @@ class TurnStateApplier:
                         item.id,
                     )
 
-                if item.id and item.id in existing_item_ids and not is_replacement:
-                     # Check if it's a true duplicate (same name)
-                    if match and match.get("name") == item.name:
-                        logger.info(
-                            "[Turn %s] Skipping true duplicate spawned item id: %s",
-                            self.game_id,
-                            item.id,
-                        )
-                        continue
-                
+                if (
+                    item.id
+                    and item.id in existing_item_ids
+                    and not is_replacement
+                    and match
+                    and match.get("name") == item.name
+                ):
+                    logger.info(
+                        "[Turn %s] Skipping true duplicate spawned item id: %s",
+                        self.game_id,
+                        item.id,
+                    )
+                    continue
+
                 filtered_spawned_items.append(item)
                 if item.id:
                     existing_item_ids.add(item.id)
@@ -410,7 +436,7 @@ class TurnStateApplier:
             if prot_meta.get("on_status_change_text"):
                 await self._save_chat_message("system", prot_meta["on_status_change_text"])
                 system_messages.append(prot_meta["on_status_change_text"])
-        
+
         state_dirty = False
         if event.new_scene_id and event.new_scene_id != self.state.current_scene_id:
             # Enforce that the target scene is adjacent (connected by a WorldExit from the current scene)
@@ -420,14 +446,14 @@ class TurnStateApplier:
                     or_(
                         and_(
                             WorldExit.from_scene_id == self.state.current_scene_id,
-                            WorldExit.to_scene_id == event.new_scene_id
+                            WorldExit.to_scene_id == event.new_scene_id,
                         ),
                         and_(
                             WorldExit.from_scene_id == event.new_scene_id,
                             WorldExit.to_scene_id == self.state.current_scene_id,
-                            WorldExit.exit_type == "bidirectional"
-                        )
-                    )
+                            WorldExit.exit_type == "bidirectional",
+                        ),
+                    ),
                 )
             )
             valid_exit = exit_res.scalars().first()
@@ -465,17 +491,19 @@ class TurnStateApplier:
 
                 self.state.current_scene_id = event.new_scene_id
                 state_dirty = True
-                
+
                 # Map Update
                 try:
-                    world_map = await AdventureLogic.get_or_create_map(self.db, self.state.template_id)
+                    world_map = await AdventureLogic.get_or_create_map(
+                        self.db, self.state.template_id
+                    )
                     # 1. Register exit between scenes
                     MapEngine.register_exit(
-                        world_map, 
-                        old_scene_id, 
-                        event.new_scene_id, 
+                        world_map,
+                        old_scene_id,
+                        event.new_scene_id,
                         exit_label=event.exit_label or "",
-                        exit_type=valid_exit.exit_type if valid_exit else "one_way"
+                        exit_type=valid_exit.exit_type if valid_exit else "one_way",
                     )
                     # 2. Register visit to the new scene
                     # Use session snapshot for scene data
@@ -486,9 +514,13 @@ class TurnStateApplier:
                         )
                     )
                     new_scene_db = scene_res.scalars().first()
-                    
+
                     # Add system message for scene change
-                    scene_name = new_scene_db.label if new_scene_db else (event.scene_label or "a new location")
+                    scene_name = (
+                        new_scene_db.label
+                        if new_scene_db
+                        else (event.scene_label or "a new location")
+                    )
                     msg = f"You have entered: {scene_name}"
                     await self._save_chat_message("system", msg)
                     system_messages.append(msg)
@@ -497,44 +529,57 @@ class TurnStateApplier:
                     # Trigger on_open_exit and on_exit_used if applicable
                     if valid_exit:
                         if valid_exit.on_open_exit_script:
-                            msgs = await self.manager._execute_inline_script(valid_exit.on_open_exit_script, "on_open_exit", valid_exit.id)
+                            msgs = await self.manager._execute_inline_script(
+                                valid_exit.on_open_exit_script, "on_open_exit", valid_exit.id
+                            )
                             system_messages.extend(msgs)
                         if valid_exit.on_open_exit_text:
                             await self._save_chat_message("system", valid_exit.on_open_exit_text)
                             system_messages.append(valid_exit.on_open_exit_text)
                         if getattr(valid_exit, "on_exit_used_script", None):
-                            msgs = await self.manager._execute_inline_script(valid_exit.on_exit_used_script, "on_exit_used", valid_exit.id)
+                            msgs = await self.manager._execute_inline_script(
+                                valid_exit.on_exit_used_script, "on_exit_used", valid_exit.id
+                            )
                             system_messages.extend(msgs)
                         if getattr(valid_exit, "on_exit_used_text", None):
                             await self._save_chat_message("system", valid_exit.on_exit_used_text)
                             system_messages.append(valid_exit.on_exit_used_text)
-                    
+
                     if new_scene_db and new_scene_db.on_enter_scene_script:
-                        msgs = await self.manager._execute_inline_script(new_scene_db.on_enter_scene_script, "on_enter_scene", new_scene_db.id)
+                        msgs = await self.manager._execute_inline_script(
+                            new_scene_db.on_enter_scene_script, "on_enter_scene", new_scene_db.id
+                        )
                         system_messages.extend(msgs)
                     if new_scene_db and new_scene_db.on_enter_scene_text:
                         await self._save_chat_message("system", new_scene_db.on_enter_scene_text)
                         system_messages.append(new_scene_db.on_enter_scene_text)
-                        
+
                     # Check for NPCs in the new scene and run their hooks
                     npc_res = await self.db.execute(
                         select(WorldEntity).where(
-                            WorldEntity.session_id == self.game_id,
-                            WorldEntity.entity_type == "NPC"
+                            WorldEntity.session_id == self.game_id, WorldEntity.entity_type == "NPC"
                         )
                     )
                     all_npcs = npc_res.scalars().all()
                     for npc in all_npcs:
-                        npc_scene = states.get(npc.id, {}).get("current_scene_id", npc.current_scene_id)
+                        npc_scene = states.get(npc.id, {}).get(
+                            "current_scene_id", npc.current_scene_id
+                        )
                         if npc_scene == event.new_scene_id:
                             npc_meta = dict(npc.metadata_json or {})
                             if npc_meta.get("on_protagonist_enters_scene_script"):
-                                msgs = await self.manager._execute_inline_script(npc_meta["on_protagonist_enters_scene_script"], "on_protagonist_enters_scene", npc.id)
+                                msgs = await self.manager._execute_inline_script(
+                                    npc_meta["on_protagonist_enters_scene_script"],
+                                    "on_protagonist_enters_scene",
+                                    npc.id,
+                                )
                                 system_messages.extend(msgs)
                             if npc_meta.get("on_protagonist_enters_scene_text"):
-                                await self._save_chat_message("system", npc_meta["on_protagonist_enters_scene_text"])
+                                await self._save_chat_message(
+                                    "system", npc_meta["on_protagonist_enters_scene_text"]
+                                )
                                 system_messages.append(npc_meta["on_protagonist_enters_scene_text"])
-                            
+
                             attack_mode = npc_meta.get("attack_mode", "PASSIVE")
                             if attack_mode == "ATTACK_ON_SIGHT":
                                 msg = f"{npc.name} is hostile and attacks on sight!"
@@ -542,35 +587,34 @@ class TurnStateApplier:
                                 system_messages.append(msg)
 
                     MapEngine.register_visit(
-                        world_map, 
-                        event.new_scene_id, 
+                        world_map,
+                        event.new_scene_id,
                         label=new_scene_db.label if new_scene_db else event.scene_label,
                         description=new_scene_db.description if new_scene_db else None,
-                        image_url=new_scene_db.image_url if new_scene_db else None
+                        image_url=new_scene_db.image_url if new_scene_db else None,
                     )
                 except Exception as e:
                     logger.error(f"Map update failed during turn: {e}")
-            
+
         # Entity State Overrides (Movement, Stats, Visibility)
         states = dict(self.state.entity_states or {})
-        
+
         if event.moved_entities:
             for move in event.moved_entities:
                 eid = move.entity_id
                 if eid not in states:
                     states[eid] = {}
-                if move.to_scene_id: 
+                if move.to_scene_id:
                     states[eid]["current_scene_id"] = move.to_scene_id
                     # If moving to a new scene, clear spatial position unless a new one is provided
                     if not move.to_spatial_position:
                         states[eid]["spatial_position"] = None
-                    
+
                     # Emit system message for NPC movement
                     ent_name = eid
                     ent_res = await self.db.execute(
                         select(WorldEntity).where(
-                            WorldEntity.id == eid,
-                            WorldEntity.session_id == self.game_id
+                            WorldEntity.id == eid, WorldEntity.session_id == self.game_id
                         )
                     )
                     ent_obj = ent_res.scalars().first()
@@ -579,8 +623,7 @@ class TurnStateApplier:
                     scene_label = move.to_scene_id
                     scene_res = await self.db.execute(
                         select(WorldScene).where(
-                            WorldScene.id == move.to_scene_id,
-                            WorldScene.session_id == self.game_id
+                            WorldScene.id == move.to_scene_id, WorldScene.session_id == self.game_id
                         )
                     )
                     scene_obj = scene_res.scalars().first()
@@ -589,8 +632,8 @@ class TurnStateApplier:
                     msg = f"{ent_name} moved to {scene_label}."
                     await self._save_chat_message("system", msg)
                     system_messages.append(msg)
-                    
-                if move.to_spatial_position: 
+
+                if move.to_spatial_position:
                     states[eid]["spatial_position"] = move.to_spatial_position
                 state_dirty = True
 
@@ -600,7 +643,9 @@ class TurnStateApplier:
             )
             canonical_ents = session_ents_res.scalars().all()
             ent_lookup_by_id = {e.id.upper(): e.id for e in canonical_ents if e.id}
-            ent_lookup_by_name = {(e.name or "").strip().lower(): e.id for e in canonical_ents if e.name}
+            ent_lookup_by_name = {
+                (e.name or "").strip().lower(): e.id for e in canonical_ents if e.name
+            }
 
             for update in event.updated_entities:
                 raw_eid = str(update.entity_id or "").strip()
@@ -657,10 +702,12 @@ class TurnStateApplier:
                             await self._save_chat_message("system", xp_msg)
                             system_messages.append(msg)
                             system_messages.append(xp_msg)
-                            
+
                             npc_meta = dict(ent_obj.metadata_json or {})
                             if npc_meta.get("on_defeat_script"):
-                                msgs = await self.manager._execute_inline_script(npc_meta["on_defeat_script"], "on_defeat", ent_obj.id)
+                                msgs = await self.manager._execute_inline_script(
+                                    npc_meta["on_defeat_script"], "on_defeat", ent_obj.id
+                                )
                                 system_messages.extend(msgs)
                             if npc_meta.get("on_defeat_text"):
                                 await self._save_chat_message("system", npc_meta["on_defeat_text"])
@@ -683,7 +730,7 @@ class TurnStateApplier:
                                 or metadata_json.get("item_to_unlock")
                                 or metadata_json.get("rule_to_unlock")
                             )
-                    
+
                     if was_locked and update.locked is False:
                         if ent_obj is None:
                             ent_res = await self.db.execute(
@@ -693,12 +740,20 @@ class TurnStateApplier:
                                 )
                             )
                             ent_obj = ent_res.scalars().first()
-                        
-                        if ent_obj and ent_obj.entity_type == "OBJECT" and str(ent_obj.item_type or "").upper() == "CONTAINER":
+
+                        if (
+                            ent_obj
+                            and ent_obj.entity_type == "OBJECT"
+                            and str(ent_obj.item_type or "").upper() == "CONTAINER"
+                        ):
                             metadata_json = dict(ent_obj.metadata_json or {})
                             code_to_unlock = str(metadata_json.get("code_to_unlock") or "").strip()
                             if code_to_unlock:
-                                xp_reward = metadata_json.get("exp_reward") or metadata_json.get("xp_reward") or 100
+                                xp_reward = (
+                                    metadata_json.get("exp_reward")
+                                    or metadata_json.get("xp_reward")
+                                    or 100
+                                )
                                 self.avatar.exp = (self.avatar.exp or 0) + xp_reward
                                 msg = f"Unlocked {ent_obj.name} with the correct code!"
                                 xp_msg = f"you gained {xp_reward} XP"
@@ -713,24 +768,30 @@ class TurnStateApplier:
 
                             if metadata_json.get("on_unlock_success_script"):
                                 msgs = await self.manager._execute_inline_script(
-                                    metadata_json["on_unlock_success_script"], "on_unlock_success", ent_obj.id
+                                    metadata_json["on_unlock_success_script"],
+                                    "on_unlock_success",
+                                    ent_obj.id,
                                 )
                                 system_messages.extend(msgs)
                             if metadata_json.get("on_unlock_success_text"):
-                                await self._save_chat_message("system", metadata_json["on_unlock_success_text"])
+                                await self._save_chat_message(
+                                    "system", metadata_json["on_unlock_success_text"]
+                                )
                                 system_messages.append(metadata_json["on_unlock_success_text"])
                     states[eid]["locked"] = update.locked
-                if update.inventory is not None: 
-                    states[eid]["inventory"] = [i.model_dump(exclude_none=True) for i in update.inventory]
+                if update.inventory is not None:
+                    states[eid]["inventory"] = [
+                        i.model_dump(exclude_none=True) for i in update.inventory
+                    ]
                 state_dirty = True
-        
+
         if event.deleted_entities:
             for eid in event.deleted_entities:
                 if eid not in states:
                     states[eid] = {}
                 states[eid]["is_hidden"] = True
                 state_dirty = True
-        
+
         if event.new_inventory_items:
             for item in event.new_inventory_items:
                 if item.id:
@@ -738,7 +799,7 @@ class TurnStateApplier:
                         states[item.id] = {}
                     states[item.id]["is_in_inventory"] = True
                     state_dirty = True
-                    
+
                     item_id_str = item.id.strip() if item.id else ""
                     item_name_str = (item.name or "").strip()
                     name_clauses = [func.upper(WorldEntity.name) == item_id_str.upper()]
@@ -746,21 +807,28 @@ class TurnStateApplier:
                         name_clauses.append(func.upper(WorldEntity.name) == item_name_str.upper())
 
                     ent_res = await self.db.execute(
-                        select(WorldEntity).where(
-                            or_(
-                                func.upper(WorldEntity.id) == item_id_str.upper(),
-                                *name_clauses
-                            ),
+                        select(WorldEntity)
+                        .where(
+                            or_(func.upper(WorldEntity.id) == item_id_str.upper(), *name_clauses),
                             or_(
                                 WorldEntity.session_id == self.game_id,
-                                and_(WorldEntity.template_id == self.adventure.id, WorldEntity.session_id.is_(None))
-                            )
-                        ).order_by(WorldEntity.session_id.desc().nulls_last())
+                                and_(
+                                    WorldEntity.template_id == self.adventure.id,
+                                    WorldEntity.session_id.is_(None),
+                                ),
+                            ),
+                        )
+                        .order_by(WorldEntity.session_id.desc().nulls_last())
                     )
                     ent_obj = ent_res.scalars().first()
                     if ent_obj:
                         meta = dict(ent_obj.metadata_json or {})
-                        if not meta.get("on_pickup_script") and not meta.get("on_pickup_text") and hasattr(self, "adventure") and self.adventure:
+                        if (
+                            not meta.get("on_pickup_script")
+                            and not meta.get("on_pickup_text")
+                            and hasattr(self, "adventure")
+                            and self.adventure
+                        ):
                             tpl_res = await self.db.execute(
                                 select(WorldEntity).where(
                                     or_(
@@ -768,7 +836,7 @@ class TurnStateApplier:
                                         func.upper(WorldEntity.name) == ent_obj.name.upper(),
                                     ),
                                     WorldEntity.template_id == self.adventure.id,
-                                    WorldEntity.session_id.is_(None)
+                                    WorldEntity.session_id.is_(None),
                                 )
                             )
                             tpl_ent = tpl_res.scalars().first()
@@ -777,7 +845,9 @@ class TurnStateApplier:
                                     if k not in meta:
                                         meta[k] = v
                         if meta.get("on_pickup_script"):
-                            msgs = await self.manager._execute_inline_script(meta["on_pickup_script"], "on_pickup", ent_obj.id)
+                            msgs = await self.manager._execute_inline_script(
+                                meta["on_pickup_script"], "on_pickup", ent_obj.id
+                            )
                             system_messages.extend(msgs)
                         if meta.get("on_pickup_text"):
                             await self._save_chat_message("system", meta["on_pickup_text"])
@@ -788,26 +858,36 @@ class TurnStateApplier:
                 if item_id:
                     item_id_str = item_id.strip()
                     ent_res = await self.db.execute(
-                        select(WorldEntity).where(
+                        select(WorldEntity)
+                        .where(
                             or_(
                                 func.upper(WorldEntity.id) == item_id_str.upper(),
                                 func.upper(WorldEntity.name) == item_id_str.upper(),
                             ),
                             or_(
                                 WorldEntity.session_id == self.game_id,
-                                and_(WorldEntity.template_id == self.adventure.id, WorldEntity.session_id.is_(None))
-                            )
-                        ).order_by(WorldEntity.session_id.desc().nulls_last())
+                                and_(
+                                    WorldEntity.template_id == self.adventure.id,
+                                    WorldEntity.session_id.is_(None),
+                                ),
+                            ),
+                        )
+                        .order_by(WorldEntity.session_id.desc().nulls_last())
                     )
                     ent_obj = ent_res.scalars().first()
                     if ent_obj:
                         meta = dict(ent_obj.metadata_json or {})
-                        if not meta.get("on_drop_script") and not meta.get("on_drop_text") and hasattr(self, "adventure") and self.adventure:
+                        if (
+                            not meta.get("on_drop_script")
+                            and not meta.get("on_drop_text")
+                            and hasattr(self, "adventure")
+                            and self.adventure
+                        ):
                             tpl_res = await self.db.execute(
                                 select(WorldEntity).where(
                                     func.upper(WorldEntity.id) == item_id.strip().upper(),
                                     WorldEntity.template_id == self.adventure.id,
-                                    WorldEntity.session_id.is_(None)
+                                    WorldEntity.session_id.is_(None),
                                 )
                             )
                             tpl_ent = tpl_res.scalars().first()
@@ -816,7 +896,9 @@ class TurnStateApplier:
                                     if k not in meta:
                                         meta[k] = v
                         if meta.get("on_drop_script"):
-                            msgs = await self.manager._execute_inline_script(meta["on_drop_script"], "on_drop", item_id)
+                            msgs = await self.manager._execute_inline_script(
+                                meta["on_drop_script"], "on_drop", item_id
+                            )
                             system_messages.extend(msgs)
                         if meta.get("on_drop_text"):
                             await self._save_chat_message("system", meta["on_drop_text"])
@@ -828,7 +910,9 @@ class TurnStateApplier:
             state_dirty = True
 
         if event.remember_notes or event.forget_notes or event.clear_notes:
-            self._apply_gm_notes_update(event.remember_notes, event.forget_notes, bool(event.clear_notes))
+            self._apply_gm_notes_update(
+                event.remember_notes, event.forget_notes, bool(event.clear_notes)
+            )
 
         # Quest Updates
         newly_completed_quests: list[dict] = []
@@ -841,7 +925,7 @@ class TurnStateApplier:
                         q["status"] = "completed"
                         newly_completed_quests.append(q)
                         modified = True
-            
+
             if modified:
                 self.state.quests = new_quests
                 state_dirty = True
@@ -849,9 +933,7 @@ class TurnStateApplier:
         if event.earned_award_keys:
             now = datetime.utcnow().isoformat()
             award_defs = {
-                (aw.get("key") or ""): aw
-                for aw in (self.adventure.awards or [])
-                if aw.get("key")
+                (aw.get("key") or ""): aw for aw in (self.adventure.awards or []) if aw.get("key")
             }
             user_awards = list(self.user.earned_awards or [])
             modified = False
@@ -860,7 +942,10 @@ class TurnStateApplier:
                     continue
                 already_earned = any(
                     ea.get("key") == key
-                    and (ea.get("template_id") == self.adventure.id or ea.get("adventure_id") == self.adventure.id)
+                    and (
+                        ea.get("template_id") == self.adventure.id
+                        or ea.get("adventure_id") == self.adventure.id
+                    )
                     for ea in user_awards
                 )
                 if already_earned:
@@ -868,7 +953,9 @@ class TurnStateApplier:
 
                 aw = award_defs.get(key)
                 if not aw:
-                    logger.warning("[Turn %s] GM tried to grant non-existent award: %s", self.game_id, key)
+                    logger.warning(
+                        "[Turn %s] GM tried to grant non-existent award: %s", self.game_id, key
+                    )
                     continue
 
                 user_awards.append(
@@ -924,7 +1011,9 @@ class TurnStateApplier:
                         q["status"] = "completed"
                         if not any(nq.get("id") == qid for nq in newly_completed_quests):
                             newly_completed_quests.append(q)
-                        logger.info("[Turn %s] Deterministic Quest Completion: %s", self.game_id, qid)
+                        logger.info(
+                            "[Turn %s] Deterministic Quest Completion: %s", self.game_id, qid
+                        )
                         modified = True
             if modified:
                 self.state.quests = new_quests
@@ -968,18 +1057,24 @@ class TurnStateApplier:
             for seq_msg in seq_messages:
                 await self._save_chat_message("system", seq_msg)
                 system_messages.append(seq_msg)
-            sequences = sorted(getattr(self.adventure, "sequences", None) or [], key=lambda x: x.get("order", 1))
+            sequences = sorted(
+                getattr(self.adventure, "sequences", None) or [], key=lambda x: x.get("order", 1)
+            )
             completed_seq = next((s for s in sequences if s.get("id") == old_seq_id), None)
             if completed_seq:
                 if completed_seq.get("on_end_sequence_script"):
                     end_msgs = await self.manager._execute_inline_script(
-                        completed_seq["on_end_sequence_script"], "on_end_sequence", completed_seq.get("id")
+                        completed_seq["on_end_sequence_script"],
+                        "on_end_sequence",
+                        completed_seq.get("id"),
                     )
                     system_messages.extend(end_msgs)
                 if completed_seq.get("on_end_sequence_text"):
                     await self._save_chat_message("system", completed_seq["on_end_sequence_text"])
                     system_messages.append(completed_seq["on_end_sequence_text"])
-            new_seq = next((s for s in sequences if s.get("id") == self.state.active_sequence_id), None)
+            new_seq = next(
+                (s for s in sequences if s.get("id") == self.state.active_sequence_id), None
+            )
             if new_seq and new_seq != completed_seq:
                 if new_seq.get("on_start_sequence_script"):
                     start_msgs = await self.manager._execute_inline_script(
@@ -1024,41 +1119,48 @@ class TurnStateApplier:
                             or_(
                                 and_(
                                     WorldExit.from_scene_id == up_exit.from_scene_id,
-                                    WorldExit.to_scene_id == up_exit.to_scene_id
+                                    WorldExit.to_scene_id == up_exit.to_scene_id,
                                 ),
                                 and_(
                                     WorldExit.from_scene_id == up_exit.to_scene_id,
                                     WorldExit.to_scene_id == up_exit.from_scene_id,
-                                    WorldExit.exit_type == "bidirectional"
-                                )
-                            )
+                                    WorldExit.exit_type == "bidirectional",
+                                ),
+                            ),
                         )
                     )
                     exit_db = exit_res.scalars().first()
                     exit_type = exit_db.exit_type if exit_db else "one_way"
 
                     MapEngine.register_exit(
-                        world_map, 
-                        up_exit.from_scene_id, 
-                        up_exit.to_scene_id, 
+                        world_map,
+                        up_exit.from_scene_id,
+                        up_exit.to_scene_id,
                         is_locked=up_exit.is_locked,
-                        exit_type=exit_type
+                        exit_type=exit_type,
                     )
                     if exit_db:
                         was_locked = bool(exit_db.is_locked)
                         exit_db.is_locked = up_exit.is_locked
                         if was_locked and up_exit.is_locked is False:
-                            exit_name = str(exit_db.label or "").strip() or f"{up_exit.from_scene_id} -> {up_exit.to_scene_id}"
+                            exit_name = (
+                                str(exit_db.label or "").strip()
+                                or f"{up_exit.from_scene_id} -> {up_exit.to_scene_id}"
+                            )
                             msg = f"Exit unlocked: {exit_name}."
                             await self._save_chat_message("system", msg)
                             system_messages.append(msg)
                             if exit_db.on_unlock_success_script:
                                 msgs = await self.manager._execute_inline_script(
-                                    exit_db.on_unlock_success_script, "on_unlock_success", exit_db.id
+                                    exit_db.on_unlock_success_script,
+                                    "on_unlock_success",
+                                    exit_db.id,
                                 )
                                 system_messages.extend(msgs)
                             if exit_db.on_unlock_success_text:
-                                await self._save_chat_message("system", exit_db.on_unlock_success_text)
+                                await self._save_chat_message(
+                                    "system", exit_db.on_unlock_success_text
+                                )
                                 system_messages.append(exit_db.on_unlock_success_text)
             except Exception as e:
                 logger.error(f"Manual map exit update failed: {e}")
@@ -1071,8 +1173,7 @@ class TurnStateApplier:
         }
         obj_res = await self.db.execute(
             select(WorldEntity).where(
-                WorldEntity.session_id == self.game_id,
-                WorldEntity.entity_type == "OBJECT"
+                WorldEntity.session_id == self.game_id, WorldEntity.entity_type == "OBJECT"
             )
         )
         all_objs = obj_res.scalars().all()
@@ -1088,8 +1189,7 @@ class TurnStateApplier:
 
         npc_res = await self.db.execute(
             select(WorldEntity).where(
-                WorldEntity.session_id == self.game_id,
-                WorldEntity.entity_type == "NPC"
+                WorldEntity.session_id == self.game_id, WorldEntity.entity_type == "NPC"
             )
         )
         all_npcs = npc_res.scalars().all()
@@ -1106,12 +1206,12 @@ class TurnStateApplier:
                                 "[Turn %s] Removing item %s from NPC %s inventory during auto-sync cleanup.",
                                 self.game_id,
                                 item_id,
-                                npc.id
+                                npc.id,
                             )
                             npc_inv_modified = True
                             continue
                     cleaned_inv.append(item)
-                
+
                 if npc_inv_modified:
                     if npc.id not in states:
                         states[npc.id] = {}
@@ -1120,14 +1220,21 @@ class TurnStateApplier:
 
         if event.new_world_memories:
             import uuid
+
             existing_memories = list(self.state.world_memories or [])
             for mem in event.new_world_memories:
-                target_scene_id = mem.scene_id or (self.state.current_scene_id if self.state else None)
+                target_scene_id = mem.scene_id or (
+                    self.state.current_scene_id if self.state else None
+                )
                 # Deduplication check: prevent identical memories in the same scene/scope
                 is_duplicate = any(
-                    (m.get("description") or "").strip().lower() == (mem.description or "").strip().lower()
+                    (m.get("description") or "").strip().lower()
+                    == (mem.description or "").strip().lower()
                     and (m.get("scope") == mem.scope)
-                    and (mem.scope == "global" or (m.get("scene_id") or "") == (target_scene_id or ""))
+                    and (
+                        mem.scope == "global"
+                        or (m.get("scene_id") or "") == (target_scene_id or "")
+                    )
                     for m in existing_memories
                 )
                 if is_duplicate:
@@ -1148,7 +1255,11 @@ class TurnStateApplier:
                     "scene_id": target_scene_id,
                 }
                 existing_memories.append(new_mem)
-                emotion_label = "positiv" if mem.emotion == "positive" else ("negativ" if mem.emotion == "negative" else "neutral")
+                emotion_label = (
+                    "positiv"
+                    if mem.emotion == "positive"
+                    else ("negativ" if mem.emotion == "negative" else "neutral")
+                )
                 scope_label = "szenen-lokal" if mem.scope == "local" else "global"
                 msg = f"Erinnerung gespeichert ({scope_label}, {emotion_label}): {mem.description}"
                 await self._save_chat_message("system", msg)
@@ -1167,7 +1278,9 @@ class TurnStateApplier:
             self.state.in_game_time = max(0, int(event.time_override_minutes))
             state_dirty = True
         elif event.extra_time_minutes != 0:
-            base_turn = int(self.adventure.time_per_turn if self.adventure.time_per_turn is not None else 5)
+            base_turn = int(
+                self.adventure.time_per_turn if self.adventure.time_per_turn is not None else 5
+            )
             max_turn = getattr(self.adventure, "max_time_per_turn", None)
             if max_turn is None and self.adventure.time_config:
                 max_turn = self.adventure.time_config.get("max_time_per_turn")
@@ -1187,8 +1300,7 @@ class TurnStateApplier:
         if state_dirty:
             self.state.entity_states = states
             flag_modified(self.state, "entity_states")
-            
+
         await self._apply_adventure_generator_tools(event)
         await self.db.flush()
         return system_messages
-

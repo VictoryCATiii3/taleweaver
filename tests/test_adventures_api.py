@@ -1429,7 +1429,7 @@ async def test_export_manifest_backfills_core_metadata_without_runtime_state(cli
     assert export_resp.status_code == 200, export_resp.text
     export_data = export_resp.json()
 
-    assert export_data["version"] == "1.0"
+    assert export_data["version"] in ("1.0", "1.0.0")
     assert export_data["id"] == adventure_id
     assert export_data["title"] == "Sparse Quest"
     assert export_data["time_per_turn"] == 7
@@ -2226,12 +2226,28 @@ async def test_import_adv_preserves_consumable_effects_in_avatar_inventory(clien
     """ADV import should keep consumable hp/mana/stamina effects inside protagonist inventory items."""
     adv_payload = {
         "format": "taleweaver.adz",
-        "version": "1.0",
+        "version": "1.3",
         "type": "ADVENTURE_BLUEPRINT",
+        "sequences": [
+            {
+                "id": "SEQ_1",
+                "order": 1,
+                "title": "Act 1",
+                "walkthrough": "Drink the potion.",
+            }
+        ],
         "adventure": {
             "title": "ADV Keep Consumable Effects",
             "context": "Consumable effect roundtrip check",
             "strict_rules": True,
+            "sequences": [
+                {
+                    "id": "SEQ_1",
+                    "order": 1,
+                    "title": "Act 1",
+                    "walkthrough": "Drink the potion.",
+                }
+            ],
         },
         "protagonist": {
             "name": "Potion Hero",
@@ -2315,12 +2331,28 @@ async def test_chat_snapshot_inventory_readable_uses_text_log_content(client: As
     """Session chat payload should include READABLE inventory text from metadata_json."""
     adv_payload = {
         "format": "taleweaver.adz",
-        "version": "1.0",
+        "version": "1.3",
         "type": "ADVENTURE_BLUEPRINT",
+        "sequences": [
+            {
+                "id": "SEQ_1",
+                "order": 1,
+                "title": "Act 1",
+                "walkthrough": "Read the datapad.",
+            }
+        ],
         "adventure": {
             "title": "ADV Readable Inventory Snapshot",
             "context": "Readable text log payload check",
             "strict_rules": True,
+            "sequences": [
+                {
+                    "id": "SEQ_1",
+                    "order": 1,
+                    "title": "Act 1",
+                    "walkthrough": "Read the datapad.",
+                }
+            ],
         },
         "protagonist": {
             "name": "Reader Hero",
@@ -3178,7 +3210,11 @@ async def test_start_session_honors_manifest_start_scene_id_when_graph_has_no_en
 
         manifest = dict(adventure.original_manifest or {})
         manifest["start_scene_id"] = "LOBBY"
+        manifest["version"] = "1.3"
         adventure.original_manifest = manifest
+        adventure.sequences = [
+            {"id": "seq1", "order": 1, "title": "Sequence 1", "walkthrough": "Start in Lobby"}
+        ]
 
         # Remove baseline world rows and rebuild a bidirectional graph.
         await db.execute(

@@ -13,7 +13,6 @@ from packaging.version import parse as parse_semver
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.routes.adventures.logic import AdventureLogic
 from backend.core.adventure_format import CURRENT_VERSION
 from backend.core.adventure_identity import manifest_origin_id
 from backend.core.config import settings
@@ -264,6 +263,8 @@ def is_legacy_session(
         state = session.state
 
     if state:
+        from backend.api.routes.adventures.logic import AdventureLogic
+
         snapshot = AdventureLogic.extract_manifest_snapshot(state)
         manifest = snapshot.get("original_manifest") or {}
         manifest_version = manifest.get("format_version") or manifest.get("version")

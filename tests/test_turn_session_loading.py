@@ -4,7 +4,6 @@ import pytest
 from sqlalchemy import inspect
 
 from backend.api.routes.adventures.gameplay_logic import GameTurnManager
-from backend.models.game_session import GameSession
 from tests.conftest import TestSessionLocal
 from tests.test_game_loop import _seed_game_context
 
@@ -24,17 +23,7 @@ async def test_reused_manager_reloads_session_after_state_refresh(
 ):
     async with TestSessionLocal() as db:
         user, adventure, avatar, state = await _seed_game_context(db)
-        db.add(
-            GameSession(
-                id=state.session_id,
-                template_id=adventure.id,
-                avatar_id=avatar.id,
-                user_id=user.id,
-                adventure_title=adventure.title,
-                status="active",
-            )
-        )
-        await db.commit()
+
         manager = GameTurnManager(db, state.session_id, user)
         assert await manager.initialize()
         state.session.status = status

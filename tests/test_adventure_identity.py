@@ -2,6 +2,8 @@
 Tests for the stable adventure identity (origin_id) used to detect updates across title changes.
 """
 
+import os
+
 import pytest
 
 from backend.core.adventure_identity import manifest_origin_id
@@ -90,10 +92,14 @@ def test_bundled_adventures_have_unique_identity_and_clean_titles():
     """Shipped samples need an origin_id for updates and must not carry export suffixes."""
     from backend.engine.adventure_updates import scan_available_adventure_files
 
+    repo_adventures = os.path.abspath(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "adventures")
+    )
     bundled = [
         f
         for f in scan_available_adventure_files(force_refresh=True)
-        if "adventures" in f["file_path"] and f["file_path"].endswith(".adz")
+        if os.path.abspath(f["file_path"]).startswith(repo_adventures)
+        and f["file_path"].endswith(".adz")
     ]
     origin_ids = [f["origin_id"] for f in bundled]
 

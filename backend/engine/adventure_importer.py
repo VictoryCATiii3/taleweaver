@@ -869,6 +869,7 @@ class AdventureTemplateImporter:
             title=adv_meta.get("title") or manifest.get("title") or "Imported Blueprint",
             teaser=adv_meta.get("teaser") or manifest.get("teaser"),
             version=adv_meta.get("version") or manifest.get("version"),
+            sequences=adv_meta.get("sequences") or manifest.get("sequences"),
             creator=adv_meta.get("creator") or manifest.get("creator"),
             copyright=adv_meta.get("copyright") or manifest.get("copyright"),
             license=adv_meta.get("license") or manifest.get("license"),

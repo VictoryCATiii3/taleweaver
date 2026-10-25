@@ -103,9 +103,10 @@ async def clean_stream_thinking(stream: AsyncIterator[Any]) -> AsyncIterator[Any
 
 
 def _voice_prefix_ready(buffer: str) -> bool:
+    has_newline_with_content = "\n" in buffer and bool(buffer.split("\n", 1)[1].strip())
     return (
         len(buffer) >= _VOICE_PREFIX_MAX_CHARS
-        or "\n" in buffer
+        or has_newline_with_content
         or ("]" in buffer and len(buffer) >= _VOICE_PREFIX_TAG_MIN_CHARS)
         or (len(buffer) >= _VOICE_PREFIX_PLAIN_MIN_CHARS and "[" not in buffer)
     )
