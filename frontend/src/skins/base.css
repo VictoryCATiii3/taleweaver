@@ -23,6 +23,13 @@
   --tw-narration-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
   --tw-label-bg: var(--tw-accent);
   --tw-label-ink: #020617;
+  --tw-font-dropcap: 'Acme', sans-serif;
+  --tw-dropcap-size: 3.2em;
+  --tw-dropcap-weight: 400;
+  --tw-dropcap-ink: var(--tw-accent-soft);
+  --tw-dropcap-shadow: 0 0 18px color-mix(in srgb, var(--tw-accent-soft) 35%, transparent);
+  /* Emotion tag inside narration (may differ from bubbles when the paper is light). */
+  --tw-narration-tag-ink: color-mix(in srgb, var(--tw-accent-soft) 70%, #ffffff);
 
   --tw-bubble-bg: rgba(15, 23, 42, 0.95);
   --tw-bubble-tail-fill: #0f172a;
@@ -87,16 +94,31 @@
   transform: scale(1.01);
 }
 
+/* flow-root keeps the floated drop cap inside the box for one-line narrations. */
 .tw-narration-text {
+  display: flow-root;
   font-family: var(--tw-font-body);
   letter-spacing: 0.02em;
 }
 
+/* Drop cap: the first letter spans about three lines and the text flows around it. */
+.tw-narration-text::first-letter {
+  float: left;
+  margin: 0.3rem 0.55rem 0 0;
+  font-family: var(--tw-font-dropcap);
+  font-size: var(--tw-dropcap-size);
+  font-weight: var(--tw-dropcap-weight);
+  font-style: normal;
+  line-height: 0.8;
+  color: var(--tw-dropcap-ink);
+  text-shadow: var(--tw-dropcap-shadow);
+}
+
 .tw-narration-label {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  vertical-align: middle;
-  margin-right: 0.625rem;
+  width: fit-content;
+  margin: 0 0 0.625rem;
   padding: 0.125rem 0.5rem;
   border-radius: 0.375rem;
   background: var(--tw-label-bg);
@@ -212,6 +234,25 @@
   background: color-mix(in srgb, var(--tw-accent-soft) 15%, transparent);
   color: color-mix(in srgb, var(--tw-accent-soft) 70%, #ffffff);
   border: 1px solid color-mix(in srgb, var(--tw-accent-soft) 30%, transparent);
+}
+
+.tw-skin .tw-narration .comic-voice-tag {
+  color: var(--tw-narration-tag-ink);
+}
+
+/* Vocal bursts (<sigh>, <laugh>, …) read as a quiet stage direction. */
+.tw-skin .comic-vocal-tag {
+  font-style: italic;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.tw-skin .comic-vocal-tag::before {
+  content: '(';
+}
+
+.tw-skin .comic-vocal-tag::after {
+  content: ')';
 }
 
 .tw-skin .comic-object-tag {
@@ -351,5 +392,5 @@
 .tw-pager-button {
   border: 1px solid var(--tw-panel-border);
   background: var(--tw-card-bg);
-  color: var(--tw-panel-ink);
+  color: var(--tw-card-ink);
 }

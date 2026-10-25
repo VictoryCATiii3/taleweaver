@@ -15,6 +15,11 @@
   --tw-narration-border: 0 solid transparent;
   --tw-narration-radius: 3px;
   --tw-narration-shadow: inset 0 0 70px rgba(120, 72, 24, 0.45), 0 18px 50px rgba(0, 0, 0, 0.6);
+  --tw-font-dropcap: 'IM Fell English SC', Georgia, serif;
+  --tw-dropcap-size: 3.6em;
+  --tw-dropcap-ink: var(--tw-accent);
+  --tw-dropcap-shadow: none;
+  --tw-narration-tag-ink: #f6e1c8;
 
   --tw-bubble-bg: #d9c49a;
   --tw-bubble-tail-fill: #d9c49a;
@@ -64,19 +69,10 @@
 }
 
 [data-skin='chronicle'] .tw-narration-text {
-  display: block;
+  display: flow-root;
   font-size: 1.08em;
   line-height: 1.65;
   letter-spacing: 0;
-}
-
-[data-skin='chronicle'] .tw-narration-text::first-letter {
-  float: left;
-  margin: 0.35rem 0.5rem 0 0;
-  font-family: 'IM Fell English SC', Georgia, serif;
-  font-size: 3.6em;
-  line-height: 0.8;
-  color: var(--tw-accent);
 }
 
 /* Dialogue: scroll with a ribbon banner for the speaker. */

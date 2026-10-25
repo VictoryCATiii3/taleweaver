@@ -11,7 +11,7 @@ import { configState } from '@/store/config'
 import { audioService } from '@/services/audioService'
 import { getItemIcon, getTypeColor, getImageUrl, getOriginalImageUrl } from '@/utils/game_icons'
 import type { ComicExchange, DialogueSegment } from '@/composables/useComicTurns'
-import { renderFormattedHtml, resolveNpc } from '@/composables/useComicTurns'
+import { renderDialogueHtml, renderFormattedHtml, resolveNpc } from '@/composables/useComicTurns'
 import { useStoryBubbleAudio } from '@/composables/useStoryBubbleAudio'
 import ImmersiveSystemMessage from '@/components/game/immersive/ImmersiveSystemMessage.vue'
 import { isTurnErrorMessage } from './systemMessages'
@@ -307,7 +307,7 @@ function getEntityForHover(nameOrEntity: any) {
               </span>
             </template>
 
-            "{{ dlg.text }}"
+            <span v-html="renderDialogueHtml(dlg.text)"></span>
           </p>
         </div>
       </div>

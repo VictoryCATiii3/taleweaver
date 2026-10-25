@@ -285,12 +285,22 @@ export function parseAssistantContent(
   }
 }
 
+// Vocal bursts from the TTS catalog (backend/core/voice_tags.py), written in angle brackets.
+const PAUSE_BURST = /\s*<\s*(?:short |medium |long )?pause\s*>\s*/gi
+const VOCAL_BURST =
+  /&lt;\s*(cough|sigh|breath|heavy breath|laugh|chuckle|throat-clearing|gasp|groan)\s*&gt;/gi
+const QUOTE_CHARS = /["„“”«»]/
+
+/** Escapes the text and renders voice tags, vocal bursts, bold text and object ids as markup. */
 export function renderFormattedHtml(text: string): string {
   if (!text) return ''
-  // TTS pause markers (e.g. "<short pause>") are meant for speech output only.
-  const displayText = text.replace(/\s*<\s*(?:short|medium|long)?\s*pause\s*>\s*/gi, ' ')
+  // Pauses only shape the speech output; other bursts are shown as a subtle stage direction.
+  const displayText = text.replace(PAUSE_BURST, ' ').trim()
   const escaped = displayText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-  const withVoiceTags = escaped.replace(/(\[[^\]\n]+\])/g, (match, tag) => {
+  const withBursts = escaped.replace(VOCAL_BURST, (_match, burst: string) => {
+    return `<span class="comic-vocal-tag">${burst.toLowerCase()}</span>`
+  })
+  const withVoiceTags = withBursts.replace(/(\[[^\]\n]+\])/g, (match, tag) => {
     const raw = tag.slice(1, -1).trim()
     if (/^DEBUG/i.test(raw)) return match
     const en = normalizeVoiceTag(raw)
@@ -303,6 +313,18 @@ export function renderFormattedHtml(text: string): string {
     ALLOWED_TAGS: ['span', 'strong', 'em', 'br', 'div'],
     ALLOWED_ATTR: ['class'],
   })
+}
+
+/**
+ * Dialogue bubble text: like renderFormattedHtml, wrapped in quotes unless the line already
+ * carries its own (e.g. `"Coffee?" She chews slower.`).
+ */
+export function renderDialogueHtml(text: string): string {
+  const html = renderFormattedHtml(text)
+  if (!html || QUOTE_CHARS.test(text)) {
+    return html
+  }
+  return `&quot;${html}&quot;`
 }
 
 export function useComicTurns(options: UseComicTurnsOptions) {

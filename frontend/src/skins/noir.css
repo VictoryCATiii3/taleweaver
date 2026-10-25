@@ -15,6 +15,12 @@
   --tw-narration-border: 0 solid transparent;
   --tw-narration-radius: 2px;
   --tw-narration-shadow: 0 0 0 8px #d8c79f, 0 22px 50px rgba(0, 0, 0, 0.75);
+  --tw-font-dropcap: 'Special Elite', 'Courier New', monospace;
+  --tw-dropcap-size: 3.4em;
+  --tw-dropcap-ink: var(--tw-accent);
+  --tw-dropcap-shadow: none;
+  /* Handwritten tags need dark ink on the cream case file. */
+  --tw-narration-tag-ink: #8f0b21;
 
   --tw-bubble-bg: #0f0f10;
   --tw-bubble-tail-fill: #0f0f10;
@@ -70,7 +76,7 @@
 }
 
 [data-skin='noir'] .tw-narration-text {
-  display: block;
+  display: flow-root;
   line-height: 1.7;
   letter-spacing: 0;
 }

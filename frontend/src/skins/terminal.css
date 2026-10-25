@@ -20,6 +20,10 @@
     inset 0 0 30px color-mix(in srgb, var(--tw-accent) 8%, transparent),
     0 0 24px color-mix(in srgb, var(--tw-accent) 20%, transparent);
   --tw-label-bg: transparent;
+  --tw-font-dropcap: 'Orbitron', ui-sans-serif, sans-serif;
+  --tw-dropcap-size: 2.9em;
+  --tw-dropcap-weight: 700;
+  --tw-dropcap-shadow: 0 0 16px color-mix(in srgb, var(--tw-accent) 70%, transparent);
   --tw-label-ink: var(--tw-accent);
 
   --tw-bubble-bg:
