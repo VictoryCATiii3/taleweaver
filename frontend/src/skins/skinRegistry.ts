@@ -6,7 +6,7 @@
  * `tw-*` classes, so adding a skin never requires touching component markup.
  */
 
-export const SKIN_IDS = ['classic', 'chronicle', 'noir', 'terminal', 'grimoire'] as const
+export const SKIN_IDS = ['classic', 'chronicle', 'noir', 'terminal', 'grimoire', 'eldritch', 'toon'] as const
 
 export type SkinId = (typeof SKIN_IDS)[number]
 
@@ -58,6 +58,18 @@ export const SKINS: SkinDefinition[] = [
     description: 'Dark vellum, blood-red ink and candlelit edges.',
     swatch: ['#16100e', '#e8dccb', '#b91c1c'],
   },
+  {
+    id: 'eldritch',
+    label: 'Eldritch',
+    description: 'Murky darkness, sickly green glow and a flickering lamp.',
+    swatch: ['#070b07', '#d6e5cf', '#a3e635'],
+  },
+  {
+    id: 'toon',
+    label: 'Toon',
+    description: 'Loud cartoon panels, bouncy bubbles and halftone dots.',
+    swatch: ['#fffbea', '#111111', '#f97316'],
+  },
 ]
 
 /** Keyword (lower case) found in the adventure tone → skin. First match wins. */
@@ -71,7 +83,19 @@ const TONE_KEYWORDS: [string, SkinId][] = [
   ['mystery', 'noir'],
   ['detective', 'noir'],
   ['crime', 'noir'],
-  ['horror', 'grimoire'],
+  ['slapstick', 'toon'],
+  ['comedy', 'toon'],
+  ['satir', 'toon'],
+  ['funny', 'toon'],
+  ['humor', 'toon'],
+  ['humour', 'toon'],
+  ['parody', 'toon'],
+  ['cartoon', 'toon'],
+  ['horror', 'eldritch'],
+  ['cosmic', 'eldritch'],
+  ['lovecraft', 'eldritch'],
+  ['eldritch', 'eldritch'],
+  ['zombie', 'eldritch'],
   ['grimdark', 'grimoire'],
   ['gothic', 'grimoire'],
   ['dark', 'grimoire'],

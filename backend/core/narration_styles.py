@@ -1,0 +1,59 @@
+"""Narration styles: how much the narrator writes per turn (player setting per session).
+
+Each style replaces the length and pacing rules of the narration prompt (Pass 2). Everything
+else (formatting, dialogue lines, item rules) stays shared in ``prompts.py``.
+The ids mirror ``frontend/src/components/game/settings/narrationStyles.ts``.
+"""
+
+from __future__ import annotations
+
+from typing import Final, Literal
+
+NarrationStyle = Literal["terse", "balanced", "rich", "epic"]
+
+DEFAULT_NARRATION_STYLE: Final[NarrationStyle] = "balanced"
+
+_STYLE_RULES: Final[dict[str, str]] = {
+    "terse": (
+        "NARRATION STYLE — TERSE (CRITICAL): Write sparse, punchy story snippets. "
+        "Routine actions get 1-2 short sentences in total. A new location or a major event gets at most "
+        "3 short sentences. Name only the single most striking detail; never describe a room in full. "
+        "NPC dialogue is one short sentence per character per turn. Skip transitions, inner thoughts and "
+        "atmosphere padding; move straight to what changed and who reacts."
+    ),
+    "balanced": (
+        "NARRATION STYLE — BALANCED (CRITICAL): 1-2 short paragraphs for standard actions. Up to 3 "
+        "paragraphs ONLY for new scenes or major events. Every prose paragraph has at most 3 sentences "
+        "(roughly 60 words). A new location gets a compact, atmospheric introduction (about 120 words) with "
+        "the 2-3 most striking details; leave the rest for the player to discover. "
+        "Keep dialogue and prose crisp and engaging; DO NOT produce walls of text or exposition dumps. "
+        "NPC dialogue stays snappy (1-3 sentences per character per turn). Let the player act frequently "
+        "and focus on the most salient sensory details instead of cataloging every object."
+    ),
+    "rich": (
+        "NARRATION STYLE — RICH (CRITICAL): Write descriptive, immersive prose. Standard actions get 2-3 "
+        "paragraphs; new scenes and major events up to 4. Every prose paragraph has at most 4 sentences "
+        "(roughly 80 words). Use concrete sensory detail (light, sound, smell, texture) and show how the "
+        "world and its characters react. NPC dialogue may run 2-4 sentences per character and reveal "
+        "personality. Stay focused on the current moment; never pad with repetition or recaps."
+    ),
+    "epic": (
+        "NARRATION STYLE — EPIC (CRITICAL): Write like a novel. Standard actions get 3-5 paragraphs; new "
+        "scenes and major events up to 6. Every prose paragraph has at most 5 sentences (roughly 100 words). "
+        "Build atmosphere and tension, describe the setting and the characters' body language in depth, and "
+        "vary rhythm between long flowing sentences and short beats. NPC dialogue may be expansive and "
+        "layered (up to 5 sentences per character), and NPCs may talk among themselves. Every paragraph must "
+        "still add something new: no repetition, no recaps of earlier turns, and no decisions on behalf of "
+        "the player."
+    ),
+}
+
+
+def is_narration_style(value: object) -> bool:
+    return isinstance(value, str) and value in _STYLE_RULES
+
+
+def narration_style_rules(style: object) -> str:
+    """Length and pacing rules for the narration prompt; unknown values fall back to balanced."""
+    key = style if is_narration_style(style) else DEFAULT_NARRATION_STYLE
+    return _STYLE_RULES[str(key)]

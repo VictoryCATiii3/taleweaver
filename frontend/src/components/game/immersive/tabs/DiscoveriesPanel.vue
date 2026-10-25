@@ -24,6 +24,7 @@ const TAKE_ALL_INTERVAL_MS = 250
 const isTakingAll = ref(false)
 const thumbFailed = ref<Record<string, boolean>>({})
 const brokenImages = ref<Record<string, boolean>>({})
+const loadedImages = ref<Record<string, boolean>>({})
 
 const portableItems = computed(() => props.items.filter((item: any) => item.is_portable !== false))
 const canTakeAll = computed(() => portableItems.value.length > 1 && !props.isEvaluating && !isTakingAll.value)
@@ -38,6 +39,14 @@ function onImageError(path: string) {
     return
   }
   brokenImages.value[path] = true
+}
+
+function onImageLoad(path: string) {
+  loadedImages.value[path] = true
+}
+
+function isImageLoading(item: any): boolean {
+  return hasImage(item) && !loadedImages.value[item.image_url]
 }
 
 function hasImage(item: any): boolean {
@@ -109,12 +118,16 @@ async function takeAll() {
           <Hand class="w-3.5 h-3.5" />
         </button>
 
-        <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-slate-950/90 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+        <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-slate-950/90 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+          <span v-if="isImageLoading(item)" class="tw-image-spinner" role="status" aria-label="Loading image"></span>
           <img
             v-if="hasImage(item)"
             :src="imageUrl(item.image_url)"
             :alt="item.name"
-            class="w-full h-full object-cover"
+            decoding="async"
+            class="w-full h-full object-cover transition-opacity duration-300"
+            :class="isImageLoading(item) ? 'opacity-0' : 'opacity-100'"
+            @load="onImageLoad(item.image_url)"
             @error="onImageError(item.image_url)"
           />
           <i v-else :class="['ra text-4xl sm:text-5xl', getItemIcon(item.item_type), getTypeColor(item.item_type)]"></i>

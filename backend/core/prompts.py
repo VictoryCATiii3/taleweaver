@@ -397,15 +397,10 @@ Default instruction for standard interactions to keep the game moving.
 
 GM_NARRATION_MANDATORY_FORMATTING = (
     "Do not mention numbers, IDs, or system terms. "
-    "1-2 short paragraphs max for standard actions. Up to 3 paragraphs ONLY for new scenes or major events.\n\n"
-    "COMPACT TEXT BLOCKS (CRITICAL): Every prose paragraph has at most 3 sentences (roughly 60 words). "
+    "Response length, paragraph size and pacing follow the NARRATION STYLE rules.\n\n"
+    "COMPACT TEXT BLOCKS (CRITICAL): Keep each prose paragraph within the sentence limit of the NARRATION STYLE. "
     "Split longer passages into separate paragraphs with a blank line. "
     "Never embed NPC speech inside a prose paragraph — it always goes on its own dialogue line.\n\n"
-    "PACING & CONCISENESS (CRITICAL): Keep dialogue and narrative prose crisp, natural, and engaging. "
-    "DO NOT produce rambling, endless walls of text or excessive exposition dumps. "
-    "NPC dialogue must remain snappy and interactive (1-3 sentences per character per turn). "
-    "Let the player react and act frequently instead of overwhelming them with long-winded monologues. "
-    "Avoid mechanically cataloging every object in the room in a single dense paragraph; focus on the most salient sensory details and immediate interactions.\n\n"
     "ITEM NARRATION RULE: Do NOT invent or describe obtaining new physical items that are not explicitly confirmed in the TECHNICAL OUTCOME or pre-defined in the scene. Only narrate interactions with items that actually exist in the world or mechanics outcome.\n\n"
     "NPC INTERACTION RULE: If multiple NPCs are present in the current scene, let them occasionally talk to each other directly (not only to the player), as long as it is narratively appropriate.\n\n"
     "MANDATORY FORMATTING: Start all character dialogue on a NEW LINE. "

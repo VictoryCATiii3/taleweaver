@@ -1,0 +1,249 @@
+/* Toon — loud cartoon panels, bouncy bubbles and halftone dots for slapstick adventures. */
+
+[data-skin='toon'] {
+  --tw-accent: #f97316;
+  --tw-accent-soft: #fb923c;
+  --tw-player: #22c55e;
+  --tw-target: #8b5cf6;
+
+  --tw-font-body: 'Comic Neue', 'Comic Sans MS', sans-serif;
+  --tw-font-dialogue: 'Comic Neue', 'Comic Sans MS', sans-serif;
+  --tw-font-label: 'Bangers', 'Impact', sans-serif;
+
+  --tw-narration-bg: #fffbea;
+  --tw-narration-ink: #1f2937;
+  --tw-narration-border: 3px solid #111111;
+  --tw-narration-radius: 18px;
+  --tw-narration-shadow: 6px 6px 0 #111111;
+  --tw-label-bg: #ef4444;
+  --tw-label-ink: #ffffff;
+  --tw-font-dropcap: 'Bangers', 'Impact', sans-serif;
+  --tw-dropcap-size: 3.5em;
+  --tw-dropcap-ink: #3b82f6;
+  --tw-dropcap-shadow: 3px 3px 0 #111111;
+  --tw-narration-tag-ink: #111111;
+
+  --tw-bubble-bg: #ffffff;
+  --tw-bubble-tail-fill: #ffffff;
+  --tw-bubble-ink: #111111;
+  --tw-bubble-color: #111111;
+  --tw-bubble-border-width: 3px;
+  --tw-bubble-radius: 22px;
+  --tw-bubble-shadow: 5px 5px 0 #111111;
+
+  --tw-strong-ink: #dc2626;
+
+  --tw-panel-bg: #fef3c7;
+  --tw-panel-border: #111111;
+  --tw-panel-ink: #111111;
+  --tw-panel-muted: #4b5563;
+  --tw-panel-radius: 16px;
+  --tw-card-bg: #ffffff;
+  --tw-card-border: #111111;
+  --tw-card-radius: 12px;
+
+  --tw-tab-bg: #fde047;
+  --tw-tab-ink: #111111;
+  --tw-tab-border: #111111;
+  --tw-tab-active-bg: #3b82f6;
+  --tw-tab-active-ink: #ffffff;
+  --tw-tab-active-border: #111111;
+  --tw-tab-radius: 10px;
+  --tw-tab-font: 'Bangers', 'Impact', sans-serif;
+
+  --tw-scene-tint:
+    radial-gradient(rgba(0, 0, 0, 0.16) 1px, transparent 1.6px) 0 0 / 7px 7px,
+    linear-gradient(180deg, rgba(253, 224, 71, 0.08), rgba(249, 115, 22, 0.1));
+  --tw-scene-filter: saturate(1.35) contrast(1.08) brightness(0.95);
+
+  /* Overlays: sunburst behind the title */
+  --tw-overlay-bg: #1e3a8a;
+  --tw-overlay-ink: #fde047;
+  --tw-overlay-muted: #dbeafe;
+  --tw-overlay-accent: var(--tw-accent);
+  --tw-overlay-highlight: #fde047;
+  --tw-font-overlay-title: 'Bangers', 'Impact', sans-serif;
+  --tw-font-overlay-eyebrow: 'Bangers', 'Impact', sans-serif;
+  --tw-overlay-title-transform: uppercase;
+  --tw-overlay-wash: repeating-conic-gradient(from 0deg at 50% 50%, rgba(253, 224, 71, 0.22) 0deg 9deg, transparent 9deg 18deg);
+  --tw-overlay-texture: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1.6px) 0 0 / 8px 8px;
+  --tw-overlay-image-filter: saturate(1.4) brightness(0.6);
+
+  /* System notes and dice */
+  --tw-sysnote-bg: #fde047;
+  --tw-sysnote-ink: #111111;
+  --tw-sysnote-border: 2px solid #111111;
+  --tw-sysnote-radius: 10px;
+  --tw-sysnote-icon: #111111;
+  --tw-sysnote-font: 'Comic Neue', 'Comic Sans MS', sans-serif;
+  --tw-sysnote-style: normal;
+  --tw-sysnote-tracking: 0;
+  --tw-sysnote-shadow: 3px 3px 0 #111111;
+  --tw-sysnote-rotate: -1deg;
+  --tw-die-face: #ffffff;
+  --tw-die-edge: #111111;
+  --tw-die-ink: #111111;
+  --tw-die-shine: rgba(255, 255, 255, 0.6);
+  --tw-die-crit: #f97316;
+  --tw-die-fumble: #ef4444;
+  --tw-die-number-font: 'Bangers', 'Impact', sans-serif;
+
+  /* NPC entrances */
+  --tw-arrival-sweep: rgba(253, 224, 71, 0.6);
+  --tw-arrival-glow: rgba(249, 115, 22, 0.8);
+  --tw-arrival-tag-bg: #ef4444;
+  --tw-arrival-tag-ink: #ffffff;
+  --tw-arrival-tag-font: 'Bangers', 'Impact', sans-serif;
+  --tw-arrival-animation: tw-npc-arrive-boing;
+  --tw-arrival-duration: 1s;
+}
+
+[data-skin='toon'] .tw-narration,
+[data-skin='toon'] .tw-bubble {
+  backdrop-filter: none;
+}
+
+[data-skin='toon'] .tw-narration-label {
+  display: block;
+  width: fit-content;
+  margin: 0 0 0.6rem;
+  padding: 0.15rem 0.6rem;
+  border: 2px solid #111111;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  transform: rotate(-2deg);
+  box-shadow: 2px 2px 0 #111111;
+}
+
+[data-skin='toon'] .tw-narration-text,
+[data-skin='toon'] .tw-bubble-text {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+[data-skin='toon'] .tw-bubble-tail polygon {
+  stroke-width: 3;
+}
+
+/* Speaker tags are colored stickers; set each variant explicitly (bubbles are outlined in black). */
+[data-skin='toon'] .tw-speaker {
+  --tw-speaker-color: #f97316;
+  border: 2px solid #111111;
+  border-radius: 6px;
+  background: var(--tw-speaker-color);
+  color: #ffffff;
+  font-family: 'Bangers', 'Impact', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-shadow: 1px 1px 0 #111111;
+  transform: rotate(-2deg);
+  box-shadow: 2px 2px 0 #111111;
+}
+
+[data-skin='toon'] .tw-speaker--player {
+  --tw-speaker-color: var(--tw-player);
+}
+
+[data-skin='toon'] .tw-speaker--target {
+  --tw-speaker-color: var(--tw-target);
+}
+
+[data-skin='toon'] .tw-speaker:hover {
+  background: var(--tw-speaker-color);
+  transform: rotate(0deg) scale(1.05);
+}
+
+[data-skin='toon'] .comic-voice-tag {
+  border: 2px solid #111111;
+  border-radius: 6px;
+  background: #fde047;
+  color: #111111;
+  font-family: 'Bangers', 'Impact', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  transform: rotate(3deg);
+}
+
+/* The speaking bubble wobbles. */
+[data-skin='toon'] .tw-bubble.is-speaking,
+[data-skin='toon'] .tw-narration.is-speaking {
+  box-shadow: 6px 6px 0 #111111;
+  animation: tw-toon-wobble 0.5s ease-in-out infinite alternate;
+}
+
+[data-skin='toon'] .tw-tab {
+  border-width: 2px;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  box-shadow: 3px 3px 0 #111111;
+  backdrop-filter: none;
+}
+
+[data-skin='toon'] .tw-tab:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #111111;
+}
+
+[data-skin='toon'] .tw-tab-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 2px #111111;
+}
+
+[data-skin='toon'] .tw-card {
+  border-width: 2px;
+  box-shadow: 3px 3px 0 #111111;
+}
+
+[data-skin='toon'] .tw-panel {
+  border-width: 3px;
+  backdrop-filter: none;
+}
+
+[data-skin='toon'] .tw-panel-title,
+[data-skin='toon'] .tw-pager {
+  font-family: 'Bangers', 'Impact', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+
+[data-skin='toon'] .tw-overlay-title {
+  text-shadow: 4px 4px 0 #111111;
+}
+
+[data-skin='toon'] .tw-npc-arrival-tag {
+  border: 2px solid #111111;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  transform: rotate(-6deg);
+}
+
+@keyframes tw-toon-wobble {
+  from { transform: rotate(-0.6deg) scale(1.01); }
+  to { transform: rotate(0.6deg) scale(1.02); }
+}
+
+/* NPC entrance: drops in from above, squashes on landing, bounces back */
+@keyframes tw-npc-arrive-boing {
+  0% { opacity: 0; transform: translateY(-120%) scaleY(1.15); }
+  45% { opacity: 1; transform: translateY(0) scale(1.12, 0.82); }
+  65% { transform: translateY(-6%) scale(0.95, 1.08); }
+  82% { transform: translateY(0) scale(1.03, 0.97); }
+  100% { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-skin='toon'] .tw-bubble.is-speaking,
+  [data-skin='toon'] .tw-narration.is-speaking {
+    animation: none;
+  }
+}
+
+[data-skin='toon'] .tw-scroll-latest {
+  border: 2px solid #111111;
+  box-shadow: 3px 3px 0 #111111;
+  backdrop-filter: none;
+}

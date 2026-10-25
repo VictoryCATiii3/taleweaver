@@ -50,6 +50,7 @@ _STATE_VALUE_FIELDS = (
     "is_debug_enabled",
     "is_walkthrough_revealed",
     "allow_dynamic_items",
+    "narration_style",
 )
 _STATE_JSON_FIELDS = (
     "time_config",

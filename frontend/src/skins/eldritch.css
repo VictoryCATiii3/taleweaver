@@ -1,0 +1,190 @@
+/* Eldritch — sickly green and murky darkness for horror adventures. */
+
+[data-skin='eldritch'] {
+  --tw-accent: #65a30d;
+  --tw-accent-soft: #a3e635;
+  --tw-player: #d9f99d;
+  --tw-target: #c084fc;
+
+  --tw-font-body: 'Newsreader', Georgia, serif;
+  --tw-font-dialogue: 'IM Fell English', Georgia, serif;
+  --tw-font-label: 'Creepster', 'Special Elite', serif;
+
+  --tw-narration-bg:
+    radial-gradient(ellipse at 50% 120%, rgba(77, 124, 15, 0.28), transparent 60%),
+    radial-gradient(ellipse at 20% 0%, #121c12 0%, #070b07 75%);
+  --tw-narration-ink: #d6e5cf;
+  --tw-narration-border: 1px solid color-mix(in srgb, var(--tw-accent) 40%, transparent);
+  --tw-narration-radius: 4px;
+  --tw-narration-shadow: inset 0 0 50px rgba(101, 163, 13, 0.16), 0 0 34px rgba(0, 0, 0, 0.85);
+  --tw-font-dropcap: 'Creepster', serif;
+  --tw-dropcap-size: 3.4em;
+  --tw-dropcap-ink: var(--tw-accent-soft);
+  --tw-dropcap-shadow: 0 0 14px rgba(163, 230, 53, 0.65);
+  --tw-narration-tag-ink: #bef264;
+
+  --tw-bubble-bg: #0c140d;
+  --tw-bubble-tail-fill: #0c140d;
+  --tw-bubble-ink: #e2efd9;
+  --tw-bubble-color: color-mix(in srgb, var(--tw-accent) 55%, transparent);
+  --tw-bubble-border-width: 1px;
+  --tw-bubble-radius: 4px;
+  --tw-bubble-shadow: inset 0 0 36px rgba(0, 0, 0, 0.6), 0 12px 34px rgba(0, 0, 0, 0.8);
+
+  --tw-strong-ink: #d9f99d;
+
+  --tw-panel-bg: rgba(6, 12, 7, 0.94);
+  --tw-panel-border: color-mix(in srgb, var(--tw-accent) 35%, transparent);
+  --tw-panel-ink: #d6e5cf;
+  --tw-panel-muted: #8ea886;
+  --tw-panel-radius: 4px;
+  --tw-card-bg: #0c140d;
+  --tw-card-border: rgba(101, 163, 13, 0.3);
+  --tw-card-radius: 3px;
+
+  --tw-tab-bg: rgba(8, 15, 9, 0.88);
+  --tw-tab-ink: #c5d8bd;
+  --tw-tab-border: rgba(101, 163, 13, 0.3);
+  --tw-tab-active-bg: color-mix(in srgb, var(--tw-accent) 22%, #070b07);
+  --tw-tab-active-ink: #ecfccb;
+  --tw-tab-active-border: var(--tw-accent-soft);
+  --tw-tab-radius: 3px;
+  --tw-tab-font: 'Creepster', 'Special Elite', serif;
+
+  --tw-scene-tint:
+    radial-gradient(ellipse at 50% 110%, rgba(77, 124, 15, 0.38), transparent 60%),
+    radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.78) 100%);
+  --tw-scene-filter: sepia(0.35) hue-rotate(45deg) saturate(0.6) brightness(0.6) contrast(1.1);
+
+  /* Overlays (scene transition, chapter intro) */
+  --tw-overlay-bg: #040805;
+  --tw-overlay-ink: #e2efd9;
+  --tw-overlay-muted: #8ea886;
+  --tw-overlay-accent: var(--tw-accent-soft);
+  --tw-overlay-highlight: #bef264;
+  --tw-font-overlay-title: 'Creepster', serif;
+  --tw-font-overlay-eyebrow: 'Special Elite', 'Courier New', monospace;
+  --tw-overlay-title-transform: none;
+  --tw-overlay-wash: radial-gradient(ellipse at 50% 80%, rgba(101, 163, 13, 0.4), transparent 60%);
+  --tw-overlay-texture: none;
+  --tw-overlay-image-filter: sepia(0.4) hue-rotate(45deg) saturate(0.6) brightness(0.5);
+
+  /* System notes and dice */
+  --tw-sysnote-bg: rgba(8, 16, 10, 0.92);
+  --tw-sysnote-ink: #d9f99d;
+  --tw-sysnote-border: 1px solid color-mix(in srgb, var(--tw-accent) 40%, transparent);
+  --tw-sysnote-radius: 3px;
+  --tw-sysnote-icon: var(--tw-accent-soft);
+  --tw-sysnote-font: 'IM Fell English', Georgia, serif;
+  --tw-sysnote-style: italic;
+  --tw-sysnote-tracking: 0;
+  --tw-sysnote-shadow: 0 0 12px rgba(101, 163, 13, 0.25);
+  --tw-die-face: #0f1a0d;
+  --tw-die-edge: var(--tw-accent-soft);
+  --tw-die-ink: #bef264;
+  --tw-die-shine: rgba(163, 230, 53, 0.12);
+  --tw-die-crit: #ecfccb;
+  --tw-die-fumble: #ef4444;
+  --tw-die-number-font: 'Creepster', serif;
+
+  /* NPC entrances */
+  --tw-arrival-sweep: rgba(163, 230, 53, 0.45);
+  --tw-arrival-glow: rgba(132, 204, 22, 0.75);
+  --tw-arrival-tag-bg: #0c140d;
+  --tw-arrival-tag-ink: #a3e635;
+  --tw-arrival-tag-font: 'Creepster', serif;
+  --tw-arrival-animation: tw-npc-arrive-ooze;
+  --tw-arrival-duration: 1.5s;
+}
+
+[data-skin='eldritch'] .tw-narration-label {
+  display: block;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  background: none;
+  color: var(--tw-accent-soft);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 10px rgba(163, 230, 53, 0.45);
+}
+
+[data-skin='eldritch'] .tw-narration-text {
+  letter-spacing: 0;
+}
+
+/* The drop cap flickers like a dying lamp. */
+[data-skin='eldritch'] .tw-narration-text::first-letter {
+  animation: tw-eldritch-flicker 6s steps(1, end) infinite;
+}
+
+[data-skin='eldritch'] .tw-bubble-text {
+  font-size: 1.06em;
+  letter-spacing: 0;
+}
+
+[data-skin='eldritch'] .tw-speaker {
+  border: 0;
+  border-bottom: 1px dashed currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tw-accent-soft);
+  font-family: 'Creepster', serif;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+}
+
+[data-skin='eldritch'] .tw-speaker--player {
+  color: var(--tw-player);
+}
+
+[data-skin='eldritch'] .tw-speaker--target {
+  color: var(--tw-target);
+}
+
+[data-skin='eldritch'] .comic-voice-tag {
+  border: 0;
+  background: none;
+  color: #bef264;
+  font-family: 'IM Fell English', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+[data-skin='eldritch'] .tw-tab {
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: none;
+  font-size: 0.85rem;
+}
+
+[data-skin='eldritch'] .tw-panel-title,
+[data-skin='eldritch'] .tw-pager {
+  font-family: 'Creepster', serif;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+}
+
+/* ::first-letter only accepts color/text properties, so the flicker dims color and glow. */
+@keyframes tw-eldritch-flicker {
+  0%, 91%, 93%, 96%, 100% { color: #a3e635; text-shadow: 0 0 14px rgba(163, 230, 53, 0.65); }
+  92% { color: #3f6212; text-shadow: none; }
+  95% { color: #4d7c0f; text-shadow: 0 0 4px rgba(163, 230, 53, 0.3); }
+}
+
+/* NPC entrance: seeps up out of the murk */
+@keyframes tw-npc-arrive-ooze {
+  0% { opacity: 0; filter: brightness(0.15) sepia(1) hue-rotate(45deg) blur(8px); transform: translateY(14%) scaleY(1.08); }
+  45% { opacity: 1; filter: brightness(0.6) sepia(0.7) hue-rotate(45deg) blur(2px); }
+  60% { filter: brightness(1.3) sepia(0.4) hue-rotate(45deg); }
+  70% { filter: brightness(0.7) sepia(0.4) hue-rotate(45deg); }
+  100% { opacity: 1; filter: none; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-skin='eldritch'] .tw-narration-text::first-letter {
+    animation: none;
+  }
+}

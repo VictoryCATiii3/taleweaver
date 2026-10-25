@@ -867,7 +867,7 @@ export const api = {
   },
 
   /** Updates a session note, status, memory turn limit, or compression toggle. */
-  updateSession(gameId: string, payload: { status?: string | null; status_note?: string | null; max_memory_turns?: number; enable_history_compression?: boolean }): Promise<GameSession> {
+  updateSession(gameId: string, payload: { status?: string | null; status_note?: string | null; max_memory_turns?: number; enable_history_compression?: boolean; narration_style?: string }): Promise<GameSession> {
     return request(`/adventures/sessions/${gameId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),

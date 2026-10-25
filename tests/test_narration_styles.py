@@ -1,0 +1,105 @@
+"""Tests for the per-session narration style (how much the narrator writes per turn)."""
+
+import pytest
+from sqlalchemy import select
+
+from backend.core import prompts
+from backend.core.narration_styles import (
+    DEFAULT_NARRATION_STYLE,
+    is_narration_style,
+    narration_style_rules,
+)
+from backend.models.session_state import SessionState
+from tests.conftest import TestSessionLocal
+from tests.test_adventures_api import _create_adventure
+
+
+@pytest.mark.parametrize(
+    ("style", "marker"),
+    [
+        ("terse", "TERSE"),
+        ("balanced", "BALANCED"),
+        ("rich", "RICH"),
+        ("epic", "EPIC"),
+    ],
+)
+def test_each_style_has_its_own_length_rules(style, marker):
+    # Arrange / Act
+    rules = narration_style_rules(style)
+
+    # Assert
+    assert f"NARRATION STYLE — {marker}" in rules
+
+
+@pytest.mark.parametrize("value", [None, "", "verbose", 3])
+def test_unknown_style_falls_back_to_balanced(value):
+    # Arrange / Act
+    rules = narration_style_rules(value)
+
+    # Assert
+    assert not is_narration_style(value)
+    assert rules == narration_style_rules(DEFAULT_NARRATION_STYLE)
+
+
+def test_shared_formatting_no_longer_hardcodes_length():
+    # Arrange
+    formatting = prompts.GM_NARRATION_MANDATORY_FORMATTING
+
+    # Act / Assert
+    assert "1-2 short paragraphs max" not in formatting
+    assert "NARRATION STYLE" in formatting
+
+
+async def test_session_update_stores_narration_style(auth_client):
+    # Arrange
+    ids = await _create_adventure(auth_client, "Narration Style Quest")
+
+    # Act
+    resp = await auth_client.patch(
+        f"/api/adventures/sessions/{ids['game_id']}", json={"narration_style": "epic"}
+    )
+
+    # Assert
+    assert resp.status_code == 200, resp.text
+    async with TestSessionLocal() as db:
+        state = (
+            (
+                await db.execute(
+                    select(SessionState).where(SessionState.session_id == ids["game_id"])
+                )
+            )
+            .scalars()
+            .first()
+        )
+    assert state.narration_style == "epic"
+
+
+async def test_session_update_rejects_unknown_narration_style(auth_client):
+    # Arrange
+    ids = await _create_adventure(auth_client, "Narration Style Error Quest")
+
+    # Act
+    resp = await auth_client.patch(
+        f"/api/adventures/sessions/{ids['game_id']}", json={"narration_style": "verbose"}
+    )
+
+    # Assert
+    assert resp.status_code == 422
+
+
+async def test_new_sessions_default_to_balanced(auth_client):
+    # Arrange / Act
+    ids = await _create_adventure(auth_client, "Default Style Quest")
+
+    # Assert
+    async with TestSessionLocal() as db:
+        state = (
+            (
+                await db.execute(
+                    select(SessionState).where(SessionState.session_id == ids["game_id"])
+                )
+            )
+            .scalars()
+            .first()
+        )
+    assert state.narration_style == DEFAULT_NARRATION_STYLE

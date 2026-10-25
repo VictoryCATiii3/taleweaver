@@ -686,7 +686,12 @@ async def update_session(
         game_session.status = payload.status
     if payload.status_note is not None:
         game_session.status_note = payload.status_note
-    if payload.max_memory_turns is not None or payload.enable_history_compression is not None:
+    state_fields = (
+        payload.max_memory_turns,
+        payload.enable_history_compression,
+        payload.narration_style,
+    )
+    if any(value is not None for value in state_fields):
         state_res = await db.execute(select(SessionState).where(SessionState.session_id == game_id))
         session_state = state_res.scalars().first()
         if session_state:
@@ -694,6 +699,8 @@ async def update_session(
                 session_state.max_memory_turns = max(1, min(100, int(payload.max_memory_turns)))
             if payload.enable_history_compression is not None:
                 session_state.enable_history_compression = payload.enable_history_compression
+            if payload.narration_style is not None:
+                session_state.narration_style = payload.narration_style
 
     await db.commit()
 

@@ -9,7 +9,8 @@ import { ref, watch, nextTick } from 'vue'
 import type { ComicTurn } from '@/composables/useComicTurns'
 import LicenseInfoBlock from '@/components/game/LicenseInfoBlock.vue'
 import ImmersiveStoryExchange from '@/components/game/immersive/ImmersiveStoryExchange.vue'
-import { Sparkles, ChevronLeft, ChevronRight, Compass } from 'lucide-vue-next'
+import { Sparkles, ChevronLeft, ChevronRight, ChevronsDown, Compass } from 'lucide-vue-next'
+import { useScrollToLatest } from './useScrollToLatest'
 
 const props = defineProps<{
   gameTurns: ComicTurn[]
@@ -41,6 +42,7 @@ const emit = defineEmits<{
 }>()
 
 const storyContainerRef = ref<HTMLElement | null>(null)
+const { hasContentBelow, scrollToLatest } = useScrollToLatest(storyContainerRef)
 
 // New page: start reading at the top.
 watch(() => props.activeTurnIndex, () => {
@@ -127,6 +129,21 @@ function isLatestExchange(exIdx: number): boolean {
       </template>
     </div>
 
+    <!-- Jump to the latest message (only while content is hidden below) -->
+    <Transition name="scroll-latest">
+      <button
+        v-if="hasContentBelow"
+        type="button"
+        class="tw-scroll-latest absolute right-3 z-20"
+        :class="props.gameTurns.length > 1 ? 'bottom-12' : 'bottom-3'"
+        title="Jump to the latest message"
+        aria-label="Jump to the latest message"
+        @click="scrollToLatest"
+      >
+        <ChevronsDown class="w-5 h-5" />
+      </button>
+    </Transition>
+
     <!-- COMIC PAGE NAVIGATION & PAGING CONTROLS -->
     <div v-if="props.gameTurns.length > 1" class="tw-pager flex items-center justify-between px-3 py-1.5 shrink-0 text-xs font-bold">
       <div class="flex items-center gap-1">
@@ -164,6 +181,17 @@ function isLatestExchange(exIdx: number): boolean {
 </template>
 
 <style scoped>
+.scroll-latest-enter-active,
+.scroll-latest-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.scroll-latest-enter-from,
+.scroll-latest-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.9);
+}
+
 .comic-story-container > * {
   flex-shrink: 0;
 }

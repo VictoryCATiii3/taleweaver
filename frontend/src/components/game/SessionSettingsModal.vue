@@ -13,10 +13,12 @@ import SettingsTranslationTab from './settings/SettingsTranslationTab.vue'
 import SettingsDisplayTab from './settings/SettingsDisplayTab.vue'
 import type { SkinId, SkinPreference } from '@/skins/skinRegistry'
 import type { TextDensity } from '@/skins/useTextDensity'
+import { isNarrationStyle, type NarrationStyle } from './settings/narrationStyles'
 import type { SessionSettingsPayload, SettingsTabId } from './settings/types'
 
 const props = defineProps<{
   initialTurns?: number
+  initialNarrationStyle?: string | null
   initialCompression?: boolean
   initialAutoSpeech?: boolean
   initialAutoSpeakNarration?: boolean
@@ -37,7 +39,7 @@ const emit = defineEmits<{
 }>()
 
 const TABS: { id: SettingsTabId; label: string }[] = [
-  { id: 'memory', label: 'Memory' },
+  { id: 'memory', label: 'Narrator' },
   { id: 'voice', label: 'Voice' },
   { id: 'translation', label: 'Translation' },
   { id: 'display', label: 'Display' },
@@ -45,6 +47,9 @@ const TABS: { id: SettingsTabId; label: string }[] = [
 
 const activeTab = ref<SettingsTabId>(props.initialTab ?? 'memory')
 const turns = ref(10)
+const narrationStyle = ref<NarrationStyle>(
+  isNarrationStyle(props.initialNarrationStyle) ? props.initialNarrationStyle : 'balanced'
+)
 const enableCompression = ref(props.initialCompression ?? true)
 const autoSpeech = ref(props.initialAutoSpeech ?? false)
 const autoSpeakNarration = ref(props.initialAutoSpeakNarration ?? true)
@@ -58,6 +63,9 @@ if (typeof props.initialTurns === 'number' && props.initialTurns >= 1) {
 }
 
 function isTabActive(id: SettingsTabId): boolean {
+  if (id === 'memory') {
+    return narrationStyle.value !== 'balanced'
+  }
   if (id === 'voice') {
     return !!props.ttsAvailable && autoSpeech.value
   }
@@ -73,6 +81,7 @@ function isTabActive(id: SettingsTabId): boolean {
 function save() {
   emit('save', {
     turns: turns.value,
+    narrationStyle: narrationStyle.value,
     enableCompression: enableCompression.value,
     autoSpeech: autoSpeech.value,
     autoSpeakNarration: autoSpeakNarration.value,
@@ -169,6 +178,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
       <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6" role="tabpanel">
         <SettingsMemoryTab
           v-if="activeTab === 'memory'"
+          v-model:narration-style="narrationStyle"
           v-model:turns="turns"
           v-model:enable-compression="enableCompression"
         />

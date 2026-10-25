@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
-UI_SKINS = frozenset({"classic", "chronicle", "noir", "terminal", "grimoire"})
+UI_SKINS = frozenset({"classic", "chronicle", "noir", "terminal", "grimoire", "eldritch", "toon"})
 
 _HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 

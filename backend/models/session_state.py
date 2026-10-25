@@ -39,6 +39,10 @@ class SessionState(Base, TimestampMixin):
     world_rumors = Column(JSON, nullable=True, default=[])
     compressed_history = Column(JSON, nullable=True, default=None)
     enable_history_compression = Column(Boolean, default=True, nullable=False)
+    # How much the narrator writes per turn (terse | balanced | rich | epic), see core/narration_styles.py
+    narration_style = Column(
+        String(16), default="balanced", nullable=False, server_default="balanced"
+    )
     start_datetime = Column(String(36), nullable=True)
 
     # Session-specific overrides/copies from template

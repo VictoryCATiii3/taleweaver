@@ -180,12 +180,14 @@ const saveSessionSettings = async (payload: SessionSettingsPayload) => {
     await api.updateSession(props.id, {
       max_memory_turns: payload.turns,
       enable_history_compression: payload.enableCompression,
+      narration_style: payload.narrationStyle,
     })
     if (sheet.value) {
       sheet.value.max_memory_turns = payload.turns
       sheet.value.enable_history_compression = payload.enableCompression
+      sheet.value.narration_style = payload.narrationStyle
     }
-    addNotification('Session memory settings updated.', 'success')
+    addNotification('Session settings updated.', 'success')
     showSettingsModal.value = false
   } catch (err) {
     addNotification('Failed to update session settings.', 'error')
@@ -1775,6 +1777,7 @@ usePlayAgentAutoLoop()
     <SessionSettingsModal
       v-if="showSettingsModal"
       :initial-turns="sheet?.max_memory_turns ?? 10"
+      :initial-narration-style="sheet?.narration_style"
       :initial-compression="sheet?.enable_history_compression ?? true"
       :initial-auto-speech="audioService.autoSpeechEnabled.value"
       :initial-auto-speak-narration="autoSpeakNarration"

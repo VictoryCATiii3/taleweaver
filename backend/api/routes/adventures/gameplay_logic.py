@@ -19,6 +19,7 @@ from backend.api.routes.adventures.agent_commands import (
     handle_playagent_command,
 )
 from backend.api.routes.adventures.logic import AdventureLogic
+from backend.core.narration_styles import narration_style_rules
 from backend.engine.dice_command import handle_roll_command, is_roll_command
 from backend.api.routes.adventures.turn_helpers import (
     TurnCombatStateHelper,
@@ -1753,6 +1754,7 @@ class GameTurnManager:
             ctx.narration_static_prompt,
             prompts.GM_NARRATION_TURN_CONTRACT,
             prompts.GM_NARRATION_MANDATORY_FORMATTING,
+            narration_style_rules(getattr(self.state, "narration_style", None)),
             prompts.get_vocal_direction_prompt(tts_provider) if use_vocal_tags else "",
             prompts.GM_CHAT_NARRATION_SUFFIX if is_chat_mode else "",
         ]

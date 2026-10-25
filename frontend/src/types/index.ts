@@ -63,6 +63,7 @@ export interface CharacterSheet {
   agent_custom_personality?: string
   max_memory_turns?: number
   enable_history_compression?: boolean
+  narration_style?: 'terse' | 'balanced' | 'rich' | 'epic' | string
   compressed_history?: any
 }
 
@@ -288,6 +289,7 @@ export interface GameSession {
   copied_from_id?: string | null
   max_memory_turns?: number
   enable_history_compression?: boolean
+  narration_style?: 'terse' | 'balanced' | 'rich' | 'epic' | string
   is_legacy_format?: boolean
   rule_enforcement_mode?: 'rpg' | 'story' | 'chat' | string
   selected_image_styles?: CatalogTile[] | any[]

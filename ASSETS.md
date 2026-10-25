@@ -35,6 +35,8 @@ This document provides transparency regarding the creation, licensing, and origi
 - **Courier Prime:** [Alan Dague-Greene](http://quoteunquoteapps.com/courierprime) via Fontsource (SIL Open Font License 1.1) — Noir dialog skin.
 - **Special Elite:** [Astigmatic](http://www.astigmatic.com) via Fontsource (Apache License 2.0) — Noir dialog skin.
 - **Share Tech Mono:** [Carrois Apostrophe](http://www.carrois.com) via Fontsource (SIL Open Font License 1.1) — Terminal dialog skin.
+- **Creepster:** [Sideshow](https://fonts.google.com/specimen/Creepster) via Fontsource (SIL Open Font License 1.1) — Eldritch dialog skin.
+- **Bangers / Comic Neue:** [Vernon Adams](https://fonts.google.com/specimen/Bangers) and [Craig Rozynski](http://comicneue.com) via Fontsource (SIL Open Font License 1.1) — Toon dialog skin.
 
 ---
 

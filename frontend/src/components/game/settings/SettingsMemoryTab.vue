@@ -3,7 +3,10 @@ import { computed } from 'vue'
 import { BrainCircuit, Sparkles } from 'lucide-vue-next'
 import SettingCard from './SettingCard.vue'
 import SettingToggle from './SettingToggle.vue'
+import NarrationStylePicker from './NarrationStylePicker.vue'
+import type { NarrationStyle } from './narrationStyles'
 
+const narrationStyle = defineModel<NarrationStyle>('narrationStyle', { required: true })
 const turns = defineModel<number>('turns', { required: true })
 const enableCompression = defineModel<boolean>('enableCompression', { required: true })
 
@@ -44,9 +47,10 @@ function handleInput(event: Event) {
 <template>
   <div class="flex flex-col gap-4">
     <p class="text-xs leading-relaxed text-slate-400">
-      Controls how much of your story the narrator remembers. More memory improves continuity, but each turn
-      sends more text to the language model.
+      Shape how the narrator writes and how much of your story it remembers.
     </p>
+
+    <NarrationStylePicker v-model="narrationStyle" />
 
     <SettingCard
       title="Narrator Turn Memory"

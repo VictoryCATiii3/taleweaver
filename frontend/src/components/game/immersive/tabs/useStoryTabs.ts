@@ -2,6 +2,8 @@ import { computed, ref, watch, type Ref } from 'vue'
 import type { ChatMessage } from '@/types'
 import type { StoryTabId } from './types'
 import { useUnseenCount } from './useUnseenCount'
+import { getImageUrl } from '@/utils/game_icons'
+import { preloadImages } from '@/utils/imagePreload'
 
 type StoryTabsSource = {
   sceneExits: () => any[] | undefined
@@ -32,6 +34,18 @@ export function useStoryTabs(source: StoryTabsSource) {
     discoveries: sceneItems.value.length,
     system: systemLog.value.length,
   }))
+
+  // Discoveries thumbnails are fetched as soon as the scene's items are known, so the tab
+  // opens with its pictures instead of loading them on demand.
+  watch(
+    sceneItems,
+    (items) => {
+      preloadImages(
+        items.map((item: any) => (item?.image_url ? getImageUrl(item.image_url, { thumbnail: true }) : null))
+      )
+    },
+    { immediate: true }
+  )
 
   // A tab whose content disappeared (scene change, last item taken) falls back to the story.
   watch(tabCounts, (counts) => {

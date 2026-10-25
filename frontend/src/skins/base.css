@@ -415,3 +415,60 @@
   background: var(--tw-card-bg);
   color: var(--tw-card-ink);
 }
+
+/* ---------- Image loading placeholder ---------- */
+.tw-image-spinner {
+  position: absolute;
+  width: 40%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  border: 3px solid color-mix(in srgb, var(--tw-accent-soft) 25%, transparent);
+  border-top-color: var(--tw-accent-soft);
+  animation: tw-spin 0.8s linear infinite;
+}
+
+@keyframes tw-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-image-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---------- Jump to latest message ---------- */
+.tw-scroll-latest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--tw-tab-active-border);
+  background: var(--tw-tab-active-bg);
+  color: var(--tw-tab-active-ink);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.tw-scroll-latest:hover {
+  transform: translateY(-2px);
+}
+
+.tw-scroll-latest svg {
+  animation: tw-nudge-down 1.6s ease-in-out infinite;
+}
+
+@keyframes tw-nudge-down {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-scroll-latest svg {
+    animation: none;
+  }
+}
