@@ -10,6 +10,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm.attributes import flag_modified
 
 from backend.api.routes.adventures.logic import AdventureLogic
+from backend.api.routes.adventures.sequence_hooks import run_sequence_transition_hooks
 from backend.engine.map_engine import MapEngine
 from backend.engine.quest_manager import QuestManager
 from backend.engine.rule_engine import (
@@ -1057,33 +1058,15 @@ class TurnStateApplier:
             for seq_msg in seq_messages:
                 await self._save_chat_message("system", seq_msg)
                 system_messages.append(seq_msg)
-            sequences = sorted(
-                getattr(self.adventure, "sequences", None) or [], key=lambda x: x.get("order", 1)
+            system_messages.extend(
+                await run_sequence_transition_hooks(
+                    self.manager,
+                    self._save_chat_message,
+                    self.adventure,
+                    old_seq_id,
+                    self.state.active_sequence_id,
+                )
             )
-            completed_seq = next((s for s in sequences if s.get("id") == old_seq_id), None)
-            if completed_seq:
-                if completed_seq.get("on_end_sequence_script"):
-                    end_msgs = await self.manager._execute_inline_script(
-                        completed_seq["on_end_sequence_script"],
-                        "on_end_sequence",
-                        completed_seq.get("id"),
-                    )
-                    system_messages.extend(end_msgs)
-                if completed_seq.get("on_end_sequence_text"):
-                    await self._save_chat_message("system", completed_seq["on_end_sequence_text"])
-                    system_messages.append(completed_seq["on_end_sequence_text"])
-            new_seq = next(
-                (s for s in sequences if s.get("id") == self.state.active_sequence_id), None
-            )
-            if new_seq and new_seq != completed_seq:
-                if new_seq.get("on_start_sequence_script"):
-                    start_msgs = await self.manager._execute_inline_script(
-                        new_seq["on_start_sequence_script"], "on_start_sequence", new_seq.get("id")
-                    )
-                    system_messages.extend(start_msgs)
-                if new_seq.get("on_start_sequence_text"):
-                    await self._save_chat_message("system", new_seq["on_start_sequence_text"])
-                    system_messages.append(new_seq["on_start_sequence_text"])
             if getattr(self.state, "is_completed", False):
                 event.game_completed = True
                 if not event.status_note:

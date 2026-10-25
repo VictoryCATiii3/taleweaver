@@ -17,6 +17,10 @@ from backend.api.routes.adventures.gameplay_logic import (
     _friendly_llm_unexpected_error_message,
 )
 from backend.api.routes.adventures.logic import AdventureLogic
+from backend.api.routes.adventures.sequence_hooks import (
+    build_sequence_intro,
+    run_sequence_transition_hooks,
+)
 from backend.core.awards import SPOILER_SEEKER_AWARD
 from backend.engine.debug_engine import DebugEngine
 from backend.engine.switch_service import SwitchService
@@ -36,6 +40,7 @@ class TurnInteractionsManager:
     def __init__(self, manager: GameTurnManager) -> None:
         self.manager = manager
         self.pending_pickup_trigger: dict[str, Any] | None = None
+        self.pending_sequence_intro: dict[str, Any] | None = None
 
     @property
     def db(self):
@@ -832,6 +837,8 @@ class TurnInteractionsManager:
     async def _handle_slash(self, user_msg: str, response: str) -> AsyncGenerator[str, None]:
         # Set when a take_direct picked up an item configured with a pickup trigger.
         self.pending_pickup_trigger: dict[str, Any] | None = None
+        # Set when the command completed a sequence: the caller narrates the new chapter.
+        self.pending_sequence_intro: dict[str, Any] | None = None
         # Handle /map specifically (doesn't use CommandParser)
         if user_msg.lower() == "/map":
             map_payload = await self._build_map_payload()
@@ -1306,6 +1313,7 @@ class TurnInteractionsManager:
                 script_context = await self.manager._build_script_context()
             except Exception as exc:
                 logger.warning("Could not build script context for sequence evaluation: %s", exc)
+        old_seq_id = self.state.active_sequence_id
         seq_messages = AdventureLogic.evaluate_sequence_progress(
             adventure=adv,
             state=self.state,
@@ -1316,9 +1324,18 @@ class TurnInteractionsManager:
             for seq_msg in seq_messages:
                 await self._save_chat_message("system", seq_msg)
                 yield f"event: system\ndata: {json.dumps({'role': 'system', 'content': seq_msg})}\n\n"
+            new_seq_id = self.state.active_sequence_id
+            hook_msgs = await run_sequence_transition_hooks(
+                self.manager, self._save_chat_message, adv, old_seq_id, new_seq_id
+            )
+            for hm in hook_msgs:
+                role = getattr(hm, "role", "system")
+                yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(hm)})}\n\n"
+            if new_seq_id != old_seq_id:
+                self.pending_sequence_intro = build_sequence_intro(adv, new_seq_id)
 
         await self.db.commit()
-        if self.pending_pickup_trigger:
+        if self.pending_pickup_trigger or self.pending_sequence_intro:
             # Caller chains an LLM pass, which emits the final event itself.
             return
         final_data = jsonable_encoder(

@@ -999,30 +999,40 @@ class GameTurnManager:
 
                 pickup = getattr(self.interactions, "pending_pickup_trigger", None)
                 self.interactions.pending_pickup_trigger = None
-                if pickup:
-                    item_name = pickup.get("item_name") or "the item"
-                    cue = pickup.get("cue") or ""
-                    if pickup.get("mode") == "narration":
-                        reaction_prompt = (
-                            f"[ITEM_PICKUP] The player just picked up {item_name}. "
-                            "Narrate ONLY the immediate reaction to this action in one or two short paragraphs. "
-                            "Do NOT change world state, award items, move the player, or advance the plot beyond this reaction."
-                        )
-                    else:
-                        reaction_prompt = (
-                            f"[ITEM_PICKUP] The player just picked up {item_name}. "
-                            "React to this action as the Game Master: let present NPCs respond in character and "
-                            "apply any rules or consequences that now trigger."
-                        )
-                    if cue:
-                        reaction_prompt += f" Author's cue for this moment: {cue}"
-                    yield f"event: status\ndata: {json.dumps({'content': 'The Game Master reacts...'})}\n\n"
+                seq_intro = getattr(self.interactions, "pending_sequence_intro", None)
+                self.interactions.pending_sequence_intro = None
+                if pickup or seq_intro:
+                    reaction_prompt = ""
+                    narration_only = True
+                    status_text = "The Game Master reacts..."
+                    if pickup:
+                        item_name = pickup.get("item_name") or "the item"
+                        cue = pickup.get("cue") or ""
+                        narration_only = pickup.get("mode") == "narration"
+                        if narration_only:
+                            reaction_prompt = (
+                                f"[ITEM_PICKUP] The player just picked up {item_name}. "
+                                "Narrate ONLY the immediate reaction to this action in one or two short paragraphs. "
+                                "Do NOT change world state, award items, move the player, or advance the plot beyond this reaction."
+                            )
+                        else:
+                            reaction_prompt = (
+                                f"[ITEM_PICKUP] The player just picked up {item_name}. "
+                                "React to this action as the Game Master: let present NPCs respond in character and "
+                                "apply any rules or consequences that now trigger."
+                            )
+                        if cue:
+                            reaction_prompt += f" Author's cue for this moment: {cue}"
+                    if seq_intro:
+                        reaction_prompt = f"{reaction_prompt} {seq_intro['prompt']}".strip()
+                        status_text = f"Opening {seq_intro['title']}..."
+                    yield f"event: status\ndata: {json.dumps({'content': status_text})}\n\n"
                     try:
                         async for chunk in self._run_llm_cycle(
                             reaction_prompt,
                             False,
                             language=language,
-                            narration_only=pickup.get("mode") == "narration",
+                            narration_only=narration_only,
                         ):
                             yield chunk
                     except asyncio.CancelledError:
