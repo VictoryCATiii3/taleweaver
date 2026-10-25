@@ -42,6 +42,8 @@ _ITEM_EVENT_FIELDS = (
     "on_equip_text",
     "on_unequip_script",
     "on_unequip_text",
+    "on_interact_script",
+    "on_interact_text",
 )
 _SWITCH_FLAT_KEYS = ("switch_states", "switch_initial_state", "switch_transitions")
 _SWITCH_FIELDS = (

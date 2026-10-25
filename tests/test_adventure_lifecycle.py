@@ -709,3 +709,26 @@ async def test_switch_object_export_import_roundtrip(auth_client, setup_test_db)
         assert switch_config.get("initial_state") == "LOCKED"
         assert len(switch_config.get("transitions")) == 1
         assert len(switch_config.get("outcomes")) == 1
+
+
+async def test_init_script_survives_adv_export_import(auth_client, setup_test_db):
+    """The global init_script (e.g. tw.dialog handlers) must be part of the .adv export."""
+    from tests.conftest import TestSessionLocal
+
+    init_script = "def on_bomb_wire(answ):\n    tw.vars.set('answer', answ)\n"
+    async with TestSessionLocal() as db:
+        user = (await db.execute(select(User).limit(1))).scalars().first()
+        adventure_id = await _seed_adventure(db, user.id)
+        adv = await db.get(AdventureTemplate, adventure_id)
+        adv.init_script = init_script
+        await db.commit()
+
+    async with TestSessionLocal() as db:
+        manifest = await AdventureExporter.build_full_manifest(db, adventure_id)
+    assert manifest["init_script"] == init_script.strip()
+
+    async with TestSessionLocal() as db:
+        await _delete_adventure(db, adventure_id)
+        assert await AdventureTemplateImporter.import_adv_manifest(db, manifest, owner_id=user.id)
+        imported = (await db.execute(select(AdventureTemplate))).scalars().first()
+        assert imported.init_script == init_script.strip()

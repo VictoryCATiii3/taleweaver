@@ -274,6 +274,7 @@ def _check_entities(entities: list[dict[str, Any]]) -> list[ValidationFinding]:
                 "on_defeat_script",
                 "on_protagonist_enters_scene_script",
                 "on_talk_script",
+                "on_interact_script",
             ):
                 code = ent.get(field) or meta_dict.get(field)
                 findings.extend(
@@ -298,6 +299,7 @@ def _check_entities(entities: list[dict[str, Any]]) -> list[ValidationFinding]:
                 "on_craft_failure_script",
                 "on_success_script",
                 "on_failure_script",
+                "on_interact_script",
             ):
                 code = ent.get(field) or meta_dict.get(field)
                 findings.extend(
@@ -391,7 +393,22 @@ def _check_sequences(sequences: Any) -> list[ValidationFinding]:
                 )
             )
         findings.extend(_check_soft_rules(seq.get("soft_rules"), loc, sid))
+        findings.extend(_check_sequence_scripts(seq.get("scripts"), loc, sid))
     return findings
+
+
+def _check_sequence_scripts(scripts: Any, loc: str, sid: str) -> list[ValidationFinding]:
+    rows = [s for s in scripts if isinstance(s, dict)] if isinstance(scripts, list) else []
+    return [
+        finding
+        for script in rows
+        for finding in _validate_script_code(
+            script.get("code"),
+            "code",
+            location=loc,
+            extra_context={"sequence_id": sid, "script_id": script.get("id") or "?"},
+        )
+    ]
 
 
 def _check_soft_rules(rules: Any, loc: str, sid: str) -> list[ValidationFinding]:

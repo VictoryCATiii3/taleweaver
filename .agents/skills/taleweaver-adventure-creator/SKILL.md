@@ -52,7 +52,8 @@ The parser is simple and literal. Respect it exactly.
 | **CONSTRUCTABLE** items | Crafted from ≥2 ingredient items; hidden until crafted. |
 | **Hidden** NPCs and objects | Revealed by a condition (searching, an event, a script). Good for secret rooms and late reveals. |
 | **Combat** | d20 turn-based fights, NPC special attacks, `ATTACK_ON_SIGHT` NPCs, NPCs that attack once a condition holds (e.g. "after the player reads the ledger"). |
-| **Scripts** (Event Scripts setting ON) | Triggers on enter/leave scene, pickup, read, equip, unlock, defeat, sequence start/end, every turn. They can set variables, move NPCs, lock or unlock exits, hand over items, damage, win or lose. |
+| **Scripts** (Event Scripts setting ON) | Triggers on enter/leave scene, pickup, read, equip, unlock, defeat, sequence start/end, every turn, and **interaction** with any object or NPC (inspect, use, push, talk; also fixed objects). They can set variables, move NPCs, lock or unlock exits, hand over items, damage, win or lose. |
+| **Sequence scripts** (scripts ON) | Scripts attached to one chapter that only run while it is active, e.g. "inspecting the bomb opens the wire dialog, but only in chapter 3". Write them in the chapter block as `Chapter Script: on interact with BOMB_ID -> <effect>`. |
 | **Sequence soft rules** (scripts ON) | A plain-language condition the GM judges ("the player persuades the clerk using his brother's death") + a script the engine runs, with an optional guard and trigger limit. This is how social solutions get real effects. |
 | **Choice dialogs** (scripts ON) | A script shows up to 8 fixed answers (NPC conversation, riddle, confession, dilemma). Each answer runs deterministic code; answers can be hidden until a condition holds, and dialogs can chain into conversations. |
 | **Variables & flags** | Remember trust, lies told, evidence found, earlier choices, and use them later in guards. |

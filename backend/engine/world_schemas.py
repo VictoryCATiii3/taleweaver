@@ -371,6 +371,14 @@ class WorldNPCSchema(WorldBaseSchema):
         default="",
         description="Optional text the NPC says when the protagonist enters the scene. Use empty string for none.",
     )
+    on_interact_script: Optional[str] = Field(
+        default="",
+        description="Optional script executed whenever the protagonist interacts with this NPC (talks to, inspects, uses an item on it). Use empty string for none.",
+    )
+    on_interact_text: Optional[str] = Field(
+        default="",
+        description="Optional text output whenever the protagonist interacts with this NPC. Use empty string for none.",
+    )
 
     model_config = {"extra": "forbid"}
 
@@ -620,6 +628,14 @@ class WorldObjectSchema(WorldBaseSchema):
         default="",
         description="Optional text output when the item is unequipped. Use empty string for none.",
     )
+    on_interact_script: Optional[str] = Field(
+        default="",
+        description="Optional script executed whenever the protagonist interacts with this object (inspects, uses, pushes, tampers with it), also for objects that cannot be picked up. Use empty string for none.",
+    )
+    on_interact_text: Optional[str] = Field(
+        default="",
+        description="Optional text output whenever the protagonist interacts with this object. Use empty string for none.",
+    )
     unlock_expression: Optional[str] = Field(
         default="",
         description="Deterministic script guard expression evaluated when unlocking this container. Keep empty if none.",
@@ -698,6 +714,27 @@ class SoftRuleSchema(WorldBaseSchema):
     model_config = {"extra": "ignore"}
 
 
+class SequenceScriptSchema(WorldBaseSchema):
+    id: str = Field(..., description="Unique slug for the script, e.g. SCRIPT_BOMB_TAMPER")
+    name: str = Field(default="", description="Human-readable title for the script")
+    trigger: Literal[
+        "on_enter_scene",
+        "on_interact",
+        "on_turn_start",
+        "on_turn_end",
+        "on_logic_pass_done",
+        "on_narration_done",
+    ] = Field(..., description="The game event trigger (on_init is not available here).")
+    target_id: Optional[str] = Field(
+        None,
+        description="Optional entity_id or scene_id target, e.g. the entity ID for on_interact.",
+    )
+    code: str = Field(..., description="Safe Python script using the 'tw' API.")
+    description: Optional[str] = Field(None, description="What this script does.")
+
+    model_config = {"extra": "ignore"}
+
+
 class SequenceSchema(WorldBaseSchema):
     id: str = Field(..., description="Unique slug for the sequence, e.g., SEQ_1_DRAGON")
     order: int = Field(..., description="The sequence order (1, 2, 3...)")
@@ -751,6 +788,10 @@ class SequenceSchema(WorldBaseSchema):
     soft_rules: list[SoftRuleSchema] = Field(
         default_factory=list,
         description="Narrative rules only active during this sequence: the GM judges the condition, the engine runs the script. Use [] if none.",
+    )
+    scripts: list[SequenceScriptSchema] = Field(
+        default_factory=list,
+        description="Event scripts that only run while this sequence is active (same triggers as top-level scripts except on_init). Use [] if none.",
     )
 
     model_config = {"extra": "ignore"}

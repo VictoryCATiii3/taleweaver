@@ -60,6 +60,9 @@ from backend.engine.rule_engine import (
     WorldEntityUpdate,
 )
 from backend.engine.scripting import GameContext, ScriptChangeset, ScriptRunner, ScriptMessage
+from backend.api.routes.adventures.interaction_hooks import fire_interact_triggers
+from backend.engine.interaction_targets import interacted_entity_ids
+from backend.engine.sequence_scripts import sequence_scripts
 from backend.engine.scripting.dialog import store_pending_dialog
 from backend.engine.skill_check import roll_attack, roll_skill_check
 from backend.models.adventure_template import AdventureTemplate
@@ -1444,16 +1447,21 @@ class GameTurnManager:
                             role = getattr(sm, "role", "system")
                             yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
 
-                    if game_event.updated_entities:
-                        for ue in game_event.updated_entities:
-                            cs_ent = script_runner.run_trigger(
-                                "on_interact", script_ctx, target_id=ue.entity_id
-                            )
-                            rule_violations.extend(cs_ent.rejected_actions)
-                            sys_msgs = await self._apply_script_changeset(cs_ent, game_event)
-                            for sm in sys_msgs:
-                                role = getattr(sm, "role", "system")
-                                yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
+                # Entity interactions: scripted and inline on_interact triggers
+                interacted_ids = await interacted_entity_ids(
+                    self.db,
+                    self.state,
+                    user_msg,
+                    [ue.entity_id for ue in game_event.updated_entities or []],
+                )
+                for entity_id in interacted_ids:
+                    sys_msgs, rejected = await fire_interact_triggers(
+                        self, script_runner, entity_id, game_event
+                    )
+                    rule_violations.extend(rejected)
+                    for sm in sys_msgs:
+                        role = getattr(sm, "role", "system")
+                        yield f"event: {role}\ndata: {json.dumps({'role': role, 'content': str(sm)})}\n\n"
 
                 if game_event.game_completed:
                     await self._finalize_session("completed", game_event.status_note)
@@ -2820,9 +2828,10 @@ class GameTurnManager:
         )
 
     def _get_script_runner(self) -> ScriptRunner:
-        """Instantiates ScriptRunner with scripts and init_script from original_manifest."""
+        """Instantiates ScriptRunner with the top-level and active-sequence scripts and init_script."""
         manifest = getattr(self.adventure, "original_manifest", None) or {}
-        scripts = manifest.get("scripts", [])
+        active_sequence = AdventureLogic.resolve_active_sequence(self.adventure, self.state)
+        scripts = [*manifest.get("scripts", []), *sequence_scripts(active_sequence)]
         init_script = manifest.get("init_script") or getattr(self.adventure, "init_script", None)
         return ScriptRunner(scripts, init_script=init_script)
 

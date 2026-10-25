@@ -51,6 +51,7 @@ EFFECT_KEYS: dict[str, tuple[str, ...]] = {
 _BASE_SCRIPT_FIELDS = (
     "on_pickup_script", "on_pickup_text", "on_drop_script", "on_drop_text",
     "on_equip_script", "on_equip_text", "on_unequip_script", "on_unequip_text",
+    "on_interact_script", "on_interact_text",
 )  # fmt: skip
 _CONTAINER_SCRIPT_FIELDS = (
     "on_unlock_success_script", "on_unlock_success_text", "on_unlock_failure_script", "on_unlock_failure_text",

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import ScriptEditor from '@/components/editor/ScriptEditor.vue'
 import SoftRulesEditor from '@/components/editor/SoftRulesEditor.vue'
+import SequenceScriptsEditor from '@/components/editor/SequenceScriptsEditor.vue'
 import {
   Plus,
   Trash2,
@@ -92,7 +93,10 @@ const availableNpcs = computed(() => {
 
 const showModal = ref(false)
 const isNewSequence = ref(false)
-const activeModalTab = ref<'general' | 'advanced' | 'soft_rules'>('general')
+const activeModalTab = ref<'general' | 'advanced' | 'soft_rules' | 'scripts'>('general')
+
+// on_interact targets of sequence scripts: every object and NPC
+const interactTargets = computed(() => [...availableItems.value, ...availableNpcs.value])
 const modalSequence = ref<any>({
   id: '',
   order: 1,
@@ -110,6 +114,7 @@ const modalSequence = ref<any>({
   on_end_sequence_script: '',
   on_end_sequence_text: '',
   soft_rules: [],
+  scripts: [],
 })
 
 const showDeleteConfirm = ref(false)
@@ -141,6 +146,7 @@ function openAddModal() {
     on_end_sequence_script: '',
     on_end_sequence_text: '',
     soft_rules: [],
+    scripts: [],
   }
   showModal.value = true
 }
@@ -165,6 +171,7 @@ function openEditModal(seq: any) {
     on_end_sequence_script: seq.on_end_sequence_script || '',
     on_end_sequence_text: seq.on_end_sequence_text || '',
     soft_rules: seq.soft_rules || [],
+    scripts: seq.scripts || [],
   }
   showModal.value = true
 }
@@ -186,6 +193,11 @@ function saveSequence() {
   }
   if (new Set(softRuleIds).size !== softRuleIds.length) {
     emit('notify', 'Soft rule IDs must be unique within the sequence.', 'error')
+    return
+  }
+  const scriptIds: string[] = (modalSequence.value.scripts || []).map((script: any) => String(script.id || '').trim())
+  if (scriptIds.some((id) => !id) || new Set(scriptIds).size !== scriptIds.length) {
+    emit('notify', 'Every sequence script needs a unique ID.', 'error')
     return
   }
 
@@ -462,6 +474,15 @@ function confirmDelete() {
               <MessageSquareQuote class="w-3.5 h-3.5" />
               <span>Soft Rules</span>
               <span v-if="modalSequence.soft_rules?.length" class="text-[10px] text-amber-300">{{ modalSequence.soft_rules.length }}</span>
+            </button>
+            <button
+              type="button"
+              @click="activeModalTab = 'scripts'"
+              :class="['pb-2 text-xs font-black uppercase tracking-widest transition-colors border-b-2 flex items-center gap-1.5', activeModalTab === 'scripts' ? 'text-amber-400 border-amber-400' : 'text-slate-500 border-transparent hover:text-white']"
+            >
+              <Code2 class="w-3.5 h-3.5" />
+              <span>Scripts</span>
+              <span v-if="modalSequence.scripts?.length" class="text-[10px] text-amber-300">{{ modalSequence.scripts.length }}</span>
             </button>
           </div>
 
@@ -745,6 +766,15 @@ function confirmDelete() {
           <!-- Soft Rules Tab -->
           <div v-show="activeModalTab === 'soft_rules'">
             <SoftRulesEditor v-model="modalSequence.soft_rules" />
+          </div>
+
+          <!-- Sequence Scripts Tab -->
+          <div v-show="activeModalTab === 'scripts'">
+            <SequenceScriptsEditor
+              v-model="modalSequence.scripts"
+              :scenes="availableScenes"
+              :entities="interactTargets"
+            />
           </div>
         </div>
 

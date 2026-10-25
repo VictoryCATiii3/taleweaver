@@ -67,6 +67,8 @@ class EntityUpdateRequest(BaseModel):
     on_equip_text: Optional[str] = None
     on_unequip_script: Optional[str] = None
     on_unequip_text: Optional[str] = None
+    on_interact_script: Optional[str] = None
+    on_interact_text: Optional[str] = None
     on_defeat_script: Optional[str] = None
     on_defeat_text: Optional[str] = None
     on_protagonist_enters_scene_script: Optional[str] = None

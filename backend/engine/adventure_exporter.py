@@ -70,6 +70,8 @@ _OBJECT_ENTITY_KEYS = {
     "on_equip_text",
     "on_unequip_script",
     "on_unequip_text",
+    "on_interact_script",
+    "on_interact_text",
     "unlock_expression",
     "on_unlock_success_script",
     "on_unlock_success_text",
@@ -109,6 +111,8 @@ _NPC_ENTITY_KEYS = {
     "on_defeat_text",
     "on_protagonist_enters_scene_script",
     "on_protagonist_enters_scene_text",
+    "on_interact_script",
+    "on_interact_text",
 }
 
 _SYSTEM_ENTITY_KEYS = {"pk", "session_id", "created_at", "updated_at", "template_id"}
@@ -164,6 +168,8 @@ _INLINE_OBJECT_SCRIPT_KEYS = (
     "on_equip_text",
     "on_unequip_script",
     "on_unequip_text",
+    "on_interact_script",
+    "on_interact_text",
     "unlock_expression",
     "on_unlock_success_script",
     "on_unlock_success_text",
@@ -283,6 +289,8 @@ def _normalize_exported_npc_metadata(filtered: dict[str, Any]) -> None:
         "on_defeat_text",
         "on_protagonist_enters_scene_script",
         "on_protagonist_enters_scene_text",
+        "on_interact_script",
+        "on_interact_text",
     ):
         val = metadata.pop(script_key, None)
         if val:
@@ -596,6 +604,7 @@ class AdventureExporter:
             "awards": adv.awards or [],
             "sequences": adv.sequences or [],
             "scripts": (adv.original_manifest or {}).get("scripts", []),
+            "init_script": adv.init_script or "",
         }
 
         return manifest

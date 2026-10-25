@@ -26,6 +26,22 @@ class SoftRuleSchema(BaseModel):
     max_triggers: Optional[int] = None
 
 
+class SequenceScriptSchema(BaseModel):
+    id: str
+    name: Optional[str] = ""
+    trigger: Literal[
+        "on_enter_scene",
+        "on_interact",
+        "on_turn_start",
+        "on_turn_end",
+        "on_logic_pass_done",
+        "on_narration_done",
+    ]
+    target_id: Optional[str] = ""
+    code: str = ""
+    description: Optional[str] = ""
+
+
 class SequenceSchema(BaseModel):
     id: str
     order: int
@@ -44,6 +60,7 @@ class SequenceSchema(BaseModel):
     on_end_sequence_script: Optional[str] = ""
     on_end_sequence_text: Optional[str] = ""
     soft_rules: list[SoftRuleSchema] = Field(default_factory=list)
+    scripts: list[SequenceScriptSchema] = Field(default_factory=list)
 
 
 class AwardSchema(BaseModel):

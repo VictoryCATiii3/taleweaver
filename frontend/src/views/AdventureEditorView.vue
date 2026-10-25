@@ -1084,6 +1084,8 @@ function openTextEdit(type: string, id: string, currentName: string, currentDesc
     on_defeat_text: selectedNpc?.on_defeat_text || metadata?.on_defeat_text || '',
     on_protagonist_enters_scene_script: selectedNpc?.on_protagonist_enters_scene_script || metadata?.on_protagonist_enters_scene_script || '',
     on_protagonist_enters_scene_text: selectedNpc?.on_protagonist_enters_scene_text || metadata?.on_protagonist_enters_scene_text || '',
+    on_interact_script: selectedNpc?.on_interact_script || selectedObject?.on_interact_script || metadata?.on_interact_script || '',
+    on_interact_text: selectedNpc?.on_interact_text || selectedObject?.on_interact_text || metadata?.on_interact_text || '',
     unlock_expression: selectedObject?.unlock_expression || metadata?.unlock_expression || '',
     on_unlock_success_script: selectedObject?.on_unlock_success_script || metadata?.on_unlock_success_script || '',
     on_unlock_success_text: selectedObject?.on_unlock_success_text || metadata?.on_unlock_success_text || '',
@@ -1178,6 +1180,8 @@ async function saveEntityText(data: any) {
           on_defeat_text: data.on_defeat_text || undefined,
           on_protagonist_enters_scene_script: data.on_protagonist_enters_scene_script || undefined,
           on_protagonist_enters_scene_text: data.on_protagonist_enters_scene_text || undefined,
+          on_interact_script: data.on_interact_script || undefined,
+          on_interact_text: data.on_interact_text || undefined,
         })
       } else {
         const itemType = String(data.item_type || 'DEFAULT').toUpperCase()
@@ -1202,6 +1206,8 @@ async function saveEntityText(data: any) {
           is_hidden: data.is_hidden,
           reveal_rule: data.reveal_rule || undefined,
           on_pickup_script: data.on_pickup_script || undefined,
+          on_interact_script: data.on_interact_script || undefined,
+          on_interact_text: data.on_interact_text || undefined,
           on_pickup_text: data.on_pickup_text || undefined,
           on_drop_script: data.on_drop_script || undefined,
           on_drop_text: data.on_drop_text || undefined,
@@ -1367,6 +1373,8 @@ async function saveEntityText(data: any) {
       on_defeat_text: editEntityContext.value.type === 'npc' ? data.on_defeat_text : undefined,
       on_protagonist_enters_scene_script: editEntityContext.value.type === 'npc' ? data.on_protagonist_enters_scene_script : undefined,
       on_protagonist_enters_scene_text: editEntityContext.value.type === 'npc' ? data.on_protagonist_enters_scene_text : undefined,
+      on_interact_script: ['npc', 'object'].includes(editEntityContext.value.type) ? data.on_interact_script : undefined,
+      on_interact_text: ['npc', 'object'].includes(editEntityContext.value.type) ? data.on_interact_text : undefined,
       on_enter_scene_script: editEntityContext.value.type === 'scene' ? data.on_enter_scene_script : undefined,
       on_enter_scene_text: editEntityContext.value.type === 'scene' ? data.on_enter_scene_text : undefined,
       on_leave_scene_script: editEntityContext.value.type === 'scene' ? data.on_leave_scene_script : undefined,

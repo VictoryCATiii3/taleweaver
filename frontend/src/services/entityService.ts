@@ -69,6 +69,8 @@ export interface EntityEditData {
   on_defeat_text?: string | null
   on_protagonist_enters_scene_script?: string | null
   on_protagonist_enters_scene_text?: string | null
+  on_interact_script?: string | null
+  on_interact_text?: string | null
 }
 
 export interface SceneCreateData {
@@ -127,6 +129,8 @@ export interface EntityCreateData {
   on_defeat_text?: string
   on_protagonist_enters_scene_script?: string
   on_protagonist_enters_scene_text?: string
+  on_interact_script?: string
+  on_interact_text?: string
 }
 
 export interface QuestCreateData {

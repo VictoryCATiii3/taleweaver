@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import EntityReferenceCombobox from '@/components/editor/EntityReferenceCombobox.vue'
 import ReferenceTextarea from '@/components/editor/ReferenceTextarea.vue'
 import ScriptEditor from '@/components/editor/ScriptEditor.vue'
+import InteractTriggerFields from '@/components/editor/InteractTriggerFields.vue'
 import NpcCombatSettings from '@/components/editor/NpcCombatSettings.vue'
 import AppearanceField from '@/components/editor/AppearanceField.vue'
 import EntityImagePreview from '@/components/editor/EntityImagePreview.vue'
@@ -148,6 +149,8 @@ const localForm = ref({
   on_defeat_text: '',
   on_protagonist_enters_scene_script: '',
   on_protagonist_enters_scene_text: '',
+  on_interact_script: '',
+  on_interact_text: '',
   on_success_script: '',
   on_failure_script: '',
   ...props.initialForm
@@ -412,6 +415,8 @@ watch(() => props.initialForm, (newVal) => {
     on_defeat_text: '',
     on_protagonist_enters_scene_script: '',
     on_protagonist_enters_scene_text: '',
+    on_interact_script: '',
+    on_interact_text: '',
     ...newVal
   }
   syncFromForm()
@@ -445,6 +450,8 @@ watch(() => props.show, (newVal) => {
       on_defeat_text: '',
       on_protagonist_enters_scene_script: '',
       on_protagonist_enters_scene_text: '',
+      on_interact_script: '',
+      on_interact_text: '',
       ...props.initialForm
     }
     syncFromForm()
@@ -644,6 +651,8 @@ function handleSave() {
     on_defeat_text: localForm.value.on_defeat_text,
     on_protagonist_enters_scene_script: localForm.value.on_protagonist_enters_scene_script,
     on_protagonist_enters_scene_text: localForm.value.on_protagonist_enters_scene_text,
+    on_interact_script: localForm.value.on_interact_script,
+    on_interact_text: localForm.value.on_interact_text,
   })
 }
 
@@ -2180,6 +2189,12 @@ const textLogPreviewClass = computed(() => {
                   ></textarea>
                 </div>
 
+                <InteractTriggerFields
+                  v-model:script="localForm.on_interact_script"
+                  v-model:text="localForm.on_interact_text"
+                  entity-label="object"
+                />
+
                 <div v-if="currentItemType !== 'SWITCH'" class="space-y-4 border border-white/5 bg-black/20 p-4 rounded-xl">
                   <ScriptEditor
                     v-model="localForm.on_pickup_script"
@@ -2354,6 +2369,12 @@ const textLogPreviewClass = computed(() => {
                   />
                   <p v-else class="text-[11px] text-slate-400">Save the NPC first to configure attack behaviour and special attacks.</p>
                 </div>
+
+                <InteractTriggerFields
+                  v-model:script="localForm.on_interact_script"
+                  v-model:text="localForm.on_interact_text"
+                  entity-label="NPC"
+                />
 
                 <div class="space-y-4 border border-white/5 bg-black/20 p-4 rounded-xl">
                   <ScriptEditor

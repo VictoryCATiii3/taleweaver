@@ -39,6 +39,10 @@ INLINE_TRIGGERS: dict[str, tuple[tuple[str, str], ...]] = {
     "OBJECTS": (
         ("on_pickup", "the item is taken into the inventory"),
         ("on_drop", "the item is dropped"),
+        (
+            "on_interact",
+            "the protagonist inspects, uses, pushes or tampers with the object (also fixed objects)",
+        ),
         ("on_equip", "the item is equipped (only WEAPON/WEARABLE items)"),
         ("on_unequip", "the item is unequipped (only WEAPON/WEARABLE items)"),
         ("on_read", "the readable item is inspected or read (only READABLE items)"),
@@ -66,6 +70,7 @@ INLINE_TRIGGERS: dict[str, tuple[tuple[str, str], ...]] = {
     "NPCS": (
         ("on_defeat", "the NPC is defeated"),
         ("on_protagonist_enters_scene", "the protagonist enters the scene containing this NPC"),
+        ("on_interact", "the protagonist talks to, inspects or otherwise interacts with this NPC"),
     ),
     "PROTAGONIST": (
         ("on_hp_change", "the protagonist HP changes (e.g. damaged or healed)"),
@@ -248,6 +253,11 @@ def build_scripts_requirement(scripts_generation_enabled: bool) -> str:
         "rule script and define its `on_choice` handler function in the top-level `init_script`. "
         "Every branch must keep the adventure winnable: a wrong answer may cost HP or reopen the "
         "dialog, but must not block the main path unless it is an intended game over.\n\n"
+        "5) SEQUENCE SCRIPTS: every sequence has a `scripts` list with the same shape as top-level "
+        "scripts (`id`, `name`, `trigger`, `target_id`, `code`) that ONLY run while that sequence "
+        "is active (any top-level trigger except on_init). Prefer them over top-level scripts for "
+        "chapter-specific behaviour, e.g. an on_interact script on an object that should only "
+        "react during one chapter. Use [] for sequences without such scripts.\n\n"
         "RULES:\n"
         "- NATURAL-LANGUAGE CONDITIONS VS. HARD RULES (MUTUAL EXCLUSIVITY): Use EITHER a natural-language condition (quest goal, award/win/loss condition text judged by the GM) OR deterministic hard rules / scripted guards on any given asset, but NOT both. If you set a guard_expression or hard rule on a sequence, quest, award, container, exit, or win/loss condition, keep its natural-language condition strictly descriptive. This does not restrict sequence `soft_rules`, which may carry their own guard_expression.\n"
         "- Only reference scene/exit/NPC/object/quest IDs that exist in this manifest.\n"

@@ -109,7 +109,7 @@ Scripts declare a trigger event and an optional target entity or scene.
 | `on_init` | When a new game session starts, immediately after initial world manifest and entity state setup. | Global (`*` or empty). |
 | `on_turn_start` | When a new in-game turn begins, i.e. right after the player's scene or the active sequence changed (after `on_turn_end` of the previous turn, before narration). | Global (`*` or empty). |
 | `on_enter_scene` | When the player enters a new scene. | Specific `scene_id` or empty for any scene. |
-| `on_interact` | When the player examines, attacks, talks to, or manipulates an entity. | Specific `entity_id` (NPC or object) or empty for all. |
+| `on_interact` | When the player examines, attacks, talks to, or manipulates an entity: the GM reported a state change on it, or the player's message names an entity in the current scene or inventory (all context-menu actions such as *Inspect*, *Use*, *Push* do). | Specific `entity_id` (NPC or object) or empty for all. |
 | `on_logic_pass_done` | After game mechanics and state mutations finish, before narration is generated. | Global (`*` or empty). |
 | `on_narration_done` | After narration generation completes, before final turn persistence. | Global (`*` or empty). |
 | `on_turn_end` | When the current in-game turn ends, i.e. when the player's scene or the active sequence changed (before `on_turn_start` of the next turn). | Global (`*` or empty). |
@@ -122,7 +122,8 @@ In addition to standalone script assets, TaleWeaver allows configuring short inl
 
 | Entity Type | Available Triggers / Guards | Description |
 | :--- | :--- | :--- |
-| **Objects (General)** | `on_pickup_script`, `on_pickup_text` | Executes when the item is taken into inventory. |
+| **Objects (General)** | `on_interact_script`, `on_interact_text` | Executes whenever the player interacts with the object (inspect, use, push, tamper), also for fixed, non-portable objects. |
+| | `on_pickup_script`, `on_pickup_text` | Executes when the item is taken into inventory. |
 | | `on_drop_script`, `on_drop_text` | Executes when the item is dropped into the scene. |
 | **Wearables & Weapons** | `on_equip_script`, `on_equip_text` | Executes when the player equips a WEAPON or WEARABLE. |
 | | `on_unequip_script`, `on_unequip_text` | Executes when the player unequips a WEAPON or WEARABLE. |
@@ -135,6 +136,7 @@ In addition to standalone script assets, TaleWeaver allows configuring short inl
 | | `on_craft_failure_script`, `..._text` | Executes when crafting fails or is blocked by guard. |
 | **NPCs** | `on_defeat_script`, `on_defeat_text` | Executes when the NPC is defeated. Use to spawn loot or change state. |
 | | `on_protagonist_enters_scene_script` | Executes when the player enters the room containing this NPC. |
+| | `on_interact_script`, `on_interact_text` | Executes whenever the player talks to, inspects or otherwise interacts with this NPC. |
 | **Scenes** | `on_enter_scene_script`, `..._text` | Executes when the player enters this specific scene. |
 | | `on_leave_scene_script`, `..._text` | Executes immediately when the player leaves this specific scene. |
 | **Exits** | `on_open_exit_script`, `..._text` | Executes when the player opens or traverses this exit. |
@@ -185,6 +187,12 @@ Sequences can declare `soft_rules`, which are active only while that sequence is
 | `max_triggers` | How often the rule may fire per session (`1` for one-time rewards); empty means unlimited. |
 
 Pass 1 only ever sees each open rule's `id` and `condition` (never the script or guard) and reports fulfilled rules in `triggered_soft_rule_ids`. Pass 1.5 then checks each one in reported order: it must belong to the sequence active when the message started, be under its trigger limit, and pass its guard. Only then does the script run. Later rules see the effects of earlier ones in the same message. Rules that fail a check are dropped silently (with a `[DEBUG soft_rule …]` line in debug mode).
+
+### Sequence Scripts
+
+Sequences can also declare `scripts`: event scripts with the same shape as top-level scripts (`id`, `name`, `trigger`, `target_id`, `code`, `description`) that **only run while that sequence is active**. Every top-level trigger is available except `on_init` (no sequence is active before the session exists; use `on_start_sequence_script` for chapter set-up).
+
+Use them for chapter-specific behaviour instead of top-level scripts that check the active chapter themselves, e.g. an `on_interact` script on a bomb that only opens its dialog during the bomb chapter. The runner collects them from the sequence that is active when the player's message starts, so a chapter change mid-message takes effect from the next message. Edit them in the World-Editor under **Sequence → Scripts**.
 
 ### Deterministic Guard Expressions
 
@@ -677,7 +685,7 @@ def on_bomb_wire(answ):
                      on_choice=on_bomb_wire)
 ```
 
-Dialog opened by the bomb's inline `on_pickup_script`:
+Dialog opened by a **sequence script** on the bomb chapter (`trigger: on_interact`, `target_id: TICKING_BOMB`), so the fixed bomb reacts to *Inspect*, *Use* or *Push* only during that chapter. The bomb's inline `on_interact_script` works the same way if it should react in every chapter:
 ```python
 tw.dialog.choose(
     "The bomb starts ticking. What do you do?",
