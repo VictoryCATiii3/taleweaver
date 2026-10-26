@@ -1,6 +1,5 @@
 import ipaddress
 import logging
-import os
 import time
 from collections import defaultdict
 from typing import Optional
@@ -217,22 +216,10 @@ async def read_users_me(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from backend.engine.adventure_importer import AdventureTemplateImporter
+    from backend.services.default_adventures import ensure_default_adventures
 
-    # Import default adventures on first login.
-    if not current_user.has_imported_defaults:
-        logger.info(
-            "First login for user '%s'. Importing default adventures...", current_user.username
-        )
-        defaults_dir = os.path.join("adventures", "default")
-        try:
-            await AdventureTemplateImporter.import_from_directory(
-                db, defaults_dir, owner_id=current_user.id, delete_after=False
-            )
-            current_user.has_imported_defaults = True
-            await db.commit()
-        except Exception as e:
-            logger.error("Failed to auto-import defaults for %s: %s", current_user.username, e)
+    # Import default adventures on first login; retried on the next call if it fails.
+    await ensure_default_adventures(db, current_user)
 
     profile = await build_user_profile_data(db, current_user)
     # Persist the healed profile image URL so the fix is applied only once.

@@ -19,9 +19,15 @@ from backend.engine.adventure_import_support import find_existing_template
 from backend.engine.adventure_importer import AdventureConflictError, AdventureTemplateImporter
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.user import User
+from backend.services.default_adventures import (
+    ensure_default_adventures,
+    import_default_adventures,
+)
 
 router = APIRouter(tags=["Adventure Imports"])
 logger = logging.getLogger(__name__)
+
+DEFAULTS_FAILED_DETAIL = "Default adventures could not be imported; see the server log."
 
 LEGACY_EXAMPLES_GONE_DETAIL = "Example adventures are now provided by the adventure library."
 _LEGACY_EXAMPLES_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -163,13 +169,8 @@ async def import_defaults(
     if current_user.has_imported_defaults:
         return {"status": "skipped", "message": "Defaults already imported."}
 
-    defaults_dir = os.path.join("adventures", "default")
-    await AdventureTemplateImporter.import_from_directory(
-        db, defaults_dir, owner_id=current_user.id, delete_after=False
-    )
-
-    current_user.has_imported_defaults = True
-    await db.commit()
+    if not await ensure_default_adventures(db, current_user):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, DEFAULTS_FAILED_DETAIL)
     return {"status": "success", "message": "Default adventures imported successfully."}
 
 
@@ -179,10 +180,8 @@ async def reimport_defaults(
     current_user: User = Depends(get_current_user),
 ):
     """Manually re-triggers import of default adventures (overwrites existing)."""
-    defaults_dir = os.path.join("adventures", "default")
-    await AdventureTemplateImporter.import_from_directory(
-        db, defaults_dir, owner_id=current_user.id, delete_after=False, overwrite=True
-    )
+    if not await import_default_adventures(db, current_user.id, overwrite=True):
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, DEFAULTS_FAILED_DETAIL)
     return {"status": "success", "message": "Default adventures re-imported successfully."}
 
 
