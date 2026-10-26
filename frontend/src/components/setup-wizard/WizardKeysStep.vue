@@ -4,6 +4,7 @@ import { CheckCircle2, Server } from 'lucide-vue-next'
 import { api } from '@/composables/useApi'
 import { settingsService } from '@/services/settingsService'
 import { refreshConfig } from '@/store/config'
+import { invalidateProviderModels } from '@/store/providerModels'
 import { KEY_PROVIDERS, wizardStyles, type SetupMode } from './wizardPresets'
 
 const props = defineProps<{ mode: SetupMode }>()
@@ -27,6 +28,7 @@ async function save(): Promise<boolean> {
   for (const [provider, value] of entries) {
     try {
       await api.saveApiKey(provider, value)
+      invalidateProviderModels(provider)
     } catch (error) {
       console.error(`[SetupWizard] Saving ${provider} key failed:`, error)
       failed.push(provider)

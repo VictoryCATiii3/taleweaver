@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import ModelCombobox from '@/components/common/ModelCombobox.vue'
 
 const props = defineProps<{
   llmForm: any
@@ -8,7 +9,6 @@ const props = defineProps<{
   isSubmitting: boolean
   isLoadingOllamaModels: boolean
   isLoadingMinimaxModels: boolean
-  isLoadingLlmModels?: Record<string, boolean>
   testResults: Record<string, { status: string; message: string }>
 }>()
 
@@ -17,7 +17,6 @@ const emit = defineEmits<{
   (e: 'test', payload: { key: string; model: string; provider: string; openrouterProvider?: string }): void
   (e: 'refreshOllamaModels', ollamaUrl?: string): void
   (e: 'refreshMinimaxModels', minimaxUrl?: string): void
-  (e: 'refreshLlmModels', provider: string, apiBase?: string): void
   (e: 'switchSection', section: string): void
 }>()
 
@@ -76,51 +75,12 @@ const missingProviders = computed(() => {
   return missing
 })
 
-const isModelCustom = (model: string, provider: string) => {
-  if (!model) return false
-  const predefined = props.availableConstants?.predefined_llm_models?.[provider]
-  if (!predefined) return true
-  return !predefined.includes(model)
+/** Self-hosted endpoints whose discovered model list depends on the configured URL. */
+const modelBaseUrl = (provider: string): string => {
+  if (provider === 'ollama') return localForm.value.ollama_url || ''
+  if (provider === 'minimax') return localForm.value.minimax_url || ''
+  return ''
 }
-
-const customTiers = ref<Record<string, boolean>>({
-  small: false,
-  complex: false,
-  generator: false,
-  play_agent: false,
-  compression: false,
-})
-
-const syncCustomTiers = () => {
-  for (const tier of ['small', 'complex', 'generator', 'play_agent', 'compression']) {
-    const model = (localForm.value as any)[`${tier}_model`]
-    const provider = (localForm.value as any)[`${tier}_model_provider`]
-    customTiers.value[tier] = isModelCustom(model, provider)
-  }
-}
-syncCustomTiers()
-
-watch(() => props.llmForm, () => {
-  syncCustomTiers()
-}, { deep: true })
-
-const onModelSelect = (tier: string, e: Event) => {
-  const val = (e.target as HTMLSelectElement).value
-  const modelKey = `${tier}_model` as keyof typeof localForm.value
-  const providerKey = `${tier}_model_provider` as keyof typeof localForm.value
-  if (val === 'custom') {
-    customTiers.value[tier] = true
-    const predefined = props.availableConstants?.predefined_llm_models?.[localForm.value[providerKey]]
-    if (predefined?.includes(localForm.value[modelKey])) {
-      (localForm.value as any)[modelKey] = ''
-    }
-  } else {
-    customTiers.value[tier] = false
-    (localForm.value as any)[modelKey] = val
-  }
-}
-
-const getModelOptionLabel = (_provider: string, model: string) => model
 
 const getProviderName = (id: string) => {
   return props.availableConstants?.llm_providers?.find((p: any) => p.id === id)?.name || id
@@ -152,35 +112,11 @@ const resolveModelOnProviderChange = (
   return currentModel
 }
 
-watch(() => localForm.value.small_model_provider, (provider, oldProvider) => {
-  localForm.value.small_model = resolveModelOnProviderChange(localForm.value.small_model, provider, oldProvider)
-  const predefined = props.availableConstants?.predefined_llm_models?.[provider]
-  customTiers.value.small = Boolean(localForm.value.small_model && predefined && !predefined.includes(localForm.value.small_model))
-})
-
-watch(() => localForm.value.complex_model_provider, (provider, oldProvider) => {
-  localForm.value.complex_model = resolveModelOnProviderChange(localForm.value.complex_model, provider, oldProvider)
-  const predefined = props.availableConstants?.predefined_llm_models?.[provider]
-  customTiers.value.complex = Boolean(localForm.value.complex_model && predefined && !predefined.includes(localForm.value.complex_model))
-})
-
-watch(() => localForm.value.generator_model_provider, (provider, oldProvider) => {
-  localForm.value.generator_model = resolveModelOnProviderChange(localForm.value.generator_model, provider, oldProvider)
-  const predefined = props.availableConstants?.predefined_llm_models?.[provider]
-  customTiers.value.generator = Boolean(localForm.value.generator_model && predefined && !predefined.includes(localForm.value.generator_model))
-})
-
-watch(() => localForm.value.play_agent_model_provider, (provider, oldProvider) => {
-  localForm.value.play_agent_model = resolveModelOnProviderChange(localForm.value.play_agent_model, provider, oldProvider)
-  const predefined = props.availableConstants?.predefined_llm_models?.[provider]
-  customTiers.value.play_agent = Boolean(localForm.value.play_agent_model && predefined && !predefined.includes(localForm.value.play_agent_model))
-})
-
-watch(() => localForm.value.compression_model_provider, (provider, oldProvider) => {
-  localForm.value.compression_model = resolveModelOnProviderChange(localForm.value.compression_model, provider, oldProvider)
-  const predefined = props.availableConstants?.predefined_llm_models?.[provider]
-  customTiers.value.compression = Boolean(localForm.value.compression_model && predefined && !predefined.includes(localForm.value.compression_model))
-})
+for (const tier of ['small', 'complex', 'generator', 'play_agent', 'compression']) {
+  watch(() => localForm.value[`${tier}_model_provider`], (provider, oldProvider) => {
+    localForm.value[`${tier}_model`] = resolveModelOnProviderChange(localForm.value[`${tier}_model`], provider, oldProvider)
+  })
+}
 
 const hasOllamaProviderSelected = computed(() => (
   localForm.value.small_model_provider === 'ollama'
@@ -220,26 +156,6 @@ const refreshOllamaModels = () => {
 
 const refreshMinimaxModels = () => {
   emit('refreshMinimaxModels', localForm.value.minimax_url)
-}
-
-const LLM_MODEL_DISCOVERY_PROVIDERS = ['openai', 'anthropic', 'google', 'openrouter', 'deepseek', 'kimi', 'minimax']
-
-const isLlmDiscoveryProvider = (provider: string | undefined | null) => {
-  return !!provider && LLM_MODEL_DISCOVERY_PROVIDERS.includes(provider)
-}
-
-const isLlmProviderLoading = (provider: string | undefined | null) => {
-  if (!provider) return false
-  if (provider === 'minimax') return props.isLoadingMinimaxModels
-  return !!props.isLoadingLlmModels?.[provider]
-}
-
-const refreshLlmProviderModels = (provider: string) => {
-  if (provider === 'minimax') {
-    emit('refreshMinimaxModels', localForm.value.minimax_url)
-  } else {
-    emit('refreshLlmModels', provider, localForm.value.minimax_url)
-  }
 }
 
 const isCompressionModelMissingWarning = computed(() => {
@@ -463,49 +379,17 @@ const triggerTest = (passKey: string, model: string, provider: string, openroute
         </div>
 
         <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Selected Model
-            </label>
-            <button
-              v-if="isLlmDiscoveryProvider(localForm.small_model_provider)"
-              type="button"
-              @click="refreshLlmProviderModels(localForm.small_model_provider)"
-              :disabled="isLlmProviderLoading(localForm.small_model_provider)"
-              class="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
-              title="Refresh available models from provider API"
-            >
-              <i class="ra ra-recycle" :class="{'animate-spin': isLlmProviderLoading(localForm.small_model_provider)}"></i>
-              <span>Refresh list</span>
-            </button>
-          </div>
-
-          <select
-            :value="customTiers.small ? 'custom' : localForm.small_model"
-            @change="(e) => onModelSelect('small', e)"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono outline-none focus:ring-2 focus:ring-purple-500/50"
-          >
-            <option
-              v-for="m in availableConstants.predefined_llm_models?.[localForm.small_model_provider]"
-              :key="m"
-              :value="m"
-            >
-              {{ getModelOptionLabel(localForm.small_model_provider, m) }}
-            </option>
-            <option value="custom">-- Custom Model ID --</option>
-          </select>
+          <label for="llm-small-model" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            Selected Model
+          </label>
+          <ModelCombobox
+            v-model="localForm.small_model"
+            input-id="llm-small-model"
+            kind="llm"
+            :provider="localForm.small_model_provider"
+            :base-url="modelBaseUrl(localForm.small_model_provider)"
+          />
         </div>
-      </div>
-
-      <!-- Custom Model Input if custom -->
-      <div v-if="customTiers.small" class="pt-1">
-        <label class="block text-xs font-bold text-slate-400 mb-1">Custom Model Identifier</label>
-        <input
-          v-model="localForm.small_model"
-          type="text"
-          placeholder="e.g. gpt-4o-mini or meta-llama/llama-3.2-3b"
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-purple-500/50 outline-none"
-        />
       </div>
 
       <!-- Test Result Alert -->
@@ -647,48 +531,17 @@ const triggerTest = (passKey: string, model: string, provider: string, openroute
         </div>
 
         <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Selected Model
-            </label>
-            <button
-              v-if="isLlmDiscoveryProvider(localForm.complex_model_provider)"
-              type="button"
-              @click="refreshLlmProviderModels(localForm.complex_model_provider)"
-              :disabled="isLlmProviderLoading(localForm.complex_model_provider)"
-              class="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
-            >
-              <i class="ra ra-recycle" :class="{'animate-spin': isLlmProviderLoading(localForm.complex_model_provider)}"></i>
-              <span>Refresh list</span>
-            </button>
-          </div>
-
-          <select
-            :value="customTiers.complex ? 'custom' : localForm.complex_model"
-            @change="(e) => onModelSelect('complex', e)"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono outline-none focus:ring-2 focus:ring-purple-500/50"
-          >
-            <option
-              v-for="m in availableConstants.predefined_llm_models?.[localForm.complex_model_provider]"
-              :key="m"
-              :value="m"
-            >
-              {{ getModelOptionLabel(localForm.complex_model_provider, m) }}
-            </option>
-            <option value="custom">-- Custom Model ID --</option>
-          </select>
+          <label for="llm-complex-model" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            Selected Model
+          </label>
+          <ModelCombobox
+            v-model="localForm.complex_model"
+            input-id="llm-complex-model"
+            kind="llm"
+            :provider="localForm.complex_model_provider"
+            :base-url="modelBaseUrl(localForm.complex_model_provider)"
+          />
         </div>
-      </div>
-
-      <!-- Custom Model Input -->
-      <div v-if="customTiers.complex" class="pt-1">
-        <label class="block text-xs font-bold text-slate-400 mb-1">Custom Model Identifier</label>
-        <input
-          v-model="localForm.complex_model"
-          type="text"
-          placeholder="e.g. claude-3-5-sonnet or gpt-4o"
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-purple-500/50 outline-none"
-        />
       </div>
 
       <!-- Test Result Alert -->
@@ -824,47 +677,17 @@ const triggerTest = (passKey: string, model: string, provider: string, openroute
         </div>
 
         <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Selected Model
-            </label>
-            <button
-              v-if="isLlmDiscoveryProvider(localForm.generator_model_provider)"
-              type="button"
-              @click="refreshLlmProviderModels(localForm.generator_model_provider)"
-              :disabled="isLlmProviderLoading(localForm.generator_model_provider)"
-              class="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-            >
-              <i class="ra ra-recycle" :class="{'animate-spin': isLlmProviderLoading(localForm.generator_model_provider)}"></i>
-              <span>Refresh list</span>
-            </button>
-          </div>
-
-          <select
-            :value="customTiers.generator ? 'custom' : localForm.generator_model"
-            @change="(e) => onModelSelect('generator', e)"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono outline-none focus:ring-2 focus:ring-purple-500/50"
-          >
-            <option
-              v-for="m in availableConstants.predefined_llm_models?.[localForm.generator_model_provider]"
-              :key="m"
-              :value="m"
-            >
-              {{ getModelOptionLabel(localForm.generator_model_provider, m) }}
-            </option>
-            <option value="custom">-- Custom Model ID --</option>
-          </select>
+          <label for="llm-generator-model" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            Selected Model
+          </label>
+          <ModelCombobox
+            v-model="localForm.generator_model"
+            input-id="llm-generator-model"
+            kind="llm"
+            :provider="localForm.generator_model_provider"
+            :base-url="modelBaseUrl(localForm.generator_model_provider)"
+          />
         </div>
-      </div>
-
-      <div v-if="customTiers.generator" class="pt-1">
-        <label class="block text-xs font-bold text-slate-400 mb-1">Custom Model Identifier</label>
-        <input
-          v-model="localForm.generator_model"
-          type="text"
-          placeholder="e.g. gpt-4o or gemini-2.5-pro"
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-purple-500/50 outline-none"
-        />
       </div>
 
       <div
@@ -969,44 +792,17 @@ const triggerTest = (passKey: string, model: string, provider: string, openroute
           </div>
 
           <div>
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Model
-              </label>
-              <button
-                v-if="isLlmDiscoveryProvider(localForm.play_agent_model_provider)"
-                type="button"
-                @click="refreshLlmProviderModels(localForm.play_agent_model_provider)"
-                :disabled="isLlmProviderLoading(localForm.play_agent_model_provider)"
-                class="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
-                title="Refresh available models from provider API"
-              >
-                <i class="ra ra-recycle" :class="{'animate-spin': isLlmProviderLoading(localForm.play_agent_model_provider)}"></i>
-                <span>Refresh list</span>
-              </button>
-            </div>
-            <select
-              :value="customTiers.play_agent ? 'custom' : localForm.play_agent_model"
-              @change="(e) => onModelSelect('play_agent', e)"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono outline-none focus:ring-2 focus:ring-purple-500/50"
-            >
-              <option v-for="m in availableConstants.predefined_llm_models?.[localForm.play_agent_model_provider]" :key="m" :value="m">
-                {{ getModelOptionLabel(localForm.play_agent_model_provider, m) }}
-              </option>
-              <option value="custom">-- Custom Model ID --</option>
-            </select>
+            <label for="llm-play-agent-model" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              Model
+            </label>
+            <ModelCombobox
+              v-model="localForm.play_agent_model"
+              input-id="llm-play-agent-model"
+              kind="llm"
+              :provider="localForm.play_agent_model_provider"
+              :base-url="modelBaseUrl(localForm.play_agent_model_provider)"
+            />
           </div>
-        </div>
-
-        <!-- Custom Model Input if custom -->
-        <div v-if="customTiers.play_agent" class="pt-1">
-          <label class="block text-xs font-bold text-slate-400 mb-1">Custom Model Identifier</label>
-          <input
-            v-model="localForm.play_agent_model"
-            type="text"
-            placeholder="e.g. gpt-4o-mini"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-purple-500/50 outline-none"
-          />
         </div>
 
         <!-- OpenRouter Provider Routing if openrouter -->
@@ -1183,18 +979,15 @@ const triggerTest = (passKey: string, model: string, provider: string, openroute
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model</label>
-            <select
-              :value="customTiers.compression ? 'custom' : localForm.compression_model"
-              @change="(e) => onModelSelect('compression', e)"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-mono outline-none focus:ring-2 focus:ring-purple-500/50"
-            >
-              <option value="">-- No Dedicated Model (Fall back to Pass 1) --</option>
-              <option v-for="m in availableConstants.predefined_llm_models?.[localForm.compression_model_provider]" :key="m" :value="m">
-                {{ getModelOptionLabel(localForm.compression_model_provider, m) }}
-              </option>
-              <option value="custom">-- Custom Model ID --</option>
-            </select>
+            <label for="llm-compression-model" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model</label>
+            <ModelCombobox
+              v-model="localForm.compression_model"
+              input-id="llm-compression-model"
+              kind="llm"
+              placeholder="Empty: fall back to Pass 1 model"
+              :provider="localForm.compression_model_provider"
+              :base-url="modelBaseUrl(localForm.compression_model_provider)"
+            />
           </div>
         </div>
 

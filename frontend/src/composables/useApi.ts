@@ -89,7 +89,18 @@ interface SettingsResponse {
   tts_settings: Record<string, unknown>
 }
 
-export type SetupWizardState = 'pending' | 'skipped' | 'dismissed' | 'completed'
+export type ModelKind = 'llm' | 'image'
+
+export interface ProviderModelList {
+  provider: string
+  kind: ModelKind
+  /** live: from the provider API; static: built-in list (no listing API); fallback: built-in after an error */
+  source: 'live' | 'static' | 'fallback'
+  error: string | null
+  models: { id: string; label: string }[]
+}
+
+export type SetupWizardState ='pending' | 'skipped' | 'dismissed' | 'completed'
 
 export interface SetupWizardStatus {
   state: SetupWizardState
@@ -595,6 +606,18 @@ export const api = {
   /** Deletes an encrypted API key for a provider. */
   deleteApiKey(provider: string): Promise<{ status: string; message: string }> {
     return request(`/settings/keys/${provider}`, { method: 'DELETE' })
+  },
+
+  /** Lists a provider's models for a role; falls back to the built-in list with an error. */
+  getProviderModels(
+    provider: string,
+    kind: ModelKind,
+    options: { baseUrl?: string; refresh?: boolean } = {},
+  ): Promise<ProviderModelList> {
+    const params = new URLSearchParams({ provider, kind })
+    if (options.baseUrl) params.set('base_url', options.baseUrl)
+    if (options.refresh) params.set('refresh', 'true')
+    return request(`/settings/models?${params.toString()}`, { timeoutMs: 30000 })
   },
 
   /** Reads the setup wizard state of the current admin. */

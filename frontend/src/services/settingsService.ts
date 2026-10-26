@@ -3,6 +3,7 @@ import { api } from '@/composables/useApi'
 import { audioService } from '@/services/audioService'
 import { catalogService } from '@/services/catalogService'
 import { refreshConfig } from '@/store/config'
+import { invalidateProviderModels } from '@/store/providerModels'
 
 /**
  * SettingsService manages all admin configuration:
@@ -305,6 +306,7 @@ class SettingsService {
 
     try {
       await api.saveApiKey(provider, apiKey)
+      invalidateProviderModels(provider)
       this.statusMessage.value = { type: 'success', text: `${provider} key saved securely.` }
       await this.fetchSettings()
       await refreshConfig()
@@ -329,6 +331,7 @@ class SettingsService {
 
     try {
       await api.deleteApiKey(provider)
+      invalidateProviderModels(provider)
       this.statusMessage.value = { type: 'success', text: `${provider} key removed successfully.` }
       await this.fetchSettings()
     } catch (err: any) {

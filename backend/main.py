@@ -32,6 +32,7 @@ from backend.api.routes import (
     config_api,
     data,
     map_api,
+    model_discovery_api,
     setup_wizard_api,
     stt_api,
     tts_api,
@@ -190,6 +191,7 @@ async def add_security_headers(request, call_next):
 
 app.include_router(config_api.router, prefix="/api")
 app.include_router(setup_wizard_api.router, prefix="/api")
+app.include_router(model_discovery_api.router, prefix="/api")
 app.include_router(adventures.router, prefix="/api")
 app.include_router(avatars.router, prefix="/api")
 app.include_router(characters.router, prefix="/api")

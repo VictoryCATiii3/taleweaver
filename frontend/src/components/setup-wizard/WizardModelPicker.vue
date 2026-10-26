@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import type { ModelKind } from '@/composables/useApi'
+import ModelCombobox from '@/components/common/ModelCombobox.vue'
 import WizardTestResult from './WizardTestResult.vue'
 import { needsKey, wizardStyles } from './wizardPresets'
 
-/** One model role: provider + model (free text with suggestions) + optional connection test. */
+/** One model role: provider + discovered model (manual entry allowed) + optional connection test. */
 const provider = defineModel<string>('provider', { required: true })
 const model = defineModel<string>('model', { required: true })
 
@@ -11,18 +13,19 @@ const props = defineProps<{
   id: string
   label: string
   hint?: string
+  kind: ModelKind
   providers: { id: string; name: string }[]
-  models: Record<string, string[]>
   configuredKeys: Record<string, unknown>
   presetFor: (provider: string) => string
+  baseUrlFor?: (provider: string) => string
   testKey: string
   testLabel: string
 }>()
 
 const emit = defineEmits<{ (e: 'test'): void }>()
 
-const suggestions = computed((): string[] => props.models[provider.value] ?? [])
 const providerNeedsKey = computed((): boolean => needsKey(provider.value, props.configuredKeys))
+const baseUrl = computed((): string => props.baseUrlFor?.(provider.value) ?? '')
 
 // A user-picked provider gets its recommended model; hydration sets both at once and is not affected.
 watch(provider, (next) => {
@@ -47,10 +50,14 @@ watch(provider, (next) => {
       </div>
       <div>
         <label :class="wizardStyles.label" :for="`${props.id}-model`">Model</label>
-        <input :id="`${props.id}-model`" v-model="model" :list="`${props.id}-models`" :class="wizardStyles.input" />
-        <datalist :id="`${props.id}-models`">
-          <option v-for="entry in suggestions" :key="entry" :value="entry" />
-        </datalist>
+        <ModelCombobox
+          v-model="model"
+          :input-id="`${props.id}-model`"
+          :provider="provider"
+          :kind="props.kind"
+          :base-url="baseUrl"
+          :input-class="`${wizardStyles.input} pr-10 font-mono`"
+        />
       </div>
     </div>
     <p v-if="providerNeedsKey" class="text-xs text-amber-400">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import ModelCombobox from '@/components/common/ModelCombobox.vue'
 
 const props = defineProps<{
   t2iForm: any
@@ -58,79 +59,12 @@ const isProviderConfigured = (providerId: string) => {
   return Boolean(props.configuredKeys?.[providerId])
 }
 
-const isModelCustom = (model: string, provider: string) => {
-  if (!model) return false
-  const predefined = props.availableConstants?.predefined_image_models?.[provider]
-  if (!predefined) return true
-  return !predefined.includes(model)
+/** Self-hosted endpoints whose discovered model list depends on the configured URL. */
+const modelBaseUrl = (provider: string): string => {
+  if (provider === 'ollama') return localForm.value.ollama_url || ''
+  if (provider === 'stable_diffusion') return localForm.value.stable_diffusion_url || ''
+  return ''
 }
-
-const isCustomSimple = ref(false)
-const isCustomAdvanced = ref(false)
-
-const syncCustomFlags = () => {
-  const checkCustom = (model: string | undefined, provider: string | undefined) => {
-    if (!model) return false
-    if (!provider) return false
-    const predefined = props.availableConstants?.predefined_image_models?.[provider]
-    if (!predefined || predefined.length === 0) return true
-    return !predefined.includes(model)
-  }
-  isCustomSimple.value = checkCustom(localForm.value.simple_model, localForm.value.simple_model_provider)
-  isCustomAdvanced.value = checkCustom(localForm.value.advanced_model, localForm.value.advanced_model_provider)
-}
-
-syncCustomFlags()
-
-watch(() => props.t2iForm, () => {
-  syncCustomFlags()
-}, { deep: true })
-
-const onSimpleModelChange = (e: Event) => {
-  const val = (e.target as HTMLSelectElement).value
-  if (val === 'custom') {
-    isCustomSimple.value = true
-    const predefined = props.availableConstants?.predefined_image_models?.[localForm.value.simple_model_provider]
-    if (predefined?.includes(localForm.value.simple_model)) {
-      localForm.value.simple_model = ''
-    }
-  } else {
-    isCustomSimple.value = false
-    localForm.value.simple_model = val
-  }
-}
-
-const onAdvancedModelChange = (e: Event) => {
-  const val = (e.target as HTMLSelectElement).value
-  if (val === 'custom') {
-    isCustomAdvanced.value = true
-    const predefined = props.availableConstants?.predefined_image_models?.[localForm.value.advanced_model_provider]
-    if (predefined?.includes(localForm.value.advanced_model)) {
-      localForm.value.advanced_model = ''
-    }
-  } else {
-    isCustomAdvanced.value = false
-    localForm.value.advanced_model = val
-  }
-}
-
-const MODEL_OPTION_LABELS: Record<string, Record<string, string>> = {
-  black_forest_labs: {
-    'flux-3-image': 'FLUX 3 Image',
-    'flux-3-image-klein': 'FLUX 3 Image Klein',
-    'flux-2-klein-4b': 'FLUX.2 [klein] 4B',
-    'flux-2-klein-9b': 'FLUX.2 [klein] 9B',
-    'flux-2-flex': 'FLUX.2 [flex]',
-    'flux-2-pro': 'FLUX.2 [pro]',
-    'flux-2-max': 'FLUX.2 [max]',
-    'flux-dev': 'FLUX.1 [dev]',
-    'flux-pro': 'FLUX.1 [pro]',
-    'flux-pro-1.1': 'FLUX1.1 [pro]',
-  },
-}
-
-const getModelOptionLabel = (provider: string, model: string) =>
-  MODEL_OPTION_LABELS[provider]?.[model] ?? model
 
 const getProviderName = (id: string) => {
   return props.availableConstants?.image_providers?.find((p: any) => p.id === id)?.name || id
@@ -164,8 +98,6 @@ const SD_PRESET_SCHEDULER = 'Normal'
 
 watch(() => localForm.value.simple_model_provider, (provider, oldProvider) => {
   localForm.value.simple_model = resolveModelOnProviderChange(localForm.value.simple_model, provider, oldProvider)
-  const predefined = props.availableConstants?.predefined_image_models?.[provider]
-  isCustomSimple.value = Boolean(localForm.value.simple_model && predefined && !predefined.includes(localForm.value.simple_model))
   if (provider === 'stable_diffusion') {
     if (!localForm.value.simple_steps) localForm.value.simple_steps = SD_PRESET_STEPS
     if (!localForm.value.simple_cfg_scale) localForm.value.simple_cfg_scale = SD_PRESET_CFG
@@ -176,8 +108,6 @@ watch(() => localForm.value.simple_model_provider, (provider, oldProvider) => {
 
 watch(() => localForm.value.advanced_model_provider, (provider, oldProvider) => {
   localForm.value.advanced_model = resolveModelOnProviderChange(localForm.value.advanced_model, provider, oldProvider)
-  const predefined = props.availableConstants?.predefined_image_models?.[provider]
-  isCustomAdvanced.value = Boolean(localForm.value.advanced_model && predefined && !predefined.includes(localForm.value.advanced_model))
   if (provider === 'stable_diffusion') {
     if (!localForm.value.advanced_steps) localForm.value.advanced_steps = SD_PRESET_STEPS
     if (!localForm.value.advanced_cfg_scale) localForm.value.advanced_cfg_scale = SD_PRESET_CFG
@@ -439,30 +369,16 @@ const testAdvanced = () => {
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model</label>
-          <select 
-            :value="isCustomSimple ? 'custom' : localForm.simple_model"
-            @change="onSimpleModelChange"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-cyan-500/50 font-mono"
-          >
-            <option value="" disabled>-- Select Model --</option>
-            <option v-for="m in availableConstants.predefined_image_models[localForm.simple_model_provider]" :key="m" :value="m">
-              {{ getModelOptionLabel(localForm.simple_model_provider, m) }}
-            </option>
-            <option value="custom">-- Custom Model ID --</option>
-          </select>
+          <label for="t2i-simple-model" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model</label>
+          <ModelCombobox
+            v-model="localForm.simple_model"
+            input-id="t2i-simple-model"
+            kind="image"
+            :provider="localForm.simple_model_provider"
+            :base-url="modelBaseUrl(localForm.simple_model_provider)"
+            input-class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-cyan-500/50 font-mono"
+          />
         </div>
-      </div>
-
-      <!-- Custom Model ID -->
-      <div v-if="isCustomSimple" class="pt-1">
-        <label class="block text-xs font-bold text-slate-400 mb-1">Custom Model Identifier</label>
-        <input 
-          v-model="localForm.simple_model" 
-          type="text" 
-          placeholder="e.g. dall-e-2 or fal-ai/flux-schnell" 
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-cyan-500/50 outline-none" 
-        />
       </div>
 
       <!-- Test Feedback -->
@@ -607,30 +523,16 @@ const testAdvanced = () => {
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model</label>
-          <select 
-            :value="isCustomAdvanced ? 'custom' : localForm.advanced_model"
-            @change="onAdvancedModelChange"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 font-mono"
-          >
-            <option value="" disabled>-- Select Model --</option>
-            <option v-for="m in availableConstants.predefined_image_models[localForm.advanced_model_provider]" :key="m" :value="m">
-              {{ getModelOptionLabel(localForm.advanced_model_provider, m) }}
-            </option>
-            <option value="custom">-- Custom Model ID --</option>
-          </select>
+          <label for="t2i-advanced-model" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model</label>
+          <ModelCombobox
+            v-model="localForm.advanced_model"
+            input-id="t2i-advanced-model"
+            kind="image"
+            :provider="localForm.advanced_model_provider"
+            :base-url="modelBaseUrl(localForm.advanced_model_provider)"
+            input-class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 font-mono"
+          />
         </div>
-      </div>
-
-      <!-- Custom Model ID -->
-      <div v-if="isCustomAdvanced" class="pt-1">
-        <label class="block text-xs font-bold text-slate-400 mb-1">Custom Model Identifier</label>
-        <input 
-          v-model="localForm.advanced_model" 
-          type="text" 
-          placeholder="e.g. dall-e-3 or flux-3-image" 
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-violet-500/50 outline-none" 
-        />
       </div>
 
       <!-- Test Feedback -->

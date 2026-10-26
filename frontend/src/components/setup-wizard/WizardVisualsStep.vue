@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
 import { settingsService } from '@/services/settingsService'
 import { testService } from '@/services/testService'
 import { configState } from '@/store/config'
@@ -50,6 +49,14 @@ function hydrate(): void {
   const provider = defaultProvider()
   Object.assign(scene, { provider, model: scenePreset(provider) })
   Object.assign(asset, { provider, model: assetPreset(provider) })
+}
+
+/** Self-hosted endpoints whose model list depends on the configured URL. */
+function baseUrlFor(provider: string): string {
+  if (provider === 'ollama') {
+    return ollamaUrl.value
+  }
+  return provider === 'stable_diffusion' ? stableDiffusionUrl.value : ''
 }
 
 function runTest(key: string, role: { provider: string; model: string }): void {
@@ -118,10 +125,11 @@ defineExpose({ save })
         v-model:model="scene.model"
         label="Scene model (detailed)"
         hint="Covers, scenes, characters and protagonists."
+        kind="image"
         :providers="providers"
-        :models="models"
         :configured-keys="configuredKeys"
         :preset-for="scenePreset"
+        :base-url-for="baseUrlFor"
         test-key="wizard-t2i-scene"
         test-label="Generate test image"
         @test="runTest('wizard-t2i-scene', scene)"
@@ -133,10 +141,11 @@ defineExpose({ save })
         v-model:model="asset.model"
         label="Asset model (quick)"
         hint="Items and small assets."
+        kind="image"
         :providers="providers"
-        :models="models"
         :configured-keys="configuredKeys"
         :preset-for="assetPreset"
+        :base-url-for="baseUrlFor"
         test-key="wizard-t2i-asset"
         test-label="Generate test image"
         @test="runTest('wizard-t2i-asset', asset)"
@@ -146,19 +155,9 @@ defineExpose({ save })
         <label :class="wizardStyles.label" for="wizard-t2i-ollama">Ollama URL</label>
         <input id="wizard-t2i-ollama" v-model="ollamaUrl" :class="wizardStyles.input" />
       </div>
-      <div v-if="usesProvider('stable_diffusion')" class="flex items-end gap-3">
-        <div class="flex-1">
-          <label :class="wizardStyles.label" for="wizard-sd-url">Stable Diffusion URL</label>
-          <input id="wizard-sd-url" v-model="stableDiffusionUrl" :class="wizardStyles.input" />
-        </div>
-        <button
-          type="button"
-          :class="wizardStyles.secondaryButton"
-          title="Reload Stable Diffusion models"
-          @click="settingsService.fetchStableDiffusionModels(stableDiffusionUrl)"
-        >
-          <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': settingsService.isLoadingStableDiffusionModels.value }" />
-        </button>
+      <div v-if="usesProvider('stable_diffusion')">
+        <label :class="wizardStyles.label" for="wizard-sd-url">Stable Diffusion URL</label>
+        <input id="wizard-sd-url" v-model="stableDiffusionUrl" :class="wizardStyles.input" />
       </div>
     </template>
 

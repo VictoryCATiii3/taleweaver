@@ -76,10 +76,6 @@ const handleRefreshMinimaxModels = async (minimaxUrl?: string) => {
   await settingsService.fetchMinimaxModels(minimaxUrl)
 }
 
-const handleRefreshLlmModels = async (provider: string, apiBase?: string) => {
-  await settingsService.fetchLlmModels(provider, apiBase)
-}
-
 const handleRefreshStableDiffusionModels = async (sdUrl?: string) => {
   await settingsService.fetchStableDiffusionModels(sdUrl)
 }
@@ -405,13 +401,11 @@ const navCategories: NavCategory[] = [
           :is-submitting="settingsService.isSubmitting.value"
           :is-loading-ollama-models="settingsService.isLoadingOllamaModels.value"
           :is-loading-minimax-models="settingsService.isLoadingMinimaxModels.value"
-          :is-loading-llm-models="settingsService.isLoadingLlmModels.value"
           :test-results="testService.testResults.value"
           @save="handleSaveLlmSettings"
           @test="({ key, model, provider, openrouterProvider }) => handleTestLlm(key, model, provider, openrouterProvider)"
           @refresh-ollama-models="handleRefreshOllamaModels"
           @refresh-minimax-models="handleRefreshMinimaxModels"
-          @refresh-llm-models="handleRefreshLlmModels"
           @switch-section="(s) => activeSection = s as Section"
         />
 

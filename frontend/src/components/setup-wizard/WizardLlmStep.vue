@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
 import { settingsService } from '@/services/settingsService'
 import { testService } from '@/services/testService'
 import { configState } from '@/store/config'
@@ -49,8 +48,12 @@ function hydrate(): void {
   Object.assign(fast, { provider, model: fastPreset(provider) })
 }
 
-async function refreshOllamaModels(): Promise<void> {
-  await settingsService.fetchOllamaModels(ollamaUrl.value)
+/** Self-hosted endpoints whose model list depends on the configured URL. */
+function baseUrlFor(provider: string): string {
+  if (provider === 'ollama') {
+    return ollamaUrl.value
+  }
+  return provider === 'minimax' ? llmForm.value.minimax_url : ''
 }
 
 function runTest(key: string, role: { provider: string; model: string }): void {
@@ -107,9 +110,6 @@ async function save(): Promise<boolean> {
 }
 
 hydrate()
-if (usesOllama.value) {
-  refreshOllamaModels()
-}
 
 defineExpose({ save })
 </script>
@@ -130,10 +130,11 @@ defineExpose({ save })
       v-model:model="story.model"
       label="Story model"
       hint="Narration, world building, adventure generation."
+      kind="llm"
       :providers="providers"
-      :models="models"
       :configured-keys="configuredKeys"
       :preset-for="storyPreset"
+      :base-url-for="baseUrlFor"
       test-key="wizard-llm-story"
       test-label="Test connection"
       @test="runTest('wizard-llm-story', story)"
@@ -145,23 +146,19 @@ defineExpose({ save })
       v-model:model="fast.model"
       label="Fast model"
       hint="Command parsing, quick checks, history compression."
+      kind="llm"
       :providers="providers"
-      :models="models"
       :configured-keys="configuredKeys"
       :preset-for="fastPreset"
+      :base-url-for="baseUrlFor"
       test-key="wizard-llm-fast"
       test-label="Test connection"
       @test="runTest('wizard-llm-fast', fast)"
     />
 
-    <div v-if="usesOllama" class="flex items-end gap-3">
-      <div class="flex-1">
-        <label :class="wizardStyles.label" for="wizard-ollama-url">Ollama URL</label>
-        <input id="wizard-ollama-url" v-model="ollamaUrl" :class="wizardStyles.input" />
-      </div>
-      <button type="button" :class="wizardStyles.secondaryButton" title="Reload Ollama models" @click="refreshOllamaModels">
-        <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': settingsService.isLoadingOllamaModels.value }" />
-      </button>
+    <div v-if="usesOllama">
+      <label :class="wizardStyles.label" for="wizard-ollama-url">Ollama URL</label>
+      <input id="wizard-ollama-url" v-model="ollamaUrl" :class="wizardStyles.input" />
     </div>
 
     <p v-if="errorMessage" :class="wizardStyles.error">{{ errorMessage }}</p>
