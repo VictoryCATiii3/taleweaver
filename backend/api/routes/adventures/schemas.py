@@ -403,6 +403,7 @@ class GameSessionResponse(BaseModel):
     image_url: Optional[str] = None
     scene_id: str
     current_scene_name: Optional[str] = None
+    current_sequence_name: Optional[str] = None
     in_game_time: int
     is_ready: bool = True
     creation_status: Optional[str] = None

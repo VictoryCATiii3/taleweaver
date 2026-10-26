@@ -43,6 +43,8 @@ class SessionState(Base, TimestampMixin):
     narration_style = Column(
         String(16), default="balanced", nullable=False, server_default="balanced"
     )
+    # Dialog skin the player picked for this session; NULL means "auto" (see core/ui_theme.py)
+    ui_skin = Column(String(16), nullable=True)
     start_datetime = Column(String(36), nullable=True)
 
     # Session-specific overrides/copies from template

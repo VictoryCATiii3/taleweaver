@@ -11,6 +11,8 @@ import re
 from typing import Any, Optional
 
 UI_SKINS = frozenset({"classic", "chronicle", "noir", "terminal", "grimoire", "eldritch", "toon"})
+# Player choice that defers to the adventure's skin; stored as NULL on the session.
+UI_SKIN_AUTO = "auto"
 
 _HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 

@@ -41,13 +41,16 @@ const emit = defineEmits<{
   (e: 'load-more'): void
 }>()
 
-/** Adventures with a running session get their own shelf above the archive. */
+/**
+ * One card per adventure that has actually been played; it continues the adventure's most
+ * recently played session (the backend resolves active_game_id to that session).
+ * The archive below always lists every adventure, played or not.
+ */
 const inProgressTemplates = computed(() =>
   props.visibleTemplates
-    .filter((t) => t.has_active_session)
+    .filter((t) => t.has_active_session && t.last_played_at)
     .sort((a, b) => lastPlayedMs(b) - lastPlayedMs(a))
 )
-const archiveTemplates = computed(() => props.visibleTemplates.filter((t) => !t.has_active_session))
 
 const sentinelRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -111,6 +114,7 @@ onUnmounted(() => {
         >
           <AdventureTemplateCard
             :template="entry"
+            resumable
             :is-starting-session="isStartingSession"
             :is-starting-this-template="startingSessionTemplateId === entry.template_id"
             :is-updating="props.updatingTemplateIds ? props.updatingTemplateIds.has(entry.template_id) : false"
@@ -130,11 +134,11 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- Shelf: everything else -->
+    <!-- Shelf: every adventure, including those in progress -->
     <section class="space-y-3" aria-label="The archive">
       <h2 class="shelf-heading text-xs sm:text-sm uppercase">The Archive</h2>
       <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 xl:gap-5 pt-2">
-        <div v-if="isSeeding" class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-amber-300/20 bg-white/5 gap-3 aspect-[2/3]">
+        <div v-if="isSeeding" class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-amber-300/20 bg-white/5 gap-3 aspect-[3/4]">
           <div class="w-8 h-8 border-2 border-aether-primary/10 border-t-aether-primary rounded-full animate-spin"></div>
           <span class="text-xxs text-aether-primary uppercase tracking-widest font-bold">Importing Tales...</span>
         </div>
@@ -150,7 +154,7 @@ onUnmounted(() => {
         />
 
         <div
-          v-for="(entry, index) in archiveTemplates"
+          v-for="(entry, index) in props.visibleTemplates"
           :key="entry.template_id"
           class="tale-enter"
           :style="{ '--i': index }"

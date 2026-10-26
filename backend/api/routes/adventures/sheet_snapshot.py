@@ -15,7 +15,7 @@ from backend.api.routes.adventures.asset_url_healing import (
 from backend.api.routes.adventures.session_start_settings import resolve_start_datetime
 from backend.core.config import settings
 from backend.core.narration_styles import DEFAULT_NARRATION_STYLE
-from backend.core.ui_theme import normalize_ui_theme
+from backend.core.ui_theme import UI_SKIN_AUTO, normalize_ui_theme
 from backend.engine.item_logic import get_item_slot, normalize_equipment_keys
 from backend.models.adventure_template import AdventureTemplate
 from backend.models.avatar import Avatar
@@ -320,6 +320,7 @@ async def build_sheet_snapshot(
         **_adventure_fields(state, ctx),
         "enable_history_compression": bool(getattr(state, "enable_history_compression", True)),
         "narration_style": getattr(state, "narration_style", None) or DEFAULT_NARRATION_STYLE,
+        "ui_skin": getattr(state, "ui_skin", None) or UI_SKIN_AUTO,
         "compressed_history": getattr(state, "compressed_history", None),
         **_agent_fields(state),
         "is_debug_enabled": bool(state.is_debug_enabled),

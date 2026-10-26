@@ -51,6 +51,7 @@ _STATE_VALUE_FIELDS = (
     "is_walkthrough_revealed",
     "allow_dynamic_items",
     "narration_style",
+    "ui_skin",
 )
 _STATE_JSON_FIELDS = (
     "time_config",

@@ -85,7 +85,7 @@ onUnmounted(() => window.removeEventListener('mousedown', handleNoteClickOutside
 <template>
   <article
     ref="tiltRef"
-    class="tale-card group rounded-2xl aspect-[2/3] flex flex-col"
+    class="tale-card group rounded-2xl aspect-[3/4] flex flex-col"
     :class="isMenuOpen || isNoteOpen ? 'z-30' : 'z-0'"
     :style="{ '--accent-rgb': accent.rgb }"
     @pointerenter="setAmbientAccent(accent.rgb)"
@@ -109,7 +109,7 @@ onUnmounted(() => window.removeEventListener('mousedown', handleNoteClickOutside
         </span>
         <span
           v-if="toneLabel"
-          class="tale-chip hidden sm:flex px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide items-center gap-1.5 max-w-full"
+          class="tale-chip tale-hover-fade hidden sm:flex px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide items-center gap-1.5 max-w-full"
           :title="toneLabel"
         >
           <i :class="['ra', accent.icon]" class="text-xs"></i>
@@ -159,46 +159,62 @@ onUnmounted(() => window.removeEventListener('mousedown', handleNoteClickOutside
       <span class="font-fantasy font-bold text-[8px] sm:text-[10px] tracking-widest uppercase">{{ statusView.label }}</span>
     </div>
 
-    <!-- Bottom: scene, title, stats, action -->
+    <!-- Bottom: progress, sequence, scene, title, stats, action -->
     <div class="tale-legible relative z-10 mt-auto p-2.5 sm:p-4 lg:p-5 flex flex-col gap-1.5 sm:gap-2.5">
-      <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold min-w-0 text-slate-200">
-        <i class="ra ra-compass shrink-0 tale-accent-text"></i>
-        <span class="truncate">{{ props.session.current_scene_name || 'Exploring...' }}</span>
+      <div class="flex items-center gap-2 sm:gap-2.5 min-w-0">
+        <ProgressRing :value="props.session.progress || 0" :size="34" />
+        <div class="flex flex-col gap-0.5 min-w-0 text-[10px] sm:text-[11px] font-bold">
+          <span v-if="props.session.current_sequence_name" class="flex items-center gap-1.5 min-w-0 text-slate-300" title="Current sequence">
+            <i class="ra ra-book shrink-0 tale-accent-text"></i>
+            <span class="truncate">{{ props.session.current_sequence_name }}</span>
+          </span>
+          <span class="flex items-center gap-1.5 min-w-0 text-slate-200" title="Current scene">
+            <i class="ra ra-compass shrink-0 tale-accent-text"></i>
+            <span class="truncate">{{ props.session.current_scene_name || 'Exploring...' }}</span>
+          </span>
+        </div>
       </div>
 
       <h3 class="tale-title text-[13px] sm:text-lg lg:text-xl text-white leading-tight line-clamp-2 break-words">
         {{ props.session.adventure_title }}
       </h3>
 
-      <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400 min-w-0">
-        <span :title="`${props.session.copied_from_id ? 'Cloned' : 'Started'} ${absoluteStart}`" class="truncate">Played {{ relativeLastPlayed }}</span>
-        <span v-if="props.session.copied_from_id" class="px-1.5 py-px rounded border border-amber-400/30 bg-amber-500/15 text-amber-300 font-bold shrink-0">Clone</span>
-        <span v-if="props.session.adventure_version" class="ml-auto px-1.5 py-px rounded border border-white/10 bg-black/30 font-mono shrink-0">v{{ props.session.adventure_version }}</span>
-      </div>
+      <div class="tale-hover-reveal hidden sm:grid">
+        <div class="flex flex-col gap-2.5">
+          <div class="flex items-center gap-2 text-[10px] text-slate-400 min-w-0">
+            <span :title="`${props.session.copied_from_id ? 'Cloned' : 'Started'} ${absoluteStart}`" class="truncate">Played {{ relativeLastPlayed }}</span>
+            <span v-if="props.session.copied_from_id" class="px-1.5 py-px rounded border border-amber-400/30 bg-amber-500/15 text-amber-300 font-bold shrink-0">Clone</span>
+            <span v-if="props.session.adventure_version" class="ml-auto px-1.5 py-px rounded border border-white/10 bg-black/30 font-mono shrink-0">v{{ props.session.adventure_version }}</span>
+          </div>
 
-      <div class="hidden sm:flex items-center gap-3 py-1 text-[11px] text-slate-300">
-        <ProgressRing :value="props.session.progress || 0" :size="38" />
-        <div class="flex flex-col gap-0.5 min-w-0">
-          <span class="flex items-center gap-1.5" title="Quests completed">
-            <i class="ra ra-scroll-unfurled text-slate-400"></i>{{ props.session.completed_quest_count || 0 }}/{{ props.session.quest_count || 0 }} quests
-          </span>
-          <span class="flex items-center gap-1.5" title="Awards earned">
-            <i class="ra ra-trophy text-amber-300"></i>{{ props.session.earned_award_count || 0 }}/{{ props.session.award_count || 0 }} awards
-          </span>
+          <div class="flex items-center gap-3 text-[11px] text-slate-300">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <span class="flex items-center gap-1.5" title="Quests completed">
+                <i class="ra ra-scroll-unfurled text-slate-400"></i>{{ props.session.completed_quest_count || 0 }}/{{ props.session.quest_count || 0 }} quests
+              </span>
+              <span class="flex items-center gap-1.5" title="Awards earned">
+                <i class="ra ra-trophy text-amber-300"></i>{{ props.session.earned_award_count || 0 }}/{{ props.session.award_count || 0 }} awards
+              </span>
+            </div>
+            <span class="ml-auto flex items-center gap-1.5 text-slate-400 shrink-0" title="In-game time">
+              <i class="ra ra-hourglass"></i>{{ playtime }}
+            </span>
+          </div>
         </div>
-        <span class="ml-auto flex items-center gap-1.5 text-slate-400 shrink-0" title="In-game time">
-          <i class="ra ra-hourglass"></i>{{ playtime }}
-        </span>
       </div>
 
-      <button
-        class="tale-action w-full py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all"
-        @click="emit('resume', props.session.game_id)"
-      >
-        <i v-if="statusView.seal" :class="['ra', statusView.icon]"></i>
-        <Play v-else class="w-3.5 h-3.5 fill-current" />
-        <span class="truncate">{{ statusView.action }}</span>
-      </button>
+      <div class="tale-hover-reveal grid">
+        <div>
+          <button
+            class="tale-action w-full py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all"
+            @click="emit('resume', props.session.game_id)"
+          >
+            <i v-if="statusView.seal" :class="['ra', statusView.icon]"></i>
+            <Play v-else class="w-3.5 h-3.5 fill-current" />
+            <span class="truncate">{{ statusView.action }}</span>
+          </button>
+        </div>
+      </div>
     </div>
   </article>
 </template>

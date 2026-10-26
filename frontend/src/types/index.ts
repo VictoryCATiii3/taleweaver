@@ -64,6 +64,8 @@ export interface CharacterSheet {
   max_memory_turns?: number
   enable_history_compression?: boolean
   narration_style?: 'terse' | 'balanced' | 'rich' | 'epic' | string
+  /** Dialog skin the player picked for this session; "auto" follows the adventure. */
+  ui_skin?: string | null
   compressed_history?: any
 }
 
@@ -285,6 +287,8 @@ export interface GameSession {
   image_url: string | null
   scene_id: string
   current_scene_name?: string | null
+  /** Title of the session's active sequence (chapter); null when the adventure has none. */
+  current_sequence_name?: string | null
   in_game_time: number
   is_paused: boolean
   is_ready: boolean

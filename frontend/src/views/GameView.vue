@@ -34,9 +34,8 @@ import SetupWarningBanner from '@/components/portal/SetupWarningBanner.vue'
 import SessionNoteModal from '@/components/portal/SessionNoteModal.vue'
 import SessionSettingsModal from '@/components/game/SessionSettingsModal.vue'
 import type { SessionSettingsPayload, SettingsTabId } from '@/components/game/settings/types'
-import { useUiSkin } from '@/skins/useUiSkin'
 import { useTextDensity } from '@/skins/useTextDensity'
-import { describeAutoSkin, resolveSkin } from '@/skins/skinRegistry'
+import { describeAutoSkin, resolveSkin, skinPreferenceOf } from '@/skins/skinRegistry'
 import WorldMemoriesModal from '@/components/game/WorldMemoriesModal.vue'
 import DebugModal from '@/components/game/DebugModal.vue'
 import { api } from '@/composables/useApi'
@@ -153,7 +152,7 @@ const isSavingSettings = ref(false)
 const autoSpeakNarration = ref(localStorage.getItem('tw_autoSpeakNarration') !== 'false')
 const autoSpeakDialogues = ref(localStorage.getItem('tw_autoSpeakDialogues') !== 'false')
 
-const { skinPreference } = useUiSkin()
+const skinPreference = computed(() => skinPreferenceOf(sheet.value?.ui_skin))
 const { textDensity } = useTextDensity()
 const autoSkin = computed(() => resolveSkin('auto', sheet.value?.ui_theme, sheet.value?.adventure_tone))
 const autoSkinReason = computed(() => describeAutoSkin(sheet.value?.ui_theme, sheet.value?.adventure_tone))
@@ -170,7 +169,6 @@ const saveSessionSettings = async (payload: SessionSettingsPayload) => {
   autoSpeakNarration.value = payload.autoSpeakNarration
   autoSpeakDialogues.value = payload.autoSpeakDialogues
   language.value = payload.language
-  skinPreference.value = payload.skin
   textDensity.value = payload.density
   // The save click is a user gesture, so this is the moment to unlock audio playback.
   if (payload.autoSpeech !== audioService.autoSpeechEnabled.value) {
@@ -182,11 +180,13 @@ const saveSessionSettings = async (payload: SessionSettingsPayload) => {
       max_memory_turns: payload.turns,
       enable_history_compression: payload.enableCompression,
       narration_style: payload.narrationStyle,
+      ui_skin: payload.skin,
     })
     if (sheet.value) {
       sheet.value.max_memory_turns = payload.turns
       sheet.value.enable_history_compression = payload.enableCompression
       sheet.value.narration_style = payload.narrationStyle
+      sheet.value.ui_skin = payload.skin
     }
     addNotification('Session settings updated.', 'success')
     showSettingsModal.value = false

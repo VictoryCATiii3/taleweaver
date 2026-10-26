@@ -30,9 +30,8 @@ import CinematicSequenceOverlay from './immersive/CinematicSequenceOverlay.vue'
 import PlayAgentPanel from './immersive/PlayAgentPanel.vue'
 import type { SettingsTabId } from './settings/types'
 import { useStoryTabs } from './immersive/tabs/useStoryTabs'
-import { useUiSkin } from '@/skins/useUiSkin'
 import { useTextDensity } from '@/skins/useTextDensity'
-import { resolveAccent, resolveSkin } from '@/skins/skinRegistry'
+import { resolveAccent, resolveSkin, skinPreferenceOf } from '@/skins/skinRegistry'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -172,7 +171,7 @@ const {
 })
 
 // --- Dialog skin ---
-const { skinPreference } = useUiSkin()
+const skinPreference = computed(() => skinPreferenceOf(props.sheet?.ui_skin))
 const { textDensity } = useTextDensity()
 const activeSkin = computed(() =>
   resolveSkin(skinPreference.value, props.sheet?.ui_theme, props.sheet?.adventure_tone)

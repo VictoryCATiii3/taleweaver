@@ -204,6 +204,45 @@
   }
 }
 
+/* Card details shown only while hovering; touch devices have no hover, so they always see them. */
+.tale-hover-reveal {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.4s ease, opacity 0.3s ease;
+}
+
+.tale-hover-reveal > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tale-hover-fade {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tale-card:hover .tale-hover-reveal,
+.tale-card:focus-within .tale-hover-reveal {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.tale-card:hover .tale-hover-fade,
+.tale-card:focus-within .tale-hover-fade {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .tale-hover-reveal {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+
+  .tale-hover-fade {
+    opacity: 1;
+  }
+}
+
 .tale-chip {
   /* Near-opaque dark base so the chip never depends on the artwork behind it */
   background:

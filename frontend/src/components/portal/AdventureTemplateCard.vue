@@ -15,6 +15,8 @@ const props = defineProps<{
   isStartingSession?: boolean
   isStartingThisTemplate?: boolean
   isUpdating?: boolean
+  /** Only cards on the "In Progress" shelf continue a session; archive cards always begin a new one. */
+  resumable?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -44,8 +46,9 @@ const needsMigration = computed(() => !!(props.template.is_legacy_format || !pro
 const hasLicenseInfo = computed(() =>
   !!(props.template.license || props.template.creator || props.template.copyright || props.template.license_url)
 )
-/** Adventures with a running session continue it; starting over is the secondary action. */
-const resumeGameId = computed(() => (props.template.has_active_session ? props.template.active_game_id || null : null))
+const resumeGameId = computed(() =>
+  props.resumable && props.template.has_active_session ? props.template.active_game_id || null : null
+)
 const teaser = computed(() => (props.template.teaser || '').replace(/\\n/g, '\n'))
 
 const actionHandlers: Record<AdventureCardAction, () => void> = {
@@ -94,7 +97,7 @@ function primaryAction(event: MouseEvent): void {
 <template>
   <article
     ref="tiltRef"
-    class="tale-card group rounded-2xl aspect-[2/3] flex flex-col"
+    class="tale-card group rounded-2xl aspect-[3/4] flex flex-col"
     :class="isMenuOpen || isLicenseOpen ? 'z-30' : 'z-0'"
     :style="{ '--accent-rgb': accent.rgb }"
     @pointerenter="onEnter"
@@ -109,7 +112,7 @@ function primaryAction(event: MouseEvent): void {
       <div class="flex flex-col gap-1.5 items-start min-w-0">
         <span
           v-if="toneLabel"
-          class="tale-chip px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-bold tracking-wide flex items-center gap-1.5 max-w-full"
+          class="tale-chip tale-hover-fade px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[11px] font-bold tracking-wide flex items-center gap-1.5 max-w-full"
           :title="toneLabel"
         >
           <i :class="['ra', accent.icon]" class="text-[10px] sm:text-xs"></i>
@@ -165,19 +168,20 @@ function primaryAction(event: MouseEvent): void {
         {{ props.template.title }}
       </h3>
 
-      <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400">
-        <span v-if="props.template.version" class="px-1.5 py-px rounded border border-white/10 bg-black/30 font-mono">v{{ props.template.version }}</span>
-        <span v-if="props.template.quest_count" class="flex items-center gap-1"><i class="ra ra-compass"></i>{{ props.template.quest_count }} quests</span>
-        <button
-          v-if="hasLicenseInfo"
-          ref="licenseTriggerRef"
-          @click.stop="isLicenseOpen = !isLicenseOpen"
-          class="ml-auto text-emerald-400/70 hover:text-emerald-300 transition-colors"
-          :title="`License: ${props.template.license || 'View details'}`"
-          aria-label="View license & credits"
-        >
-          <i class="ra ra-scroll-unfurled text-xs"></i>
-        </button>
+      <div class="tale-hover-reveal hidden sm:grid">
+        <div class="flex items-center gap-2 text-[10px] text-slate-400">
+          <span v-if="props.template.version" class="px-1.5 py-px rounded border border-white/10 bg-black/30 font-mono">v{{ props.template.version }}</span>
+          <button
+            v-if="hasLicenseInfo"
+            ref="licenseTriggerRef"
+            @click.stop="isLicenseOpen = !isLicenseOpen"
+            class="ml-auto text-emerald-400/70 hover:text-emerald-300 transition-colors"
+            :title="`License: ${props.template.license || 'View details'}`"
+            aria-label="View license & credits"
+          >
+            <i class="ra ra-scroll-unfurled text-xs"></i>
+          </button>
+        </div>
       </div>
 
       <div v-if="teaser" class="tale-reveal hidden sm:grid">
@@ -204,27 +208,19 @@ function primaryAction(event: MouseEvent): void {
         <span class="truncate">Migrate adventure</span>
       </button>
 
-      <div v-else class="flex gap-2">
-        <button
-          class="tale-action flex-1 min-w-0 py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="props.isStartingSession"
-          @click="primaryAction"
-        >
-          <span v-for="b in bursts" :key="b.id" class="ink-burst" :style="{ '--burst-x': b.x, '--burst-y': b.y }"></span>
-          <i v-if="props.isStartingSession" class="ra ra-cycle animate-spin"></i>
-          <Play v-else class="w-3.5 h-3.5 fill-current" />
-          <span class="truncate">{{ props.isStartingThisTemplate ? 'Starting...' : (resumeGameId ? 'Continue' : 'Begin') }}</span>
-        </button>
-        <button
-          v-if="resumeGameId"
-          class="shrink-0 w-9 sm:w-11 rounded-xl border border-white/15 bg-slate-950/70 text-slate-300 hover:text-white hover:border-white/30 flex items-center justify-center transition-all disabled:opacity-50"
-          :disabled="props.isStartingSession"
-          title="Start a new journey"
-          aria-label="Start a new journey"
-          @click="emit('startSession', props.template.template_id)"
-        >
-          <i class="ra ra-quill-ink text-sm"></i>
-        </button>
+      <div v-else class="tale-hover-reveal grid">
+        <div>
+          <button
+            class="tale-action w-full min-w-0 py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="props.isStartingSession"
+            @click="primaryAction"
+          >
+            <span v-for="b in bursts" :key="b.id" class="ink-burst" :style="{ '--burst-x': b.x, '--burst-y': b.y }"></span>
+            <i v-if="props.isStartingSession" class="ra ra-cycle animate-spin"></i>
+            <Play v-else class="w-3.5 h-3.5 fill-current" />
+            <span class="truncate">{{ props.isStartingThisTemplate ? 'Starting...' : (resumeGameId ? 'Continue' : 'Begin') }}</span>
+          </button>
+        </div>
       </div>
     </div>
 

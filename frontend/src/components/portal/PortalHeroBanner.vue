@@ -70,7 +70,7 @@ const teaser = computed(() => (hero.value?.teaser || '').replace(/\\n/g, '\n'))
 <template>
   <section
     v-if="hero"
-    class="tale-enter relative overflow-hidden rounded-3xl min-h-[220px] sm:min-h-[300px] lg:min-h-[340px] flex items-end"
+    class="tale-enter relative overflow-hidden rounded-3xl min-h-[180px] sm:min-h-[220px] lg:min-h-[250px] flex items-end"
     :style="{ '--accent-rgb': accent.rgb, boxShadow: `0 0 0 1px rgb(251 191 36 / 0.16), 0 30px 60px -30px rgb(${accent.rgb} / 0.45)` }"
   >
     <img v-if="hero.imageUrl" :src="hero.imageUrl" alt="" class="hero-kenburns absolute inset-0 w-full h-full object-cover object-top" />
@@ -78,16 +78,16 @@ const teaser = computed(() => (hero.value?.teaser || '').replace(/\\n/g, '\n'))
     <div class="absolute inset-0 bg-gradient-to-t from-[#050b14] via-transparent to-transparent"></div>
     <div class="tale-card__frame absolute inset-0"><div class="tale-card__frame-bl"></div></div>
 
-    <div class="relative z-10 p-5 sm:p-8 lg:p-10 max-w-2xl space-y-3 sm:space-y-4">
+    <div class="relative z-10 p-4 sm:p-6 lg:p-7 max-w-2xl space-y-2 sm:space-y-3">
       <p class="tale-accent-text tale-legible text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em]">
         <i :class="['ra', hero.session ? 'ra-hourglass' : 'ra-castle-emblem']" class="mr-1.5"></i>
         {{ hero.session ? 'Continue your journey' : 'Featured tale' }}
       </p>
 
-      <h2 class="tale-title text-2xl sm:text-4xl lg:text-5xl text-white leading-tight">{{ hero.title }}</h2>
+      <h2 class="tale-title text-xl sm:text-3xl lg:text-4xl text-white leading-tight">{{ hero.title }}</h2>
 
       <div v-if="hero.session" class="flex flex-wrap items-center gap-3 sm:gap-5 text-xs text-slate-300">
-        <ProgressRing :value="hero.session.progress || 0" :size="44" />
+        <ProgressRing :value="hero.session.progress || 0" :size="36" />
         <span class="flex items-center gap-1.5">
           <i class="ra ra-hourglass text-slate-400"></i>Played {{ formatRelative(hero.session.last_played_at || hero.session.created_at) }}
         </span>
@@ -102,12 +102,12 @@ const teaser = computed(() => (hero.value?.teaser || '').replace(/\\n/g, '\n'))
         </span>
       </div>
 
-      <p v-else-if="teaser" class="font-narrative text-sm sm:text-base text-slate-300 leading-relaxed line-clamp-3 whitespace-pre-wrap">{{ teaser }}</p>
+      <p v-else-if="teaser" class="font-narrative text-sm sm:text-base text-slate-300 leading-relaxed line-clamp-2 whitespace-pre-wrap">{{ teaser }}</p>
 
       <div class="flex flex-wrap gap-2.5 pt-1">
         <button
           v-if="hero.session"
-          class="tale-action px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
+          class="tale-action px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all"
           :disabled="props.isStartingSession"
           @click="emit('resume', hero.session.game_id)"
         >
@@ -115,7 +115,7 @@ const teaser = computed(() => (hero.value?.teaser || '').replace(/\\n/g, '\n'))
         </button>
         <button
           v-if="hero.templateId"
-          class="px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all disabled:opacity-50"
+          class="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all disabled:opacity-50"
           :class="hero.session ? 'bg-white/5 border border-white/15 text-slate-200 hover:bg-white/10' : 'tale-action'"
           :disabled="props.isStartingSession"
           @click="emit('start-session', hero.templateId)"

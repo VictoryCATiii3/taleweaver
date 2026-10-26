@@ -18,10 +18,12 @@ from backend.api.routes.adventures.session_items import (
     backfill_item_from_entity,
     iter_avatar_items,
 )
+from backend.api.routes.adventures.session_sequence_label import active_sequence_title
 from backend.api.routes.adventures.session_starter import start_session
 from backend.core.auth import get_current_user
 from backend.core.config import settings
 from backend.core.database import get_db
+from backend.core.ui_theme import UI_SKIN_AUTO
 from backend.engine.adventure_updates import is_legacy_session
 from backend.engine.session_checkpoint_service import SessionCheckpointService
 from backend.engine.session_exporter import SessionExporter
@@ -110,6 +112,7 @@ async def list_sessions(
             ),
             scene_id=s.current_scene_id if s else "START",
             current_scene_name=scene_label or ("Exploring..." if s else "Archived"),
+            current_sequence_name=active_sequence_title(a, s),
             in_game_time=s.in_game_time if s else 0,
             is_ready=a.is_ready if a else True,
             creation_status=a.creation_status if a else "Ready",
@@ -690,6 +693,7 @@ async def update_session(
         payload.max_memory_turns,
         payload.enable_history_compression,
         payload.narration_style,
+        payload.ui_skin,
     )
     if any(value is not None for value in state_fields):
         state_res = await db.execute(select(SessionState).where(SessionState.session_id == game_id))
@@ -701,6 +705,8 @@ async def update_session(
                 session_state.enable_history_compression = payload.enable_history_compression
             if payload.narration_style is not None:
                 session_state.narration_style = payload.narration_style
+            if payload.ui_skin is not None:
+                session_state.ui_skin = None if payload.ui_skin == UI_SKIN_AUTO else payload.ui_skin
 
     await db.commit()
 

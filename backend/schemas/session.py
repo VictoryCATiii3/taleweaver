@@ -1,6 +1,8 @@
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from backend.core.ui_theme import UI_SKIN_AUTO, UI_SKINS
 
 
 class SessionStateBase(BaseModel):
@@ -56,6 +58,15 @@ class GameSessionUpdate(BaseModel):
     max_memory_turns: Optional[int] = None
     enable_history_compression: Optional[bool] = None
     narration_style: Optional[Literal["terse", "balanced", "rich", "epic"]] = None
+    # "auto" clears the choice so the adventure's own skin applies again
+    ui_skin: Optional[str] = None
+
+    @field_validator("ui_skin")
+    @classmethod
+    def validate_ui_skin(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == UI_SKIN_AUTO or v in UI_SKINS:
+            return v
+        raise ValueError(f"Unknown dialog skin: {v}")
 
 
 class GameSession(GameSessionBase):

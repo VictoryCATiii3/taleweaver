@@ -113,6 +113,11 @@ export function isSkinId(value: unknown): value is SkinId {
   return typeof value === 'string' && (SKIN_IDS as readonly string[]).includes(value)
 }
 
+/** Skin choice stored on the session; anything unknown (or missing) means "auto". */
+export function skinPreferenceOf(value: unknown): SkinPreference {
+  return isSkinId(value) ? value : 'auto'
+}
+
 export function findSkin(id: SkinId): SkinDefinition {
   return SKINS.find((skin) => skin.id === id) ?? SKINS[0]
 }
