@@ -479,6 +479,6 @@
   width: 2.75rem;
   height: 2.75rem;
   padding: 0;
-  /* Floats above the story, tabs and overlays. */
+  /* Floats above the story; travel and sequence overlays still cover it. */
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
 }

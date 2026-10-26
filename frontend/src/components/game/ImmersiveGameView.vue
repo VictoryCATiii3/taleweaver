@@ -314,7 +314,8 @@ defineExpose({
       <main class="flex-1 flex flex-col justify-between min-h-0 relative overflow-hidden">
         <!-- Full scene artwork (top-right corner of the story area) -->
         <!-- Wrapper owns the positioning: .tw-tab sets position: relative on the button itself. -->
-        <div v-if="activeSceneImageUrl" class="absolute right-0 top-0 z-[90]">
+        <!-- z-30 matches the story tabs; travel (z-40) and sequence (z-[70]) overlays must cover it. -->
+        <div v-if="activeSceneImageUrl" class="absolute right-0 top-0 z-30">
           <button
             type="button"
             class="tw-tab tw-scene-image-button"

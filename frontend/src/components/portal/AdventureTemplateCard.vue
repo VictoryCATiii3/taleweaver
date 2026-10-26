@@ -144,7 +144,9 @@ function primaryAction(event: MouseEvent): void {
         </div>
       </div>
 
+      <!-- Managing an adventure happens in the archive; the "In Progress" shelf only continues it. -->
       <AdventureCardMenu
+        v-if="!props.resumable"
         v-model:open="isMenuOpen"
         :needs-migration="needsMigration"
         :has-update="!!props.template.has_update"
