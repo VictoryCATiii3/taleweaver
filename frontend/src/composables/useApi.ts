@@ -89,6 +89,13 @@ interface SettingsResponse {
   tts_settings: Record<string, unknown>
 }
 
+export type SetupWizardState = 'pending' | 'skipped' | 'dismissed' | 'completed'
+
+export interface SetupWizardStatus {
+  state: SetupWizardState
+  visuals_opt_out: boolean
+}
+
 export interface GeneratorSurprisePresetPayload {
   available_tones?: string[]
   available_styles?: string[]
@@ -588,6 +595,16 @@ export const api = {
   /** Deletes an encrypted API key for a provider. */
   deleteApiKey(provider: string): Promise<{ status: string; message: string }> {
     return request(`/settings/keys/${provider}`, { method: 'DELETE' })
+  },
+
+  /** Reads the setup wizard state of the current admin. */
+  getSetupWizard(): Promise<SetupWizardStatus> {
+    return request('/settings/setup-wizard')
+  },
+
+  /** Merges the given fields into the setup wizard state of the current admin. */
+  updateSetupWizard(payload: Partial<SetupWizardStatus>): Promise<SetupWizardStatus> {
+    return request('/settings/setup-wizard', { method: 'PUT', body: JSON.stringify(payload) })
   },
 
   /** Retrieves settings; callers can skip dynamic model discovery for lightweight reads. */

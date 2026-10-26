@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { configState } from '@/store/config'
+import { isSetupWizardAvailable, openSetupWizard } from '@/store/setupWizard'
 
 defineProps<{
   activeSection?: string
@@ -25,8 +26,16 @@ defineProps<{
         </p>
       </div>
     </div>
-    <router-link to="/admin" class="px-6 py-3 rounded-xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-[0.2em] hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 whitespace-nowrap">
+    <button
+      v-if="isSetupWizardAvailable"
+      type="button"
+      class="px-6 py-3 rounded-xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-[0.2em] hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 whitespace-nowrap"
+      @click="openSetupWizard"
+    >
       Configure Now
-    </router-link>
+    </button>
+    <span v-else class="text-xs font-bold text-amber-400/80 uppercase tracking-widest whitespace-nowrap">
+      Ask an administrator
+    </span>
   </div>
 </template>

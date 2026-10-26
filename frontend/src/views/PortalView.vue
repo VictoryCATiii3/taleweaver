@@ -332,7 +332,8 @@ onMounted(() => {
 watch(
   () => configState.isLoaded,
   (loaded) => {
-    if (loaded && !hasCheckedSetup.value) {
+    // Admins get the setup assistant instead (SetupWizardModal).
+    if (loaded && !hasCheckedSetup.value && !isAdmin.value) {
       const isDismissed = localStorage.getItem('taleweaver_setup_warning_dismissed') === 'true'
       const needsLlm = !configState.hasLlmConfig
       const needsT2i = !configState.hasT2iConfig

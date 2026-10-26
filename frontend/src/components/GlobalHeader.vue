@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { authState, clearAuth } from '@/store/auth'
 import { configState } from '@/store/config'
 import ChangeCredentialsModal from '@/components/portal/ChangeCredentialsModal.vue'
+import SetupWizardNavButton from '@/components/setup-wizard/SetupWizardNavButton.vue'
 import { isMobileSidebarOpen, openMobileSidebar } from '@/store/layout'
 
 const router = useRouter()
@@ -76,7 +77,9 @@ function handleLogout() {
       </router-link>
     </div>
 
-    <!-- Right: User Profile -->
+    <!-- Right: Setup assistant + User Profile -->
+    <div class="flex items-center gap-3">
+      <SetupWizardNavButton />
     <div class="relative">
       <button 
         @click="toggleMenu"
@@ -138,6 +141,7 @@ function handleLogout() {
 
       <!-- Click Overlay to close dropdown -->
       <div v-if="isMenuOpen" @click="isMenuOpen = false" class="fixed inset-0 z-[-1]"></div>
+    </div>
     </div>
 
     <!-- Change Credentials Modal -->

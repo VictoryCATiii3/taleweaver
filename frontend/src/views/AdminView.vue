@@ -7,6 +7,7 @@ import { settingsService } from '@/services/settingsService'
 import { userService } from '@/services/userService'
 import { catalogService } from '@/services/catalogService'
 import { testService } from '@/services/testService'
+import { restartSetupWizard } from '@/store/setupWizard'
 
 const router = useRouter()
 
@@ -352,7 +353,16 @@ const navCategories: NavCategory[] = [
         </div>
       </nav>
 
-      <div class="mt-auto pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+      <button
+        type="button"
+        class="mt-4 w-full px-3 py-2.5 rounded-xl border border-slate-800 text-left text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/70 transition-all"
+        title="Walk through API keys, models, visuals and voice step by step"
+        @click="restartSetupWizard"
+      >
+        Setup assistant
+      </button>
+
+      <div class="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
         <span class="flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
           Online

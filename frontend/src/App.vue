@@ -6,6 +6,7 @@ import { configState, refreshConfig } from '@/store/config'
 import { api } from '@/composables/useApi'
 import { isPublicRoute } from '@/router'
 import GlobalHeader from '@/components/GlobalHeader.vue'
+import SetupWizardModal from '@/components/setup-wizard/SetupWizardModal.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -108,6 +109,7 @@ onUnmounted(() => {
     <main class="flex-1 min-h-0 relative overflow-hidden">
       <RouterView />
     </main>
+    <SetupWizardModal />
   </div>
 </template>
 

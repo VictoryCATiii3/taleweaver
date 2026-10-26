@@ -58,6 +58,9 @@ class User(Base, TimestampMixin):
     # General game preferences: {"clock_24h": false}
     game_settings: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
+    # Setup wizard progress, per user (not broadcast): {"state": "pending", "visuals_opt_out": false}
+    setup_wizard: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+
     # Award System: stores earned awards as a list of objects
     # [{"key": "...", "tier": "gold", "adventure_title": "...", "session_id": "...", "earned_at": "..."}]
     earned_awards: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)
