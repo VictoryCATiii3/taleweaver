@@ -93,7 +93,9 @@ class UserResponse(BaseModel):
 
 class SetupRootRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
-    password: str = Field(min_length=10, max_length=256)
+    # Length and complexity are checked by validate_password_strength, which honours
+    # STRICT_PASSWORD_POLICY; a fixed min_length here would reject relaxed passwords.
+    password: str = Field(max_length=256)
 
 
 class PasswordPolicy(BaseModel):
