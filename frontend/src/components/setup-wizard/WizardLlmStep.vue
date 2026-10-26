@@ -1,97 +1,102 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { settingsService } from '@/services/settingsService'
 import { testService } from '@/services/testService'
 import { configState } from '@/store/config'
-import WizardTestResult from './WizardTestResult.vue'
+import WizardModelPicker from './WizardModelPicker.vue'
 import { LLM_PRESETS, needsKey, resolvePreset, wizardStyles, type SetupMode } from './wizardPresets'
 
 const props = defineProps<{ mode: SetupMode }>()
 
-const TEST_KEY = 'wizard-llm'
-
 const llmForm = settingsService.llmForm
 const constants = settingsService.availableConstants
 const configuredKeys = computed(() => settingsService.configuredKeys.value)
+const providers = computed(() => constants.value.llm_providers)
+const models = computed(() => constants.value.predefined_llm_models)
 
-const provider = ref(initialProvider())
-const fastModel = ref('')
-const storyModel = ref('')
+const story = reactive({ provider: '', model: '' })
+const fast = reactive({ provider: '', model: '' })
 const ollamaUrl = ref(llmForm.value.ollama_url || 'http://localhost:11434')
 const errorMessage = ref('')
 
-const providers = computed(() => constants.value.llm_providers)
-const models = computed((): string[] => constants.value.predefined_llm_models[provider.value] ?? [])
-const providerNeedsKey = computed((): boolean => needsKey(provider.value, configuredKeys.value))
+const usesOllama = computed((): boolean => story.provider === 'ollama' || fast.provider === 'ollama')
 
-function initialProvider(): string {
-  if (configState.hasLlmConfig) {
-    return llmForm.value.complex_model_provider
-  }
+function defaultProvider(): string {
   if (props.mode === 'local') {
     return 'ollama'
   }
-  const withKey = settingsService.availableConstants.value.llm_providers.find(
-    (entry) => !needsKey(entry.id, settingsService.configuredKeys.value),
-  )
+  const withKey = providers.value.find((entry) => !needsKey(entry.id, configuredKeys.value))
   return withKey?.id ?? 'openai'
 }
 
-function applyPreset(): void {
-  const keepCurrent = configState.hasLlmConfig && llmForm.value.complex_model_provider === provider.value
-  if (keepCurrent) {
-    fastModel.value = llmForm.value.small_model
-    storyModel.value = llmForm.value.complex_model
+function storyPreset(provider: string): string {
+  return resolvePreset(LLM_PRESETS, provider, models.value[provider] ?? []).story
+}
+
+function fastPreset(provider: string): string {
+  return resolvePreset(LLM_PRESETS, provider, models.value[provider] ?? []).fast
+}
+
+function hydrate(): void {
+  if (configState.hasLlmConfig) {
+    Object.assign(story, { provider: llmForm.value.complex_model_provider, model: llmForm.value.complex_model })
+    Object.assign(fast, { provider: llmForm.value.small_model_provider, model: llmForm.value.small_model })
     return
   }
-  const preset = resolvePreset(LLM_PRESETS, provider.value, models.value)
-  fastModel.value = preset.fast
-  storyModel.value = preset.story
+  const provider = defaultProvider()
+  Object.assign(story, { provider, model: storyPreset(provider) })
+  Object.assign(fast, { provider, model: fastPreset(provider) })
 }
 
 async function refreshOllamaModels(): Promise<void> {
   await settingsService.fetchOllamaModels(ollamaUrl.value)
-  if (!models.value.includes(storyModel.value)) {
-    applyPreset()
-  }
 }
 
-function runTest(): void {
-  testService.testLlm(TEST_KEY, storyModel.value, provider.value, ollamaUrl.value)
+function runTest(key: string, role: { provider: string; model: string }): void {
+  testService.testLlm(key, role.model, role.provider, ollamaUrl.value)
+}
+
+/** The generator follows the story model unless an admin already picked a different one. */
+function generatorRole(): Record<string, string> {
+  const form = llmForm.value
+  const followsStory = !form.generator_model
+    || (form.generator_model === form.complex_model && form.generator_model_provider === form.complex_model_provider)
+  if (!followsStory) {
+    return {}
+  }
+  return { generator_model: story.model.trim(), generator_model_provider: story.provider }
 }
 
 /** Fills empty secondary roles with the fast model; existing custom choices are left alone. */
 function secondaryRoles(): Record<string, string> {
   const roles: Record<string, string> = {}
   if (!llmForm.value.play_agent_model) {
-    roles.play_agent_model = fastModel.value.trim()
-    roles.play_agent_model_provider = provider.value
+    roles.play_agent_model = fast.model.trim()
+    roles.play_agent_model_provider = fast.provider
   }
   if (!llmForm.value.compression_model) {
-    roles.compression_model = fastModel.value.trim()
-    roles.compression_model_provider = provider.value
+    roles.compression_model = fast.model.trim()
+    roles.compression_model_provider = fast.provider
   }
   return roles
 }
 
 async function save(): Promise<boolean> {
   errorMessage.value = ''
-  if (!fastModel.value.trim() || !storyModel.value.trim()) {
+  if (!fast.model.trim() || !story.model.trim()) {
     errorMessage.value = 'Choose both models, or skip this page.'
     return false
   }
-  const p = provider.value
   await settingsService.saveLlmSettings({
     ...llmForm.value,
-    small_model: fastModel.value.trim(),
-    small_model_provider: p,
-    complex_model: storyModel.value.trim(),
-    complex_model_provider: p,
-    generator_model: storyModel.value.trim(),
-    generator_model_provider: p,
+    ...generatorRole(),
     ...secondaryRoles(),
-    preferred_provider: p,
+    small_model: fast.model.trim(),
+    small_model_provider: fast.provider,
+    complex_model: story.model.trim(),
+    complex_model_provider: story.provider,
+    preferred_provider: story.provider,
     ollama_url: ollamaUrl.value,
   })
   if (settingsService.statusMessage.value?.type === 'error') {
@@ -101,12 +106,8 @@ async function save(): Promise<boolean> {
   return true
 }
 
-watch(provider, () => {
-  testService.clearResults(TEST_KEY)
-  applyPreset()
-})
-applyPreset()
-if (provider.value === 'ollama') {
+hydrate()
+if (usesOllama.value) {
   refreshOllamaModels()
 }
 
@@ -118,58 +119,49 @@ defineExpose({ save })
     <div>
       <h3 class="text-lg font-black text-white mb-2">Intelligence</h3>
       <p :class="wizardStyles.hint">
-        The Game Master uses a strong <span class="text-slate-300">story model</span> for narration
-        and world building, and a cheaper <span class="text-slate-300">fast model</span> for quick
-        checks. This is required to play.
+        The Game Master uses a strong model for narration and world building, and a cheaper fast model
+        for quick checks. They can come from different providers. This is required to play.
       </p>
     </div>
 
-    <div>
-      <label :class="wizardStyles.label" for="wizard-llm-provider">Provider</label>
-      <select id="wizard-llm-provider" v-model="provider" :class="wizardStyles.input">
-        <option v-for="entry in providers" :key="entry.id" :value="entry.id" class="bg-slate-900">
-          {{ entry.name }}{{ needsKey(entry.id, configuredKeys) ? ' — no API key' : '' }}
-        </option>
-      </select>
-      <p v-if="providerNeedsKey" class="mt-2 text-xs text-amber-400">
-        No API key for this provider yet. Go back one page to add it.
-      </p>
-    </div>
+    <WizardModelPicker
+      id="wizard-story"
+      v-model:provider="story.provider"
+      v-model:model="story.model"
+      label="Story model"
+      hint="Narration, world building, adventure generation."
+      :providers="providers"
+      :models="models"
+      :configured-keys="configuredKeys"
+      :preset-for="storyPreset"
+      test-key="wizard-llm-story"
+      test-label="Test connection"
+      @test="runTest('wizard-llm-story', story)"
+    />
 
-    <div v-if="provider === 'ollama'" class="flex items-end gap-3">
+    <WizardModelPicker
+      id="wizard-fast"
+      v-model:provider="fast.provider"
+      v-model:model="fast.model"
+      label="Fast model"
+      hint="Command parsing, quick checks, history compression."
+      :providers="providers"
+      :models="models"
+      :configured-keys="configuredKeys"
+      :preset-for="fastPreset"
+      test-key="wizard-llm-fast"
+      test-label="Test connection"
+      @test="runTest('wizard-llm-fast', fast)"
+    />
+
+    <div v-if="usesOllama" class="flex items-end gap-3">
       <div class="flex-1">
         <label :class="wizardStyles.label" for="wizard-ollama-url">Ollama URL</label>
         <input id="wizard-ollama-url" v-model="ollamaUrl" :class="wizardStyles.input" />
       </div>
-      <button type="button" :class="wizardStyles.secondaryButton" @click="refreshOllamaModels">
+      <button type="button" :class="wizardStyles.secondaryButton" title="Reload Ollama models" @click="refreshOllamaModels">
         <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': settingsService.isLoadingOllamaModels.value }" />
       </button>
-    </div>
-
-    <div class="grid sm:grid-cols-2 gap-4">
-      <div>
-        <label :class="wizardStyles.label" for="wizard-story-model">Story model</label>
-        <input id="wizard-story-model" v-model="storyModel" list="wizard-llm-models" :class="wizardStyles.input" />
-      </div>
-      <div>
-        <label :class="wizardStyles.label" for="wizard-fast-model">Fast model</label>
-        <input id="wizard-fast-model" v-model="fastModel" list="wizard-llm-models" :class="wizardStyles.input" />
-      </div>
-      <datalist id="wizard-llm-models">
-        <option v-for="model in models" :key="model" :value="model" />
-      </datalist>
-    </div>
-
-    <div class="flex flex-wrap items-center gap-4">
-      <button
-        type="button"
-        :class="wizardStyles.secondaryButton"
-        :disabled="!storyModel || providerNeedsKey"
-        @click="runTest"
-      >
-        Test connection
-      </button>
-      <WizardTestResult :test-key="TEST_KEY" />
     </div>
 
     <p v-if="errorMessage" :class="wizardStyles.error">{{ errorMessage }}</p>

@@ -1,84 +1,78 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { ImageOff, RefreshCw } from 'lucide-vue-next'
+import { computed, reactive, ref, watch } from 'vue'
+import { RefreshCw } from 'lucide-vue-next'
 import { settingsService } from '@/services/settingsService'
 import { testService } from '@/services/testService'
 import { configState } from '@/store/config'
 import { setVisualsOptOut, setupWizardState } from '@/store/setupWizard'
-import WizardTestResult from './WizardTestResult.vue'
+import WizardModelPicker from './WizardModelPicker.vue'
 import { IMAGE_PRESETS, needsKey, resolvePreset, wizardStyles, type SetupMode } from './wizardPresets'
 
 const props = defineProps<{ mode: SetupMode }>()
 
-const TEST_KEY = 'wizard-t2i'
-const NO_IMAGES = 'none'
-
 const t2iForm = settingsService.t2iForm
 const constants = settingsService.availableConstants
 const configuredKeys = computed(() => settingsService.configuredKeys.value)
+const providers = computed(() => constants.value.image_providers)
+const models = computed(() => constants.value.predefined_image_models)
 
-const provider = ref(initialProvider())
-const quickModel = ref('')
-const sceneModel = ref('')
+const noImages = ref(!configState.hasT2iConfig && setupWizardState.visualsOptOut)
+const scene = reactive({ provider: '', model: '' })
+const asset = reactive({ provider: '', model: '' })
 const ollamaUrl = ref(t2iForm.value.ollama_url || 'http://localhost:11434')
 const stableDiffusionUrl = ref(t2iForm.value.stable_diffusion_url || 'http://127.0.0.1:7860')
 const errorMessage = ref('')
 
-const providers = computed(() => constants.value.image_providers)
-const models = computed((): string[] => constants.value.predefined_image_models[provider.value] ?? [])
-const isDisabled = computed((): boolean => provider.value === NO_IMAGES)
-const providerNeedsKey = computed((): boolean => !isDisabled.value && needsKey(provider.value, configuredKeys.value))
+const usesProvider = (id: string): boolean => scene.provider === id || asset.provider === id
 
-function initialProvider(): string {
-  if (configState.hasT2iConfig) {
-    return t2iForm.value.advanced_model_provider
-  }
-  if (setupWizardState.visualsOptOut) {
-    return NO_IMAGES
-  }
+function defaultProvider(): string {
   if (props.mode === 'local') {
     return 'stable_diffusion'
   }
-  const withKey = settingsService.availableConstants.value.image_providers.find(
-    (entry) => !needsKey(entry.id, settingsService.configuredKeys.value),
-  )
+  const withKey = providers.value.find((entry) => !needsKey(entry.id, configuredKeys.value))
   return withKey?.id ?? 'openai'
 }
 
-function applyPreset(): void {
-  const keepCurrent = configState.hasT2iConfig && t2iForm.value.advanced_model_provider === provider.value
-  if (keepCurrent) {
-    quickModel.value = t2iForm.value.simple_model
-    sceneModel.value = t2iForm.value.advanced_model
-    return
-  }
-  const preset = resolvePreset(IMAGE_PRESETS, provider.value, models.value)
-  quickModel.value = preset.fast
-  sceneModel.value = preset.story
+function scenePreset(provider: string): string {
+  return resolvePreset(IMAGE_PRESETS, provider, models.value[provider] ?? []).story
 }
 
-function runTest(): void {
-  testService.testVision(TEST_KEY, sceneModel.value, provider.value, ollamaUrl.value, stableDiffusionUrl.value)
+function assetPreset(provider: string): string {
+  return resolvePreset(IMAGE_PRESETS, provider, models.value[provider] ?? []).fast
+}
+
+function hydrate(): void {
+  if (configState.hasT2iConfig) {
+    Object.assign(scene, { provider: t2iForm.value.advanced_model_provider, model: t2iForm.value.advanced_model })
+    Object.assign(asset, { provider: t2iForm.value.simple_model_provider, model: t2iForm.value.simple_model })
+    return
+  }
+  const provider = defaultProvider()
+  Object.assign(scene, { provider, model: scenePreset(provider) })
+  Object.assign(asset, { provider, model: assetPreset(provider) })
+}
+
+function runTest(key: string, role: { provider: string; model: string }): void {
+  testService.testVision(key, role.model, role.provider, ollamaUrl.value, stableDiffusionUrl.value)
 }
 
 async function save(): Promise<boolean> {
   errorMessage.value = ''
-  if (isDisabled.value) {
+  if (noImages.value) {
     await setVisualsOptOut(true)
     return true
   }
-  if (!quickModel.value.trim() || !sceneModel.value.trim()) {
-    errorMessage.value = 'Choose both models, pick "No images", or skip this page.'
+  if (!scene.model.trim() || !asset.model.trim()) {
+    errorMessage.value = 'Choose both models, turn images off, or skip this page.'
     return false
   }
-  const p = provider.value
   await settingsService.saveT2iSettings({
     ...t2iForm.value,
-    simple_model: quickModel.value.trim(),
-    simple_model_provider: p,
-    advanced_model: sceneModel.value.trim(),
-    advanced_model_provider: p,
-    provider: p,
+    simple_model: asset.model.trim(),
+    simple_model_provider: asset.provider,
+    advanced_model: scene.model.trim(),
+    advanced_model_provider: scene.provider,
+    provider: scene.provider,
     ollama_url: ollamaUrl.value,
     stable_diffusion_url: stableDiffusionUrl.value,
   })
@@ -90,11 +84,10 @@ async function save(): Promise<boolean> {
   return true
 }
 
-watch(provider, () => {
-  testService.clearResults(TEST_KEY)
-  applyPreset()
+watch(noImages, () => {
+  errorMessage.value = ''
 })
-applyPreset()
+hydrate()
 
 defineExpose({ save })
 </script>
@@ -104,44 +97,56 @@ defineExpose({ save })
     <div>
       <h3 class="text-lg font-black text-white mb-2">Visuals</h3>
       <p :class="wizardStyles.hint">
-        Images bring covers, scenes and characters to life. TaleWeaver also works text-only.
+        Images bring covers, scenes and characters to life. Scenes and quick assets can use different
+        providers. TaleWeaver also works text-only.
       </p>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      <button
-        v-for="entry in providers"
-        :key="entry.id"
-        type="button"
-        :class="[wizardStyles.option, provider === entry.id ? wizardStyles.optionActive : wizardStyles.optionIdle]"
-        @click="provider = entry.id"
-      >
-        <p class="text-xs font-black text-white">{{ entry.name }}</p>
-        <p v-if="needsKey(entry.id, configuredKeys)" class="text-[10px] text-amber-400 mt-1">No API key</p>
-      </button>
-      <button
-        type="button"
-        :class="[wizardStyles.option, isDisabled ? wizardStyles.optionActive : wizardStyles.optionIdle]"
-        @click="provider = NO_IMAGES"
-      >
-        <p class="flex items-center gap-2 text-xs font-black text-white"><ImageOff class="w-4 h-4" /> No images</p>
-      </button>
-    </div>
+    <label class="flex items-center gap-3 cursor-pointer select-none">
+      <input v-model="noImages" type="checkbox" class="w-4 h-4 accent-emerald-400" />
+      <span class="text-sm font-bold text-white">No images — play text-only</span>
+    </label>
 
-    <p v-if="isDisabled" :class="wizardStyles.hint">
+    <p v-if="noImages" :class="wizardStyles.hint">
       Adventures will be text-only. You can enable images later in the admin settings.
     </p>
 
     <template v-else>
-      <p v-if="providerNeedsKey" class="text-xs text-amber-400">
-        No API key for this provider yet. Go back to the API keys page to add it.
-      </p>
+      <WizardModelPicker
+        id="wizard-scene"
+        v-model:provider="scene.provider"
+        v-model:model="scene.model"
+        label="Scene model (detailed)"
+        hint="Covers, scenes, characters and protagonists."
+        :providers="providers"
+        :models="models"
+        :configured-keys="configuredKeys"
+        :preset-for="scenePreset"
+        test-key="wizard-t2i-scene"
+        test-label="Generate test image"
+        @test="runTest('wizard-t2i-scene', scene)"
+      />
 
-      <div v-if="provider === 'ollama'">
+      <WizardModelPicker
+        id="wizard-asset"
+        v-model:provider="asset.provider"
+        v-model:model="asset.model"
+        label="Asset model (quick)"
+        hint="Items and small assets."
+        :providers="providers"
+        :models="models"
+        :configured-keys="configuredKeys"
+        :preset-for="assetPreset"
+        test-key="wizard-t2i-asset"
+        test-label="Generate test image"
+        @test="runTest('wizard-t2i-asset', asset)"
+      />
+
+      <div v-if="usesProvider('ollama')">
         <label :class="wizardStyles.label" for="wizard-t2i-ollama">Ollama URL</label>
         <input id="wizard-t2i-ollama" v-model="ollamaUrl" :class="wizardStyles.input" />
       </div>
-      <div v-if="provider === 'stable_diffusion'" class="flex items-end gap-3">
+      <div v-if="usesProvider('stable_diffusion')" class="flex items-end gap-3">
         <div class="flex-1">
           <label :class="wizardStyles.label" for="wizard-sd-url">Stable Diffusion URL</label>
           <input id="wizard-sd-url" v-model="stableDiffusionUrl" :class="wizardStyles.input" />
@@ -149,36 +154,11 @@ defineExpose({ save })
         <button
           type="button"
           :class="wizardStyles.secondaryButton"
+          title="Reload Stable Diffusion models"
           @click="settingsService.fetchStableDiffusionModels(stableDiffusionUrl)"
         >
           <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': settingsService.isLoadingStableDiffusionModels.value }" />
         </button>
-      </div>
-
-      <div class="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label :class="wizardStyles.label" for="wizard-scene-model">Scene model (detailed)</label>
-          <input id="wizard-scene-model" v-model="sceneModel" list="wizard-image-models" :class="wizardStyles.input" />
-        </div>
-        <div>
-          <label :class="wizardStyles.label" for="wizard-quick-model">Asset model (quick)</label>
-          <input id="wizard-quick-model" v-model="quickModel" list="wizard-image-models" :class="wizardStyles.input" />
-        </div>
-        <datalist id="wizard-image-models">
-          <option v-for="model in models" :key="model" :value="model" />
-        </datalist>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-4">
-        <button
-          type="button"
-          :class="wizardStyles.secondaryButton"
-          :disabled="!sceneModel || providerNeedsKey"
-          @click="runTest"
-        >
-          Generate test image
-        </button>
-        <WizardTestResult :test-key="TEST_KEY" />
       </div>
     </template>
 
